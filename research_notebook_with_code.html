@@ -2825,17 +2825,26 @@ sys.stderr = sys.__stderr__
         async function generateThumbnail(url) {
             try {
                 // Check if it's a PDF
-                const isPdf = url.toLowerCase().endsWith('.pdf') || 
+                const isPdf = url.toLowerCase().endsWith('.pdf') ||
                               url.toLowerCase().includes('/pdf/') ||
                               url.toLowerCase().includes('arxiv.org/pdf');
-                
+
                 if (isPdf) {
                     return await generatePdfThumbnail(url);
                 }
-                
+
                 // For regular pages, use microlink
                 const encodedUrl = encodeURIComponent(url);
-                return `https://api.microlink.io/?url=${encodedUrl}&screenshot=true&meta=false&embed=screenshot.url`;
+                const apiUrl = `https://api.microlink.io/?url=${encodedUrl}&screenshot=true&meta=false`;
+                const response = await fetch(apiUrl);
+                const json = await response.json();
+
+                // Extract screenshot URL from the response
+                if (json.status === 'success' && json.data?.screenshot?.url) {
+                    return json.data.screenshot.url;
+                }
+
+                return null;
             } catch {
                 return null;
             }
@@ -2891,7 +2900,10 @@ sys.stderr = sys.__stderr__
                 console.log('PDF thumbnail failed, using fallback:', error.message);
                 // Fallback to microlink for PDFs that can't be loaded directly (CORS issues)
                 const encodedUrl = encodeURIComponent(url);
-                return `https://api.microlink.io/?url=${encodedUrl}&screenshot=true&meta=false&embed=screenshot.url`;
+                const apiUrl = `https://api.microlink.io/?url=${encodedUrl}&screenshot=true&meta=false`;
+                const response = await fetch(apiUrl);
+                const json = await response.json();
+                return json.status === 'success' && json.data?.screenshot?.url ? json.data.screenshot.url : null;
             }
         }
 
@@ -3131,7 +3143,7 @@ sys.stderr = sys.__stderr__
                         <button class="btn-icon-only" onclick="confirmDeleteItem('${sectionId}', '${bookmark.id}', 'bookmark')" title="Delete">×</button>
                     </div>
                     <div class="bookmark-thumbnail">
-                        ${bookmark.thumbnail ? 
+                        ${bookmark.thumbnail ?
                             `<img src="${bookmark.thumbnail}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'bookmark-thumbnail-placeholder\\'>🌐</div>'">` :
                             '<div class="bookmark-thumbnail-placeholder">🌐</div>'
                         }
