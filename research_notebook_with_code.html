@@ -1,0 +1,3008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Notebook</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Source+Sans+3:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Marked.js for markdown rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+    <!-- KaTeX for LaTeX rendering -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #f8f6f3;
+            --bg-secondary: #ffffff;
+            --bg-accent: #1a1a1a;
+            --text-primary: #1a1a1a;
+            --text-secondary: #5a5a5a;
+            --text-muted: #8a8a8a;
+            --border: #e0ddd8;
+            --border-dark: #c5c2bd;
+            --accent: #c45d3a;
+            --accent-hover: #a84d2e;
+            --shadow: rgba(26, 26, 26, 0.08);
+            --note-bg: #fffef9;
+            --note-border: #e8e4d9;
+            --link-color: #2563eb;
+            --link-hover: #1d4ed8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Source Sans 3', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        header {
+            background: var(--bg-accent);
+            color: var(--bg-primary);
+            padding: 2.5rem 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(196, 93, 58, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(196, 93, 58, 0.1) 0%, transparent 40%);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            font-weight: 400;
+            letter-spacing: 0.02em;
+            margin-bottom: 0.5rem;
+        }
+
+        .tagline {
+            font-weight: 300;
+            color: rgba(248, 246, 243, 0.7);
+            font-size: 1rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .toolbar {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-secondary);
+        }
+
+        .toolbar-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .toolbar-divider {
+            width: 1px;
+            background: var(--border);
+            margin: 0 0.5rem;
+        }
+
+        .btn {
+            font-family: 'Source Sans 3', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 500;
+            letter-spacing: 0.03em;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border-dark);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-primary);
+            border-color: var(--text-primary);
+        }
+
+        .btn-note {
+            background: var(--note-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--note-border);
+        }
+
+        .btn-note:hover {
+            background: #f5f3e8;
+            border-color: var(--accent);
+        }
+
+        .btn-code {
+            background: #f0f4f0;
+            color: var(--text-primary);
+            border: 1px solid #c8d4c8;
+        }
+
+        .btn-code:hover {
+            background: #e4ebe4;
+            border-color: #4a7c4a;
+        }
+
+        .btn-icon {
+            font-size: 1.1rem;
+        }
+
+        main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 6rem 2rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.3;
+        }
+
+        .empty-state h2 {
+            font-family: 'Playfair Display', serif;
+            font-weight: 400;
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .section {
+            margin-bottom: 3rem;
+            animation: fadeIn 0.4s ease;
+            position: relative;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--bg-accent);
+            position: relative;
+        }
+
+        .section-delete {
+            position: absolute;
+            left: -0.5rem;
+            top: -0.5rem;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            font-size: 0.75rem;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s;
+            color: var(--text-muted);
+        }
+
+        .section:hover .section-delete {
+            opacity: 1;
+        }
+
+        .section-delete:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.75rem;
+            font-weight: 400;
+            flex: 1;
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+        }
+
+        .section-title input {
+            font-family: inherit;
+            font-size: inherit;
+            font-weight: inherit;
+            border: none;
+            background: transparent;
+            outline: none;
+            padding: 0.25rem 0;
+            border-bottom: 2px solid transparent;
+        }
+
+        .section-title input:focus {
+            border-bottom-color: var(--accent);
+        }
+
+        .section-count {
+            font-family: 'Source Sans 3', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 400;
+            color: var(--text-muted);
+            margin-left: 0.75rem;
+        }
+
+        .section-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-small {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        .btn-danger {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .btn-danger:hover {
+            background: var(--accent);
+            color: white;
+        }
+
+        .items-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .items-grid.collapsed {
+            display: none;
+        }
+
+        .section-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            color: var(--text-muted);
+            transition: transform 0.3s ease;
+            padding: 0.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .section-toggle:hover {
+            color: var(--text-primary);
+        }
+
+        .section-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        /* Bookmark Card Styles */
+        .bookmark-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .bookmark-card:hover {
+            box-shadow: 0 8px 30px var(--shadow);
+            transform: translateY(-2px);
+        }
+
+        .bookmark-thumbnail {
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--border) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .bookmark-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center top;
+        }
+
+        .bookmark-thumbnail-placeholder {
+            font-size: 3rem;
+            color: var(--text-muted);
+            opacity: 0.3;
+        }
+
+        .bookmark-content {
+            padding: 1.25rem;
+        }
+
+        .bookmark-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .bookmark-title a {
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .bookmark-title a:hover {
+            color: var(--accent);
+        }
+
+        .bookmark-url {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .bookmark-description {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-actions {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            display: flex;
+            gap: 0.25rem;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10;
+        }
+
+        .bookmark-card:hover .card-actions,
+        .note-card:hover .card-actions {
+            opacity: 1;
+        }
+
+        .btn-icon-only {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-icon-only:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        /* Note Card Styles */
+        .note-card {
+            background: var(--note-bg);
+            border: 1px solid var(--note-border);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .note-card:hover {
+            box-shadow: 0 8px 30px var(--shadow);
+            transform: translateY(-2px);
+        }
+
+        .note-card.highlighted,
+        .bookmark-card.highlighted {
+            animation: highlightPulse 2s ease-out;
+        }
+
+        @keyframes highlightPulse {
+            0% { box-shadow: 0 0 0 4px var(--accent); }
+            100% { box-shadow: 0 8px 30px var(--shadow); }
+        }
+
+        .note-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--note-border);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .note-icon {
+            font-size: 1.25rem;
+            opacity: 0.6;
+        }
+
+        .note-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .note-preview {
+            padding: 1.25rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            max-height: 150px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .note-preview::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background: linear-gradient(transparent, var(--note-bg));
+            pointer-events: none;
+        }
+
+        .note-preview p {
+            margin-bottom: 0.5rem;
+        }
+
+        .note-preview h1, .note-preview h2, .note-preview h3 {
+            font-family: 'Playfair Display', serif;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .note-preview .internal-link {
+            position: relative;
+            z-index: 5;
+        }
+
+        .note-preview .katex {
+            font-size: 0.9em;
+        }
+
+        .note-meta {
+            padding: 0.75rem 1.25rem;
+            border-top: 1px solid var(--note-border);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Code Card Styles */
+        .code-card {
+            background: #f8faf8;
+            border: 1px solid #d0dcd0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .code-card:hover {
+            box-shadow: 0 8px 30px var(--shadow);
+            transform: translateY(-2px);
+        }
+
+        .code-card.highlighted {
+            animation: highlightPulse 2s ease-out;
+        }
+
+        .code-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid #d0dcd0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: #f0f4f0;
+        }
+
+        .code-icon {
+            font-size: 1.25rem;
+            opacity: 0.7;
+        }
+
+        .code-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .code-preview {
+            padding: 1rem 1.25rem;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            max-height: 120px;
+            overflow: hidden;
+            position: relative;
+            background: #fafcfa;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .code-preview::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background: linear-gradient(transparent, #fafcfa);
+            pointer-events: none;
+        }
+
+        .code-output-preview {
+            padding: 0.75rem 1.25rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            border-top: 1px dashed #d0dcd0;
+            background: #fff;
+            max-height: 60px;
+            overflow: hidden;
+        }
+
+        .code-output-preview:empty {
+            display: none;
+        }
+
+        .code-output-preview img {
+            max-height: 50px;
+            max-width: 100%;
+        }
+
+        .code-meta {
+            padding: 0.75rem 1.25rem;
+            border-top: 1px solid #d0dcd0;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            background: #f0f4f0;
+        }
+
+        /* Code Editor Modal */
+        .code-editor-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .code-editor {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            min-height: 200px;
+            padding: 1rem;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            resize: vertical;
+            tab-size: 4;
+        }
+
+        .code-editor:focus {
+            outline: none;
+            border-color: #4a7c4a;
+        }
+
+        .code-output {
+            min-height: 100px;
+            max-height: 400px;
+            overflow: auto;
+            padding: 1rem;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .code-output:empty::before {
+            content: 'Output will appear here...';
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .code-output pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .code-output .error {
+            color: #dc3545;
+        }
+
+        .code-output .stderr {
+            color: #856404;
+        }
+
+        .code-output img {
+            max-width: 100%;
+            margin: 0.5rem 0;
+        }
+
+        .code-output table {
+            border-collapse: collapse;
+            margin: 0.5rem 0;
+            font-size: 0.8rem;
+        }
+
+        .code-output table th,
+        .code-output table td {
+            border: 1px solid var(--border);
+            padding: 0.375rem 0.75rem;
+            text-align: left;
+        }
+
+        .code-output table th {
+            background: var(--bg-primary);
+            font-weight: 600;
+        }
+
+        .code-output table tr:nth-child(even) {
+            background: #fafafa;
+        }
+
+        .code-toolbar {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .btn-run {
+            background: #28a745;
+            color: white;
+            border: none;
+        }
+
+        .btn-run:hover {
+            background: #218838;
+        }
+
+        .btn-run:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .pyodide-status {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .pyodide-status.loading {
+            color: #856404;
+        }
+
+        .pyodide-status.ready {
+            color: #28a745;
+        }
+
+        .pyodide-status.error {
+            color: #dc3545;
+        }
+
+        .spinner-small {
+            width: 14px;
+            height: 14px;
+            border: 2px solid #ccc;
+            border-top-color: #856404;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* Code Viewer Modal */
+        .code-viewer {
+            background: #f8faf8;
+            border: 1px solid #d0dcd0;
+            max-width: 800px;
+        }
+
+        .code-viewer .modal-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid #d0dcd0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: #f0f4f0;
+        }
+
+        .code-viewer .modal-header h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            flex: 1;
+            margin: 0;
+        }
+
+        .code-viewer-content {
+            padding: 0;
+        }
+
+        .code-viewer-code {
+            padding: 1rem 1.25rem;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            max-height: 250px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .code-viewer-output {
+            padding: 1rem 1.25rem;
+            border-top: 1px solid #d0dcd0;
+            max-height: 300px;
+            overflow: auto;
+            background: #fff;
+        }
+
+        .code-viewer-output:empty {
+            display: none;
+        }
+
+        /* Internal Links */
+        .internal-link {
+            color: var(--link-color);
+            text-decoration: none;
+            border-bottom: 1px dashed var(--link-color);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .internal-link:hover {
+            color: var(--link-hover);
+            border-bottom-style: solid;
+        }
+
+        .internal-link.broken {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        /* Backlinks */
+        .backlinks {
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .backlinks-title {
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .backlinks-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .backlink-item {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .backlink-item:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(26, 26, 26, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.active .modal {
+            transform: translateY(0);
+        }
+
+        .modal-large {
+            max-width: 800px;
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-header h2 {
+            font-family: 'Playfair Display', serif;
+            font-weight: 400;
+            font-size: 1.5rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            font-family: 'Source Sans 3', sans-serif;
+            font-size: 1rem;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            transition: all 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: var(--bg-secondary);
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-group textarea.note-editor {
+            min-height: 300px;
+            font-family: 'Source Sans 3', sans-serif;
+            line-height: 1.6;
+        }
+
+        .form-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--bg-accent);
+            color: var(--bg-primary);
+            padding: 1rem 1.5rem;
+            font-size: 0.875rem;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 1001;
+        }
+
+        .toast.active {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* Note Viewer Modal - styled like a card */
+        .note-viewer {
+            background: var(--note-bg);
+            border: 1px solid var(--note-border);
+            max-width: 700px;
+        }
+
+        .note-viewer .modal-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--note-border);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .note-viewer .modal-header h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            flex: 1;
+            margin: 0;
+        }
+
+        .note-viewer-content {
+            padding: 1.25rem;
+            line-height: 1.7;
+            max-height: 60vh;
+            overflow-y: auto;
+            font-size: 0.925rem;
+            color: var(--text-secondary);
+        }
+
+        .note-viewer-content h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .note-viewer-content h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.25rem;
+            margin: 1.25rem 0 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .note-viewer-content h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.1rem;
+            margin: 1rem 0 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .note-viewer-content p {
+            margin-bottom: 0.875rem;
+        }
+
+        .note-viewer-content ul, .note-viewer-content ol {
+            margin: 0.875rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .note-viewer-content li {
+            margin-bottom: 0.375rem;
+        }
+
+        .note-viewer-content code {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: var(--bg-primary);
+            padding: 0.125rem 0.375rem;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        .note-viewer-content pre {
+            background: var(--bg-primary);
+            padding: 1rem;
+            overflow-x: auto;
+            margin: 0.875rem 0;
+            border-radius: 4px;
+        }
+
+        .note-viewer-content pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .note-viewer-content blockquote {
+            border-left: 3px solid var(--accent);
+            padding-left: 1rem;
+            margin: 0.875rem 0;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .note-viewer-content .katex-display {
+            margin: 1rem 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .note-viewer-content .katex {
+            font-size: 1.05em;
+        }
+
+        .note-viewer-meta {
+            padding: 0.75rem 1.25rem;
+            border-top: 1px solid var(--note-border);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .note-viewer-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .note-viewer-actions .btn-small {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        /* Bookmark Viewer Modal - styled like a card */
+        .bookmark-viewer {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            max-width: 500px;
+        }
+
+        .bookmark-viewer .modal-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .bookmark-viewer .modal-header h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            flex: 1;
+            margin: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .bookmark-viewer-content {
+            padding: 0;
+        }
+
+        .bookmark-viewer-thumbnail {
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--border) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .bookmark-viewer-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center top;
+        }
+
+        .bookmark-viewer-thumbnail .placeholder {
+            font-size: 3rem;
+            color: var(--text-muted);
+            opacity: 0.3;
+        }
+
+        .bookmark-viewer-url {
+            padding: 1rem 1.25rem 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .bookmark-viewer-url a {
+            color: var(--link-color);
+            text-decoration: none;
+        }
+
+        .bookmark-viewer-url a:hover {
+            text-decoration: underline;
+        }
+
+        .bookmark-viewer-description {
+            padding: 0.5rem 1.25rem 1rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .bookmark-viewer-description:empty {
+            display: none;
+        }
+
+        #bookmarkViewerBacklinks {
+            padding: 0 1.25rem 1rem;
+        }
+
+        #bookmarkViewerBacklinks:empty {
+            display: none;
+        }
+
+        /* Tab switcher for note editor */
+        .editor-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1rem;
+        }
+
+        .editor-tab {
+            padding: 0.5rem 1rem;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .editor-tab:hover {
+            color: var(--text-primary);
+        }
+
+        .editor-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .editor-preview {
+            display: none;
+            padding: 1rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            min-height: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            line-height: 1.7;
+        }
+
+        .editor-preview.active {
+            display: block;
+        }
+
+        .editor-preview h1, .editor-preview h2, .editor-preview h3 {
+            font-family: 'Playfair Display', serif;
+        }
+
+        .editor-preview p {
+            margin-bottom: 1rem;
+        }
+
+        .editor-preview .katex-display {
+            margin: 1rem 0;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                padding: 1.5rem 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .toolbar {
+                padding: 1rem;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            .items-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>Research Notebook</h1>
+            <p class="tagline">Bookmarks, notes, and connections</p>
+        </div>
+    </header>
+
+    <div class="toolbar">
+        <div class="toolbar-group">
+            <button class="btn btn-primary" onclick="openSectionModal()">
+                <span class="btn-icon">+</span> New Section
+            </button>
+            <button class="btn btn-note" onclick="openNoteModal()">
+                <span class="btn-icon">📝</span> New Note
+            </button>
+            <button class="btn btn-code" onclick="openCodeModal()">
+                <span class="btn-icon">🐍</span> New Code
+            </button>
+        </div>
+        <div class="toolbar-divider"></div>
+        <div class="toolbar-group">
+            <button class="btn btn-secondary" onclick="exportData()">
+                <span class="btn-icon">↓</span> Export
+            </button>
+            <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">
+                <span class="btn-icon">↑</span> Import
+            </button>
+            <input type="file" id="importFile" accept=".json" style="display: none" onchange="importData(event)">
+        </div>
+    </div>
+
+    <main id="content">
+        <div class="empty-state">
+            <div class="empty-state-icon">📚</div>
+            <h2>Your research notebook awaits</h2>
+            <p>Create a section to start organizing your bookmarks and notes</p>
+        </div>
+    </main>
+
+    <!-- Section Modal -->
+    <div class="modal-overlay" id="sectionModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>New Section</h2>
+                <button class="modal-close" onclick="closeSectionModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="sectionName">Section Name</label>
+                    <input type="text" id="sectionName" placeholder="e.g., Machine Learning Papers">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeSectionModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="createSection()">Create Section</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bookmark Modal -->
+    <div class="modal-overlay" id="bookmarkModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="bookmarkModalTitle">Add Bookmark</h2>
+                <button class="modal-close" onclick="closeBookmarkModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="bookmarkSection">Section</label>
+                    <select id="bookmarkSection"></select>
+                </div>
+                <div class="form-group">
+                    <label for="bookmarkUrl">URL</label>
+                    <input type="url" id="bookmarkUrl" placeholder="https://example.com">
+                </div>
+                <div class="form-group">
+                    <label for="bookmarkTitle">Title (optional)</label>
+                    <input type="text" id="bookmarkTitle" placeholder="Page title">
+                </div>
+                <div class="form-group">
+                    <label for="bookmarkDescription">Description (optional)</label>
+                    <textarea id="bookmarkDescription" placeholder="A brief description of this bookmark..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeBookmarkModal()">Cancel</button>
+                <button class="btn btn-primary" id="bookmarkSubmitBtn" onclick="saveBookmark()">
+                    Add Bookmark
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Note Modal (Editor) -->
+    <div class="modal-overlay" id="noteModal">
+        <div class="modal modal-large">
+            <div class="modal-header">
+                <h2 id="noteModalTitle">New Note</h2>
+                <button class="modal-close" onclick="closeNoteModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="noteSection">Section</label>
+                    <select id="noteSection"></select>
+                </div>
+                <div class="form-group">
+                    <label for="noteTitle">Title</label>
+                    <input type="text" id="noteTitle" placeholder="Note title">
+                </div>
+                <div class="form-group">
+                    <label>Content</label>
+                    <div class="editor-tabs">
+                        <button class="editor-tab active" onclick="switchEditorTab('write')">Write</button>
+                        <button class="editor-tab" onclick="switchEditorTab('preview')">Preview</button>
+                    </div>
+                    <textarea id="noteContent" class="note-editor" placeholder="Write your note in Markdown...
+
+Use [[Title]] to link to other notes or bookmarks.
+Use $x^2$ for inline math, $$E=mc^2$$ for display math."></textarea>
+                    <div id="notePreview" class="editor-preview"></div>
+                    <p class="form-hint">Supports Markdown and LaTeX ($inline$, $$display$$). Link with [[Title]] or [[id:xyz]]</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeNoteModal()">Cancel</button>
+                <button class="btn btn-primary" id="noteSubmitBtn" onclick="saveNote()">Save Note</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Note Viewer Modal -->
+    <div class="modal-overlay" id="noteViewerModal">
+        <div class="modal note-viewer">
+            <div class="modal-header">
+                <span class="note-icon">📝</span>
+                <h2 id="noteViewerTitle">Note</h2>
+                <button class="modal-close" onclick="closeNoteViewer()">×</button>
+            </div>
+            <div class="note-viewer-content" id="noteViewerContent"></div>
+            <div class="note-viewer-meta">
+                <span id="noteViewerMeta"></span>
+                <div class="note-viewer-actions">
+                    <button class="btn btn-secondary btn-small" onclick="editCurrentNote()">✎ Edit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bookmark Viewer Modal -->
+    <div class="modal-overlay" id="bookmarkViewerModal">
+        <div class="modal bookmark-viewer">
+            <div class="modal-header">
+                <span class="note-icon">🔗</span>
+                <h2 id="bookmarkViewerTitle">Bookmark</h2>
+                <button class="modal-close" onclick="closeBookmarkViewer()">×</button>
+            </div>
+            <div class="bookmark-viewer-content">
+                <div class="bookmark-viewer-thumbnail" id="bookmarkViewerThumbnail"></div>
+                <div class="bookmark-viewer-url" id="bookmarkViewerUrl"></div>
+                <div class="bookmark-viewer-description" id="bookmarkViewerDescription"></div>
+                <div id="bookmarkViewerBacklinks"></div>
+            </div>
+            <div class="note-viewer-meta">
+                <span id="bookmarkViewerMeta"></span>
+                <div class="note-viewer-actions">
+                    <a id="bookmarkViewerLink" href="#" target="_blank" class="btn btn-primary btn-small">Open ↗</a>
+                    <button class="btn btn-secondary btn-small" onclick="editCurrentBookmark()">✎ Edit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Code Editor Modal -->
+    <div class="modal-overlay" id="codeModal">
+        <div class="modal modal-large">
+            <div class="modal-header">
+                <h2 id="codeModalTitle">New Code Note</h2>
+                <button class="modal-close" onclick="closeCodeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="codeSection">Section</label>
+                    <select id="codeSection"></select>
+                </div>
+                <div class="form-group">
+                    <label for="codeTitle">Title</label>
+                    <input type="text" id="codeTitle" placeholder="Code note title">
+                </div>
+                <div class="form-group">
+                    <label>Python Code</label>
+                    <div class="code-toolbar">
+                        <button class="btn btn-run btn-small" id="runCodeBtn" onclick="runCode()">
+                            ▶ Run
+                        </button>
+                        <span class="pyodide-status" id="pyodideStatus"></span>
+                    </div>
+                    <textarea id="codeContent" class="code-editor" placeholder="# Write Python code here
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+print('Hello, World!')" spellcheck="false"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Output</label>
+                    <div class="code-output" id="codeOutput"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeCodeModal()">Cancel</button>
+                <button class="btn btn-primary" id="codeSubmitBtn" onclick="saveCode()">Save Code Note</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Code Viewer Modal -->
+    <div class="modal-overlay" id="codeViewerModal">
+        <div class="modal code-viewer">
+            <div class="modal-header">
+                <span class="code-icon">🐍</span>
+                <h2 id="codeViewerTitle">Code</h2>
+                <button class="modal-close" onclick="closeCodeViewer()">×</button>
+            </div>
+            <div class="code-viewer-content">
+                <div class="code-viewer-code" id="codeViewerCode"></div>
+                <div class="code-viewer-output" id="codeViewerOutput"></div>
+                <div id="codeViewerBacklinks" style="padding: 0 1.25rem 1rem;"></div>
+            </div>
+            <div class="note-viewer-meta">
+                <span id="codeViewerMeta"></span>
+                <div class="note-viewer-actions">
+                    <button class="btn btn-run btn-small" onclick="runCurrentCode()">▶ Run</button>
+                    <button class="btn btn-secondary btn-small" onclick="editCurrentCode()">✎ Edit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Data structure
+        let data = {
+            sections: [],
+            // Notes are stored in sections alongside bookmarks
+            // Each item has a 'type' field: 'bookmark', 'note', or 'code'
+        };
+
+        // Track collapsed sections (not persisted)
+        let collapsedSections = new Set();
+
+        let editingBookmark = null;
+        let editingNote = null;
+        let editingCode = null;
+        let currentViewingNote = null;
+        let currentViewingCode = null;
+
+        // Pyodide state
+        let pyodide = null;
+        let pyodideLoading = false;
+        let pyodideReady = false;
+
+        // Configure marked for safe rendering
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+
+        // Load data from localStorage
+        function loadData() {
+            const saved = localStorage.getItem('researchNotebook');
+            if (saved) {
+                data = JSON.parse(saved);
+                // Migration: ensure all items have correct type
+                data.sections.forEach(section => {
+                    // Handle old format with 'bookmarks' array
+                    if (section.bookmarks) {
+                        section.items = section.bookmarks.map(b => ({
+                            ...b,
+                            type: b.type || 'bookmark'
+                        }));
+                        delete section.bookmarks;
+                    }
+                    if (!section.items) {
+                        section.items = [];
+                    }
+                    // Fix types for all items - infer from structure if missing/wrong
+                    section.items = section.items.map(item => {
+                        // Determine correct type based on item structure
+                        // Code notes have 'code' field, notes have 'content' field, bookmarks have 'url' field
+                        let correctType;
+                        if (item.code !== undefined) {
+                            correctType = 'code';
+                        } else if (item.url && !item.content) {
+                            correctType = 'bookmark';
+                        } else if (item.content !== undefined && !item.url) {
+                            correctType = 'note';
+                        } else {
+                            // Fall back to existing type or 'bookmark'
+                            correctType = item.type || 'bookmark';
+                        }
+                        return { ...item, type: correctType };
+                    });
+                });
+                saveData(); // Save the fixed data
+            }
+            // Also try to migrate from old bookmark manager
+            if (data.sections.length === 0) {
+                const oldData = localStorage.getItem('bookmarkCurator');
+                if (oldData) {
+                    const parsed = JSON.parse(oldData);
+                    if (parsed.sections) {
+                        data.sections = parsed.sections.map(section => ({
+                            ...section,
+                            items: (section.bookmarks || []).map(b => ({
+                                ...b,
+                                type: 'bookmark'
+                            }))
+                        }));
+                        saveData();
+                        showToast('Migrated data from Bookmark Curator');
+                    }
+                }
+            }
+            render();
+        }
+
+        // Save data to localStorage
+        function saveData() {
+            localStorage.setItem('researchNotebook', JSON.stringify(data));
+        }
+
+        // Show toast notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('active');
+            setTimeout(() => toast.classList.remove('active'), 3000);
+        }
+
+        // Section Modal
+        function openSectionModal() {
+            document.getElementById('sectionModal').classList.add('active');
+            document.getElementById('sectionName').focus();
+        }
+
+        function closeSectionModal() {
+            document.getElementById('sectionModal').classList.remove('active');
+            document.getElementById('sectionName').value = '';
+        }
+
+        function createSection() {
+            const name = document.getElementById('sectionName').value.trim();
+            if (!name) {
+                showToast('Please enter a section name');
+                return;
+            }
+
+            data.sections.push({
+                id: Date.now().toString(),
+                name: name,
+                items: []
+            });
+
+            saveData();
+            render();
+            closeSectionModal();
+            showToast('Section created');
+        }
+
+        // Bookmark Modal
+        function openBookmarkModal(sectionId = null, bookmark = null) {
+            editingBookmark = bookmark ? { ...bookmark, sectionId } : null;
+            
+            const select = document.getElementById('bookmarkSection');
+            select.innerHTML = data.sections.map(s => 
+                `<option value="${s.id}" ${s.id === sectionId ? 'selected' : ''}>${s.name}</option>`
+            ).join('');
+
+            if (data.sections.length === 0) {
+                showToast('Create a section first');
+                return;
+            }
+
+            document.getElementById('bookmarkModalTitle').textContent = bookmark ? 'Edit Bookmark' : 'Add Bookmark';
+            document.getElementById('bookmarkSubmitBtn').textContent = bookmark ? 'Save Changes' : 'Add Bookmark';
+            
+            document.getElementById('bookmarkUrl').value = bookmark?.url || '';
+            document.getElementById('bookmarkTitle').value = bookmark?.title || '';
+            document.getElementById('bookmarkDescription').value = bookmark?.description || '';
+
+            document.getElementById('bookmarkModal').classList.add('active');
+            document.getElementById('bookmarkUrl').focus();
+        }
+
+        function closeBookmarkModal() {
+            document.getElementById('bookmarkModal').classList.remove('active');
+            document.getElementById('bookmarkUrl').value = '';
+            document.getElementById('bookmarkTitle').value = '';
+            document.getElementById('bookmarkDescription').value = '';
+            editingBookmark = null;
+        }
+
+        async function saveBookmark() {
+            const sectionId = document.getElementById('bookmarkSection').value;
+            const url = document.getElementById('bookmarkUrl').value.trim();
+            const title = document.getElementById('bookmarkTitle').value.trim();
+            const description = document.getElementById('bookmarkDescription').value.trim();
+
+            if (!url) {
+                showToast('Please enter a URL');
+                return;
+            }
+
+            // Validate URL
+            try {
+                new URL(url);
+            } catch {
+                showToast('Please enter a valid URL');
+                return;
+            }
+
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return;
+
+            const btn = document.getElementById('bookmarkSubmitBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="loading-spinner"></span> Saving...';
+            btn.disabled = true;
+
+            // Generate thumbnail
+            const thumbnail = await generateThumbnail(url);
+
+            const bookmarkData = {
+                id: editingBookmark?.id || Date.now().toString(),
+                type: 'bookmark',
+                url,
+                title: title || extractDomain(url),
+                description,
+                thumbnail,
+                createdAt: editingBookmark?.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+
+            if (editingBookmark) {
+                // If section changed, move bookmark
+                if (editingBookmark.sectionId !== sectionId) {
+                    const oldSection = data.sections.find(s => s.id === editingBookmark.sectionId);
+                    if (oldSection) {
+                        oldSection.items = oldSection.items.filter(b => b.id !== editingBookmark.id);
+                    }
+                    section.items.push(bookmarkData);
+                } else {
+                    const index = section.items.findIndex(b => b.id === editingBookmark.id);
+                    if (index !== -1) {
+                        section.items[index] = bookmarkData;
+                    }
+                }
+            } else {
+                section.items.push(bookmarkData);
+            }
+
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+
+            saveData();
+            render();
+            closeBookmarkModal();
+            showToast(editingBookmark ? 'Bookmark updated' : 'Bookmark added');
+        }
+
+        // Note Modal
+        function openNoteModal(sectionId = null, note = null) {
+            editingNote = note ? { ...note, sectionId } : null;
+            
+            const select = document.getElementById('noteSection');
+            select.innerHTML = data.sections.map(s => 
+                `<option value="${s.id}" ${s.id === sectionId ? 'selected' : ''}>${s.name}</option>`
+            ).join('');
+
+            if (data.sections.length === 0) {
+                showToast('Create a section first');
+                return;
+            }
+
+            document.getElementById('noteModalTitle').textContent = note ? 'Edit Note' : 'New Note';
+            document.getElementById('noteSubmitBtn').textContent = note ? 'Save Changes' : 'Save Note';
+            
+            document.getElementById('noteTitle').value = note?.title || '';
+            document.getElementById('noteContent').value = note?.content || '';
+            
+            // Reset to write tab
+            switchEditorTab('write');
+
+            document.getElementById('noteModal').classList.add('active');
+            document.getElementById('noteTitle').focus();
+        }
+
+        function closeNoteModal() {
+            document.getElementById('noteModal').classList.remove('active');
+            document.getElementById('noteTitle').value = '';
+            document.getElementById('noteContent').value = '';
+            editingNote = null;
+        }
+
+        function switchEditorTab(tab) {
+            const writeTab = document.querySelector('.editor-tab:first-child');
+            const previewTab = document.querySelector('.editor-tab:last-child');
+            const textarea = document.getElementById('noteContent');
+            const preview = document.getElementById('notePreview');
+
+            if (tab === 'write') {
+                writeTab.classList.add('active');
+                previewTab.classList.remove('active');
+                textarea.style.display = 'block';
+                preview.classList.remove('active');
+            } else {
+                writeTab.classList.remove('active');
+                previewTab.classList.add('active');
+                textarea.style.display = 'none';
+                preview.classList.add('active');
+                preview.innerHTML = renderMarkdownWithLinks(textarea.value);
+            }
+        }
+
+        function saveNote() {
+            const sectionId = document.getElementById('noteSection').value;
+            const title = document.getElementById('noteTitle').value.trim();
+            const content = document.getElementById('noteContent').value.trim();
+
+            if (!title) {
+                showToast('Please enter a title');
+                return;
+            }
+
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return;
+
+            const noteData = {
+                id: editingNote?.id || Date.now().toString(),
+                type: 'note',
+                title,
+                content,
+                createdAt: editingNote?.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+
+            if (editingNote) {
+                // If section changed, move note
+                if (editingNote.sectionId !== sectionId) {
+                    const oldSection = data.sections.find(s => s.id === editingNote.sectionId);
+                    if (oldSection) {
+                        oldSection.items = oldSection.items.filter(n => n.id !== editingNote.id);
+                    }
+                    section.items.push(noteData);
+                } else {
+                    const index = section.items.findIndex(n => n.id === editingNote.id);
+                    if (index !== -1) {
+                        section.items[index] = noteData;
+                    }
+                }
+            } else {
+                section.items.push(noteData);
+            }
+
+            saveData();
+            render();
+            closeNoteModal();
+            showToast(editingNote ? 'Note updated' : 'Note created');
+        }
+
+        // Note Viewer
+        function openNoteViewer(sectionId, noteId) {
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return;
+            
+            const note = section.items.find(n => n.id === noteId);
+            if (!note) return;
+
+            currentViewingNote = { ...note, sectionId };
+
+            document.getElementById('noteViewerTitle').textContent = note.title;
+            
+            let content = renderMarkdownWithLinks(note.content);
+            
+            // Add backlinks
+            const backlinks = findBacklinks(noteId);
+            if (backlinks.length > 0) {
+                content += `
+                    <div class="backlinks">
+                        <div class="backlinks-title">Linked from</div>
+                        <div class="backlinks-list">
+                            ${backlinks.map(bl => `
+                                <span class="backlink-item internal-link" data-link-section="${bl.sectionId}" data-link-item="${bl.id}">${escapeHtml(bl.title)}</span>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('noteViewerContent').innerHTML = content;
+            
+            // Set meta info
+            let metaText = formatDate(note.createdAt);
+            if (note.updatedAt && note.updatedAt !== note.createdAt) {
+                metaText += ` · Updated ${formatDate(note.updatedAt)}`;
+            }
+            document.getElementById('noteViewerMeta').textContent = metaText;
+            
+            document.getElementById('noteViewerModal').classList.add('active');
+        }
+
+        function closeNoteViewer() {
+            document.getElementById('noteViewerModal').classList.remove('active');
+            currentViewingNote = null;
+        }
+
+        function editCurrentNote() {
+            if (!currentViewingNote) return;
+            const sectionId = currentViewingNote.sectionId;
+            const note = { ...currentViewingNote };
+            closeNoteViewer();
+            openNoteModal(sectionId, note);
+        }
+
+        // Bookmark Viewer
+        let currentViewingBookmark = null;
+
+        function openBookmarkViewer(sectionId, bookmarkId) {
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return;
+            
+            const bookmark = section.items.find(b => b.id === bookmarkId);
+            if (!bookmark) return;
+
+            currentViewingBookmark = { ...bookmark, sectionId };
+
+            document.getElementById('bookmarkViewerTitle').textContent = bookmark.title;
+            
+            // Set thumbnail
+            const thumbnailEl = document.getElementById('bookmarkViewerThumbnail');
+            if (bookmark.thumbnail) {
+                thumbnailEl.innerHTML = `<img src="${bookmark.thumbnail}" alt="" onerror="this.parentElement.innerHTML='<div class=\\'placeholder\\'>🔗</div>'">`;
+            } else {
+                thumbnailEl.innerHTML = '<div class="placeholder">🔗</div>';
+            }
+            
+            // Set URL
+            document.getElementById('bookmarkViewerUrl').innerHTML = `<a href="${escapeHtml(bookmark.url)}" target="_blank">${escapeHtml(bookmark.url)}</a>`;
+            
+            // Set description
+            const descEl = document.getElementById('bookmarkViewerDescription');
+            descEl.textContent = bookmark.description || '';
+            
+            // Set link button
+            document.getElementById('bookmarkViewerLink').href = bookmark.url;
+            
+            // Add backlinks
+            const backlinks = findBacklinks(bookmarkId);
+            const backlinksEl = document.getElementById('bookmarkViewerBacklinks');
+            if (backlinks.length > 0) {
+                backlinksEl.innerHTML = `
+                    <div class="backlinks">
+                        <div class="backlinks-title">Linked from</div>
+                        <div class="backlinks-list">
+                            ${backlinks.map(bl => `
+                                <span class="backlink-item internal-link" data-link-section="${bl.sectionId}" data-link-item="${bl.id}">${escapeHtml(bl.title)}</span>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                backlinksEl.innerHTML = '';
+            }
+            
+            // Set meta info
+            let metaText = formatDate(bookmark.createdAt);
+            if (bookmark.updatedAt && bookmark.updatedAt !== bookmark.createdAt) {
+                metaText += ` · Updated ${formatDate(bookmark.updatedAt)}`;
+            }
+            document.getElementById('bookmarkViewerMeta').textContent = metaText;
+            
+            document.getElementById('bookmarkViewerModal').classList.add('active');
+        }
+
+        function closeBookmarkViewer() {
+            document.getElementById('bookmarkViewerModal').classList.remove('active');
+            currentViewingBookmark = null;
+        }
+
+        function editCurrentBookmark() {
+            if (!currentViewingBookmark) return;
+            const sectionId = currentViewingBookmark.sectionId;
+            const bookmark = { ...currentViewingBookmark };
+            closeBookmarkViewer();
+            openBookmarkModal(sectionId, bookmark);
+        }
+
+        // ============ Pyodide / Code Notes ============
+
+        // Load Pyodide lazily
+        async function loadPyodide() {
+            if (pyodideReady) return pyodide;
+            if (pyodideLoading) {
+                // Wait for existing load to complete
+                while (pyodideLoading) {
+                    await new Promise(r => setTimeout(r, 100));
+                }
+                return pyodide;
+            }
+
+            pyodideLoading = true;
+            updatePyodideStatus('loading', 'Loading Python...');
+
+            try {
+                // Load Pyodide script dynamically
+                if (!window.loadPyodide) {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                }
+
+                pyodide = await window.loadPyodide({
+                    indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/'
+                });
+
+                // Load common packages
+                updatePyodideStatus('loading', 'Loading packages...');
+                await pyodide.loadPackage(['numpy', 'pandas', 'matplotlib']);
+
+                // Set up matplotlib for inline display
+                await pyodide.runPythonAsync(`
+import matplotlib
+matplotlib.use('AGG')
+import matplotlib.pyplot as plt
+import io
+import base64
+
+def _get_plot_as_base64():
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    plt.close('all')
+    return img_base64
+                `);
+
+                pyodideReady = true;
+                pyodideLoading = false;
+                updatePyodideStatus('ready', 'Python ready');
+                return pyodide;
+            } catch (error) {
+                pyodideLoading = false;
+                updatePyodideStatus('error', 'Failed to load Python');
+                throw error;
+            }
+        }
+
+        function updatePyodideStatus(state, message) {
+            const statusEl = document.getElementById('pyodideStatus');
+            if (!statusEl) return;
+            
+            statusEl.className = 'pyodide-status ' + state;
+            if (state === 'loading') {
+                statusEl.innerHTML = `<span class="spinner-small"></span> ${message}`;
+            } else {
+                statusEl.textContent = message;
+            }
+        }
+
+        // Run Python code
+        async function runCode() {
+            const code = document.getElementById('codeContent').value;
+            const outputEl = document.getElementById('codeOutput');
+            const runBtn = document.getElementById('runCodeBtn');
+
+            if (!code.trim()) {
+                outputEl.innerHTML = '<span class="error">No code to run</span>';
+                return;
+            }
+
+            runBtn.disabled = true;
+            runBtn.textContent = '⏳ Running...';
+            outputEl.innerHTML = '<span style="color: var(--text-muted);">Running...</span>';
+
+            try {
+                const py = await loadPyodide();
+                const result = await executePythonCode(py, code);
+                outputEl.innerHTML = result;
+            } catch (error) {
+                outputEl.innerHTML = `<pre class="error">${escapeHtml(error.toString())}</pre>`;
+            } finally {
+                runBtn.disabled = false;
+                runBtn.textContent = '▶ Run';
+            }
+        }
+
+        async function executePythonCode(py, code) {
+            let output = '';
+            
+            // Capture stdout
+            await py.runPythonAsync(`
+import sys
+from io import StringIO
+_stdout_capture = StringIO()
+_stderr_capture = StringIO()
+sys.stdout = _stdout_capture
+sys.stderr = _stderr_capture
+            `);
+
+            try {
+                // Run the user's code
+                const result = await py.runPythonAsync(code);
+
+                // Get captured output
+                const stdout = await py.runPythonAsync('_stdout_capture.getvalue()');
+                const stderr = await py.runPythonAsync('_stderr_capture.getvalue()');
+
+                // Check for matplotlib figures
+                const hasFigure = await py.runPythonAsync('len(plt.get_fignums()) > 0');
+                
+                if (stdout) {
+                    output += `<pre>${escapeHtml(stdout)}</pre>`;
+                }
+                
+                if (stderr) {
+                    output += `<pre class="stderr">${escapeHtml(stderr)}</pre>`;
+                }
+
+                if (hasFigure) {
+                    const imgBase64 = await py.runPythonAsync('_get_plot_as_base64()');
+                    output += `<img src="data:image/png;base64,${imgBase64}" alt="Plot">`;
+                }
+
+                // Check if result is a DataFrame
+                if (result && await py.runPythonAsync(`'DataFrame' in str(type(${code.trim().split('\\n').pop()}))`).catch(() => false)) {
+                    try {
+                        const html = await py.runPythonAsync(`${code.trim().split('\\n').pop()}.to_html(max_rows=20)`);
+                        output += html;
+                    } catch (e) {
+                        // Not a DataFrame or error getting HTML
+                    }
+                }
+
+                // If there's a return value and no other output, show it
+                if (result !== undefined && result !== null && !output) {
+                    const resultStr = result.toString();
+                    if (resultStr && resultStr !== 'undefined') {
+                        output += `<pre>${escapeHtml(resultStr)}</pre>`;
+                    }
+                }
+
+                if (!output) {
+                    output = '<span style="color: var(--text-muted);">Code executed successfully (no output)</span>';
+                }
+
+            } catch (error) {
+                output = `<pre class="error">${escapeHtml(error.toString())}</pre>`;
+            } finally {
+                // Reset stdout/stderr
+                await py.runPythonAsync(`
+sys.stdout = sys.__stdout__
+sys.stderr = sys.__stderr__
+                `);
+            }
+
+            return output;
+        }
+
+        // Code Modal
+        function openCodeModal(sectionId = null, codeNote = null) {
+            editingCode = codeNote ? { ...codeNote, sectionId } : null;
+            
+            const select = document.getElementById('codeSection');
+            select.innerHTML = data.sections.map(s => 
+                `<option value="${s.id}" ${s.id === sectionId ? 'selected' : ''}>${s.name}</option>`
+            ).join('');
+
+            if (data.sections.length === 0) {
+                showToast('Create a section first');
+                return;
+            }
+
+            document.getElementById('codeModalTitle').textContent = codeNote ? 'Edit Code Note' : 'New Code Note';
+            document.getElementById('codeSubmitBtn').textContent = codeNote ? 'Save Changes' : 'Save Code Note';
+            
+            document.getElementById('codeTitle').value = codeNote?.title || '';
+            document.getElementById('codeContent').value = codeNote?.code || '';
+            document.getElementById('codeOutput').innerHTML = codeNote?.output || '';
+
+            // Update Pyodide status
+            if (pyodideReady) {
+                updatePyodideStatus('ready', 'Python ready');
+            } else if (pyodideLoading) {
+                updatePyodideStatus('loading', 'Loading Python...');
+            } else {
+                updatePyodideStatus('', 'Python will load on first run');
+            }
+
+            document.getElementById('codeModal').classList.add('active');
+            document.getElementById('codeTitle').focus();
+        }
+
+        function closeCodeModal() {
+            document.getElementById('codeModal').classList.remove('active');
+            document.getElementById('codeTitle').value = '';
+            document.getElementById('codeContent').value = '';
+            document.getElementById('codeOutput').innerHTML = '';
+            editingCode = null;
+        }
+
+        function saveCode() {
+            const sectionId = document.getElementById('codeSection').value;
+            const title = document.getElementById('codeTitle').value.trim();
+            const code = document.getElementById('codeContent').value;
+            const output = document.getElementById('codeOutput').innerHTML;
+
+            if (!title) {
+                showToast('Please enter a title');
+                return;
+            }
+
+            if (!code.trim()) {
+                showToast('Please enter some code');
+                return;
+            }
+
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return;
+
+            const codeData = {
+                id: editingCode?.id || Date.now().toString(),
+                type: 'code',
+                title,
+                code,
+                output,
+                createdAt: editingCode?.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+
+            if (editingCode) {
+                if (editingCode.sectionId !== sectionId) {
+                    const oldSection = data.sections.find(s => s.id === editingCode.sectionId);
+                    if (oldSection) {
+                        oldSection.items = oldSection.items.filter(c => c.id !== editingCode.id);
+                    }
+                    section.items.push(codeData);
+                } else {
+                    const index = section.items.findIndex(c => c.id === editingCode.id);
+                    if (index !== -1) {
+                        section.items[index] = codeData;
+                    }
+                }
+            } else {
+                section.items.push(codeData);
+            }
+
+            saveData();
+            render();
+            closeCodeModal();
+            showToast(editingCode ? 'Code note updated' : 'Code note created');
+        }
+
+        // Code Viewer
+        function openCodeViewer(sectionId, codeId) {
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return;
+            
+            const codeNote = section.items.find(c => c.id === codeId);
+            if (!codeNote) return;
+
+            currentViewingCode = { ...codeNote, sectionId };
+
+            document.getElementById('codeViewerTitle').textContent = codeNote.title;
+            document.getElementById('codeViewerCode').textContent = codeNote.code;
+            document.getElementById('codeViewerOutput').innerHTML = codeNote.output || '';
+
+            // Add backlinks
+            const backlinks = findBacklinks(codeId);
+            const backlinksEl = document.getElementById('codeViewerBacklinks');
+            if (backlinks.length > 0) {
+                backlinksEl.innerHTML = `
+                    <div class="backlinks">
+                        <div class="backlinks-title">Linked from</div>
+                        <div class="backlinks-list">
+                            ${backlinks.map(bl => `
+                                <span class="backlink-item internal-link" data-link-section="${bl.sectionId}" data-link-item="${bl.id}">${escapeHtml(bl.title)}</span>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                backlinksEl.innerHTML = '';
+            }
+
+            // Set meta info
+            let metaText = formatDate(codeNote.createdAt);
+            if (codeNote.updatedAt && codeNote.updatedAt !== codeNote.createdAt) {
+                metaText += ` · Updated ${formatDate(codeNote.updatedAt)}`;
+            }
+            document.getElementById('codeViewerMeta').textContent = metaText;
+
+            document.getElementById('codeViewerModal').classList.add('active');
+        }
+
+        function closeCodeViewer() {
+            document.getElementById('codeViewerModal').classList.remove('active');
+            currentViewingCode = null;
+        }
+
+        function editCurrentCode() {
+            if (!currentViewingCode) return;
+            const sectionId = currentViewingCode.sectionId;
+            const code = { ...currentViewingCode };
+            closeCodeViewer();
+            openCodeModal(sectionId, code);
+        }
+
+        async function runCurrentCode() {
+            if (!currentViewingCode) return;
+            
+            const outputEl = document.getElementById('codeViewerOutput');
+            outputEl.innerHTML = '<span style="color: var(--text-muted);">Running...</span>';
+
+            try {
+                const py = await loadPyodide();
+                const result = await executePythonCode(py, currentViewingCode.code);
+                outputEl.innerHTML = result;
+
+                // Update stored output
+                const section = data.sections.find(s => s.id === currentViewingCode.sectionId);
+                if (section) {
+                    const codeNote = section.items.find(c => c.id === currentViewingCode.id);
+                    if (codeNote) {
+                        codeNote.output = result;
+                        codeNote.updatedAt = new Date().toISOString();
+                        saveData();
+                        render();
+                    }
+                }
+            } catch (error) {
+                outputEl.innerHTML = `<pre class="error">${escapeHtml(error.toString())}</pre>`;
+            }
+        }
+
+        // Internal linking
+        function renderMarkdownWithLinks(text, containerId = null) {
+            if (!text) return '';
+            
+            // Store all special elements to protect from markdown processing
+            const protectedBlocks = [];
+            let processed = text;
+            
+            // Protect display math $$...$$ 
+            processed = processed.replace(/\$\$([^$]+)\$\$/g, (match, latex) => {
+                protectedBlocks.push({ type: 'displaymath', content: latex });
+                return `%%PROTECTED_${protectedBlocks.length - 1}%%`;
+            });
+            
+            // Protect inline math $...$
+            processed = processed.replace(/\$([^$\n]+)\$/g, (match, latex) => {
+                protectedBlocks.push({ type: 'inlinemath', content: latex });
+                return `%%PROTECTED_${protectedBlocks.length - 1}%%`;
+            });
+            
+            // Protect internal links [[Title]] or [[id:xyz]]
+            const linkPattern = /\[\[([^\]]+)\]\]/g;
+            processed = processed.replace(linkPattern, (match, linkText) => {
+                const target = resolveLink(linkText);
+                if (target) {
+                    protectedBlocks.push({ 
+                        type: 'link', 
+                        sectionId: target.sectionId, 
+                        itemId: target.id, 
+                        title: target.title 
+                    });
+                } else {
+                    protectedBlocks.push({ 
+                        type: 'brokenlink', 
+                        text: linkText 
+                    });
+                }
+                return `%%PROTECTED_${protectedBlocks.length - 1}%%`;
+            });
+            
+            // Render markdown
+            let html = marked.parse(processed);
+            
+            // Restore protected blocks
+            html = html.replace(/%%PROTECTED_(\d+)%%/g, (match, index) => {
+                const block = protectedBlocks[parseInt(index)];
+                switch (block.type) {
+                    case 'displaymath':
+                        try {
+                            return katex.renderToString(block.content, {
+                                displayMode: true,
+                                throwOnError: false
+                            });
+                        } catch (e) {
+                            return `<span style="color: var(--accent);">${escapeHtml(block.content)}</span>`;
+                        }
+                    case 'inlinemath':
+                        try {
+                            return katex.renderToString(block.content, {
+                                displayMode: false,
+                                throwOnError: false
+                            });
+                        } catch (e) {
+                            return `<span style="color: var(--accent);">${escapeHtml(block.content)}</span>`;
+                        }
+                    case 'link':
+                        return `<span class="internal-link" data-link-section="${block.sectionId}" data-link-item="${block.itemId}">${escapeHtml(block.title)}</span>`;
+                    case 'brokenlink':
+                        return `<span class="internal-link broken" title="Link not found">${escapeHtml(block.text)}</span>`;
+                    default:
+                        return match;
+                }
+            });
+            
+            return html;
+        }
+
+        // Render preview for note cards (truncated, with clickable links)
+        function renderNotePreview(text, maxLength = 300) {
+            if (!text) return '';
+            
+            // Truncate text first for performance
+            let truncated = text;
+            if (text.length > maxLength) {
+                truncated = text.substring(0, maxLength);
+                // Try to break at a word boundary
+                const lastSpace = truncated.lastIndexOf(' ');
+                if (lastSpace > maxLength * 0.7) {
+                    truncated = truncated.substring(0, lastSpace);
+                }
+                truncated += '...';
+            }
+            
+            return renderMarkdownWithLinks(truncated);
+        }
+
+        function resolveLink(linkText) {
+            // Check if it's an ID link: [[id:abc123]]
+            if (linkText.startsWith('id:')) {
+                const id = linkText.substring(3);
+                for (const section of data.sections) {
+                    const item = section.items.find(i => i.id === id);
+                    if (item) {
+                        return { ...item, sectionId: section.id };
+                    }
+                }
+                return null;
+            }
+            
+            // Otherwise search by title (case-insensitive)
+            const searchTitle = linkText.toLowerCase();
+            for (const section of data.sections) {
+                const item = section.items.find(i => i.title.toLowerCase() === searchTitle);
+                if (item) {
+                    return { ...item, sectionId: section.id };
+                }
+            }
+            return null;
+        }
+
+        function findBacklinks(itemId) {
+            const backlinks = [];
+            const pattern = new RegExp(`\\[\\[id:${itemId}\\]\\]|\\[\\[([^\\]]+)\\]\\]`, 'g');
+            
+            // Get the target item's title
+            let targetTitle = null;
+            for (const section of data.sections) {
+                const item = section.items.find(i => i.id === itemId);
+                if (item) {
+                    targetTitle = item.title.toLowerCase();
+                    break;
+                }
+            }
+            
+            for (const section of data.sections) {
+                for (const item of section.items) {
+                    if (item.id === itemId) continue;
+                    
+                    const content = item.type === 'note' ? item.content : item.description;
+                    if (!content) continue;
+                    
+                    // Check for ID link
+                    if (content.includes(`[[id:${itemId}]]`)) {
+                        backlinks.push({ ...item, sectionId: section.id });
+                        continue;
+                    }
+                    
+                    // Check for title link
+                    if (targetTitle) {
+                        const matches = content.matchAll(/\[\[([^\]]+)\]\]/g);
+                        for (const match of matches) {
+                            if (match[1].toLowerCase() === targetTitle) {
+                                backlinks.push({ ...item, sectionId: section.id });
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return backlinks;
+        }
+
+        function navigateToItem(sectionId, itemId) {
+            closeNoteViewer();
+            closeBookmarkViewer();
+            closeCodeViewer();
+            
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return;
+            
+            const item = section.items.find(i => i.id === itemId);
+            if (!item) return;
+            
+            if (item.type === 'note') {
+                openNoteViewer(sectionId, itemId);
+            } else if (item.type === 'code') {
+                openCodeViewer(sectionId, itemId);
+            } else {
+                openBookmarkViewer(sectionId, itemId);
+            }
+        }
+
+        // Generate thumbnail using a service or PDF.js for PDFs
+        async function generateThumbnail(url) {
+            try {
+                // Check if it's a PDF
+                const isPdf = url.toLowerCase().endsWith('.pdf') || 
+                              url.toLowerCase().includes('/pdf/') ||
+                              url.toLowerCase().includes('arxiv.org/pdf');
+                
+                if (isPdf) {
+                    return await generatePdfThumbnail(url);
+                }
+                
+                // For regular pages, use microlink
+                const encodedUrl = encodeURIComponent(url);
+                return `https://api.microlink.io/?url=${encodedUrl}&screenshot=true&meta=false&embed=screenshot.url`;
+            } catch {
+                return null;
+            }
+        }
+
+        // Generate thumbnail from PDF first page using PDF.js
+        async function generatePdfThumbnail(url) {
+            try {
+                // Set worker source
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                
+                // Load the PDF
+                const loadingTask = pdfjsLib.getDocument({
+                    url: url,
+                });
+                
+                const pdf = await loadingTask.promise;
+                const page = await pdf.getPage(1);
+                
+                // Set scale for good quality
+                const scale = 2;
+                const viewport = page.getViewport({ scale });
+                
+                // Create canvas for full page render
+                const fullCanvas = document.createElement('canvas');
+                const fullContext = fullCanvas.getContext('2d');
+                fullCanvas.width = viewport.width;
+                fullCanvas.height = viewport.height;
+                
+                // Render page to canvas
+                await page.render({
+                    canvasContext: fullContext,
+                    viewport: viewport
+                }).promise;
+                
+                // Create a cropped canvas with just the top 45% of the page
+                const cropRatio = 0.45;
+                const croppedCanvas = document.createElement('canvas');
+                const croppedContext = croppedCanvas.getContext('2d');
+                croppedCanvas.width = viewport.width;
+                croppedCanvas.height = viewport.height * cropRatio;
+                
+                // Copy top portion from full canvas to cropped canvas
+                croppedContext.drawImage(
+                    fullCanvas,
+                    0, 0, viewport.width, viewport.height * cropRatio,
+                    0, 0, viewport.width, viewport.height * cropRatio
+                );
+                
+                // Convert to data URL
+                return croppedCanvas.toDataURL('image/jpeg', 0.9);
+            } catch (error) {
+                console.log('PDF thumbnail failed, using fallback:', error.message);
+                // Fallback to microlink for PDFs that can't be loaded directly (CORS issues)
+                const encodedUrl = encodeURIComponent(url);
+                return `https://api.microlink.io/?url=${encodedUrl}&screenshot=true&meta=false&embed=screenshot.url`;
+            }
+        }
+
+        function extractDomain(url) {
+            try {
+                return new URL(url).hostname.replace('www.', '');
+            } catch {
+                return url;
+            }
+        }
+
+        // Toggle section collapsed state
+        function toggleSection(sectionId) {
+            if (collapsedSections.has(sectionId)) {
+                collapsedSections.delete(sectionId);
+            } else {
+                collapsedSections.add(sectionId);
+            }
+            render();
+        }
+
+        // Edit bookmark - find bookmark and open modal
+        function editBookmark(sectionId, bookmarkId) {
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return;
+            const bookmark = section.items.find(b => b.id === bookmarkId);
+            if (!bookmark) return;
+            openBookmarkModal(sectionId, bookmark);
+        }
+
+        // Confirm before deleting item
+        function confirmDeleteItem(sectionId, itemId, itemType) {
+            if (confirm(`Delete this ${itemType}?`)) {
+                deleteItem(sectionId, itemId);
+            }
+        }
+
+        // Delete section
+        function deleteSection(sectionId) {
+            if (!confirm('Delete this section?')) return;
+            data.sections = data.sections.filter(s => s.id !== sectionId);
+            saveData();
+            render();
+            showToast('Section deleted');
+        }
+
+        // Delete item
+        function deleteItem(sectionId, itemId) {
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return;
+            section.items = section.items.filter(i => i.id !== itemId);
+            saveData();
+            render();
+            showToast('Item deleted');
+        }
+
+        // Update section name
+        function updateSectionName(sectionId, newName) {
+            const section = data.sections.find(s => s.id === sectionId);
+            if (section && newName.trim()) {
+                section.name = newName.trim();
+                saveData();
+            }
+        }
+
+        // Export data
+        function exportData() {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'research_notebook.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Notebook exported');
+        }
+
+        // Import data
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported.sections && Array.isArray(imported.sections)) {
+                        // Handle both old and new format
+                        data.sections = imported.sections.map(section => ({
+                            ...section,
+                            items: section.items || (section.bookmarks || []).map(b => ({
+                                ...b,
+                                type: b.type || 'bookmark'
+                            }))
+                        }));
+                        saveData();
+                        render();
+                        showToast('Notebook imported');
+                    } else {
+                        showToast('Invalid file format');
+                    }
+                } catch {
+                    showToast('Error reading file');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric',
+                year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+            });
+        }
+
+        // Get plain text preview from markdown
+        function getPlainTextPreview(markdown, maxLength = 200) {
+            if (!markdown) return '';
+            // Remove markdown syntax
+            let text = markdown
+                .replace(/\[\[([^\]]+)\]\]/g, '$1') // Internal links
+                .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // External links
+                .replace(/[#*_`~]/g, '') // Headers, bold, italic, code
+                .replace(/\n+/g, ' ') // Newlines
+                .trim();
+            if (text.length > maxLength) {
+                text = text.substring(0, maxLength) + '...';
+            }
+            return text;
+        }
+
+        // Render the UI
+        function render() {
+            const content = document.getElementById('content');
+
+            if (data.sections.length === 0) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📚</div>
+                        <h2>Your research notebook awaits</h2>
+                        <p>Create a section to start organizing your bookmarks and notes</p>
+                    </div>
+                `;
+                return;
+            }
+
+            content.innerHTML = data.sections.map(section => {
+                const isCollapsed = collapsedSections.has(section.id);
+                const itemCount = section.items.length;
+                
+                return `
+                <div class="section" data-section-id="${section.id}">
+                    ${itemCount === 0 ? `<button class="section-delete" onclick="deleteSection('${section.id}')" title="Delete empty section">×</button>` : ''}
+                    <div class="section-header">
+                        <button class="section-toggle ${isCollapsed ? 'collapsed' : ''}" onclick="toggleSection('${section.id}')" title="${isCollapsed ? 'Expand' : 'Collapse'}">▼</button>
+                        <h2 class="section-title">
+                            <input type="text" value="${escapeHtml(section.name)}" 
+                                onchange="updateSectionName('${section.id}', this.value)"
+                                onblur="updateSectionName('${section.id}', this.value)">
+                            ${isCollapsed && itemCount > 0 ? `<span class="section-count">(${itemCount})</span>` : ''}
+                        </h2>
+                        <div class="section-actions">
+                            <button class="btn btn-code btn-small" onclick="openCodeModal('${section.id}')">
+                                + Code
+                            </button>
+                            <button class="btn btn-note btn-small" onclick="openNoteModal('${section.id}')">
+                                + Note
+                            </button>
+                            <button class="btn btn-secondary btn-small" onclick="openBookmarkModal('${section.id}')">
+                                + Bookmark
+                            </button>
+                        </div>
+                    </div>
+                    <div class="items-grid ${isCollapsed ? 'collapsed' : ''}">
+                        ${itemCount === 0 ? 
+                            '<p style="color: var(--text-muted); grid-column: 1/-1;">No items yet. Add a bookmark, note, or code!</p>' :
+                            section.items.map(item => {
+                                if (item.type === 'note') {
+                                    return renderNoteCard(section.id, item);
+                                } else if (item.type === 'code') {
+                                    return renderCodeCard(section.id, item);
+                                } else {
+                                    return renderBookmarkCard(section.id, item);
+                                }
+                            }).join('')
+                        }
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        function renderBookmarkCard(sectionId, bookmark) {
+            return `
+                <div class="bookmark-card" data-item-id="${bookmark.id}">
+                    <div class="card-actions">
+                        <button class="btn-icon-only" onclick="editBookmark('${sectionId}', '${bookmark.id}')" title="Edit">✎</button>
+                        <button class="btn-icon-only" onclick="confirmDeleteItem('${sectionId}', '${bookmark.id}', 'bookmark')" title="Delete">×</button>
+                    </div>
+                    <div class="bookmark-thumbnail">
+                        ${bookmark.thumbnail ? 
+                            `<img src="${bookmark.thumbnail}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'bookmark-thumbnail-placeholder\\'>🌐</div>'">` :
+                            '<div class="bookmark-thumbnail-placeholder">🌐</div>'
+                        }
+                    </div>
+                    <div class="bookmark-content">
+                        <h3 class="bookmark-title">
+                            <a href="${escapeHtml(bookmark.url)}" target="_blank" rel="noopener noreferrer">
+                                ${escapeHtml(bookmark.title)}
+                            </a>
+                        </h3>
+                        <div class="bookmark-url">${escapeHtml(bookmark.url)}</div>
+                        ${bookmark.description ? 
+                            `<p class="bookmark-description">${escapeHtml(bookmark.description)}</p>` : 
+                            ''
+                        }
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderNoteCard(sectionId, note) {
+            const previewHtml = renderNotePreview(note.content);
+            return `
+                <div class="note-card" data-item-id="${note.id}" data-section-id="${sectionId}">
+                    <div class="card-actions">
+                        <button class="btn-icon-only" onclick="event.stopPropagation(); openNoteModal('${sectionId}', findNote('${sectionId}', '${note.id}'))" title="Edit">✎</button>
+                        <button class="btn-icon-only" onclick="event.stopPropagation(); confirmDeleteItem('${sectionId}', '${note.id}', 'note')" title="Delete">×</button>
+                    </div>
+                    <div class="note-header">
+                        <span class="note-icon">📝</span>
+                        <span class="note-title">${escapeHtml(note.title)}</span>
+                    </div>
+                    <div class="note-preview">
+                        ${previewHtml || '<em style="color: var(--text-muted);">Empty note</em>'}
+                    </div>
+                    <div class="note-meta">
+                        <span>${formatDate(note.createdAt)}</span>
+                        ${note.updatedAt && note.updatedAt !== note.createdAt ? 
+                            `<span>Updated ${formatDate(note.updatedAt)}</span>` : ''
+                        }
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCodeCard(sectionId, codeNote) {
+            const codePreview = codeNote.code ? escapeHtml(codeNote.code.substring(0, 200)) : '';
+            const hasOutput = codeNote.output && codeNote.output.trim();
+            return `
+                <div class="code-card" data-item-id="${codeNote.id}" data-section-id="${sectionId}">
+                    <div class="card-actions">
+                        <button class="btn-icon-only" onclick="event.stopPropagation(); openCodeModal('${sectionId}', findCode('${sectionId}', '${codeNote.id}'))" title="Edit">✎</button>
+                        <button class="btn-icon-only" onclick="event.stopPropagation(); confirmDeleteItem('${sectionId}', '${codeNote.id}', 'code note')" title="Delete">×</button>
+                    </div>
+                    <div class="code-header">
+                        <span class="code-icon">🐍</span>
+                        <span class="code-title">${escapeHtml(codeNote.title)}</span>
+                    </div>
+                    <div class="code-preview">${codePreview || '<em style="color: var(--text-muted);">Empty code</em>'}</div>
+                    ${hasOutput ? `<div class="code-output-preview">${codeNote.output.substring(0, 500)}</div>` : ''}
+                    <div class="code-meta">
+                        <span>${formatDate(codeNote.createdAt)}</span>
+                        ${codeNote.updatedAt && codeNote.updatedAt !== codeNote.createdAt ? 
+                            `<span>Updated ${formatDate(codeNote.updatedAt)}</span>` : ''
+                        }
+                    </div>
+                </div>
+            `;
+        }
+
+        function findNote(sectionId, noteId) {
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return null;
+            return section.items.find(n => n.id === noteId);
+        }
+
+        function findCode(sectionId, codeId) {
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return null;
+            return section.items.find(c => c.id === codeId);
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            if (typeof text !== 'string') return text;
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Handle Enter key in modals
+        document.getElementById('sectionName').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') createSection();
+        });
+
+        document.getElementById('bookmarkUrl').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') saveBookmark();
+        });
+
+        document.getElementById('noteTitle').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') document.getElementById('noteContent').focus();
+        });
+
+        document.getElementById('codeTitle').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') document.getElementById('codeContent').focus();
+        });
+
+        // Allow Tab key in code editor
+        document.getElementById('codeContent').addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = e.target.selectionStart;
+                const end = e.target.selectionEnd;
+                e.target.value = e.target.value.substring(0, start) + '    ' + e.target.value.substring(end);
+                e.target.selectionStart = e.target.selectionEnd = start + 4;
+            }
+        });
+
+        // Close modals on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.classList.remove('active');
+                }
+            });
+        });
+
+        // Close modals on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeSectionModal();
+                closeBookmarkModal();
+                closeNoteModal();
+                closeCodeModal();
+                closeNoteViewer();
+                closeBookmarkViewer();
+                closeCodeViewer();
+            }
+        });
+
+        // Event delegation for internal links
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.internal-link[data-link-section][data-link-item]');
+            if (link) {
+                e.preventDefault();
+                e.stopPropagation();
+                const sectionId = link.dataset.linkSection;
+                const itemId = link.dataset.linkItem;
+                navigateToItem(sectionId, itemId);
+            }
+        });
+
+        // Initialize
+        loadData();
+    </script>
+</body>
+</html>
