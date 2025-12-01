@@ -1726,68 +1726,161 @@ print('Hello, World!')" spellcheck="false"></textarea>
             gfm: true
         });
 
-        // Load data from localStorage
-        function loadData() {
-            const saved = localStorage.getItem('researchNotebook');
-            if (saved) {
-                data = JSON.parse(saved);
-                // Migration: ensure all items have correct type
-                data.sections.forEach(section => {
-                    // Handle old format with 'bookmarks' array
-                    if (section.bookmarks) {
-                        section.items = section.bookmarks.map(b => ({
-                            ...b,
-                            type: b.type || 'bookmark'
-                        }));
-                        delete section.bookmarks;
-                    }
-                    if (!section.items) {
-                        section.items = [];
-                    }
-                    // Fix types for all items - infer from structure if missing/wrong
-                    section.items = section.items.map(item => {
-                        // Determine correct type based on item structure
-                        // Code notes have 'code' field, notes have 'content' field, bookmarks have 'url' field
-                        let correctType;
-                        if (item.code !== undefined) {
-                            correctType = 'code';
-                        } else if (item.url && !item.content) {
-                            correctType = 'bookmark';
-                        } else if (item.content !== undefined && !item.url) {
-                            correctType = 'note';
-                        } else {
-                            // Fall back to existing type or 'bookmark'
-                            correctType = item.type || 'bookmark';
-                        }
-                        return { ...item, type: correctType };
+        // Load data from IndexedDB (with localStorage migration)
+        async function loadData() {
+            try {
+                let jsonStr = null;
+
+                // Try loading from IndexedDB first
+                try {
+                    const db = await openDB();
+                    const tx = db.transaction(IDB_STORE, 'readonly');
+                    const store = tx.objectStore(IDB_STORE);
+
+                    jsonStr = await new Promise((resolve, reject) => {
+                        const request = store.get(IDB_KEY);
+                        request.onsuccess = () => resolve(request.result);
+                        request.onerror = () => reject(request.error);
                     });
-                });
-                saveData(); // Save the fixed data
-            }
-            // Also try to migrate from old bookmark manager
-            if (data.sections.length === 0) {
-                const oldData = localStorage.getItem('bookmarkCurator');
-                if (oldData) {
-                    const parsed = JSON.parse(oldData);
-                    if (parsed.sections) {
-                        data.sections = parsed.sections.map(section => ({
-                            ...section,
-                            items: (section.bookmarks || []).map(b => ({
-                                ...b,
-                                type: 'bookmark'
-                            }))
-                        }));
-                        saveData();
-                        showToast('Migrated data from Bookmark Curator');
+
+                    db.close();
+
+                    if (jsonStr) {
+                        console.log(`Loaded data from IndexedDB (${(jsonStr.length / 1024).toFixed(1)}KB)`);
+                    }
+                } catch (error) {
+                    console.error('IndexedDB load error:', error);
+                }
+
+                // Migrate from legacy localStorage if IndexedDB is empty
+                if (!jsonStr) {
+                    const legacyData = localStorage.getItem(LEGACY_STORAGE_KEY);
+                    if (legacyData) {
+                        jsonStr = legacyData;
+                        console.log('Migrating data from localStorage to IndexedDB');
+                        // Will be saved to IndexedDB below
                     }
                 }
+
+                // Also try to migrate from old bookmark manager
+                if (!jsonStr) {
+                    const oldData = localStorage.getItem('bookmarkCurator');
+                    if (oldData) {
+                        const parsed = JSON.parse(oldData);
+                        if (parsed.sections) {
+                            data.sections = parsed.sections.map(section => ({
+                                ...section,
+                                items: (section.bookmarks || []).map(b => ({
+                                    ...b,
+                                    type: 'bookmark'
+                                }))
+                            }));
+                            await saveData();
+                            showToast('Migrated data from Bookmark Curator');
+                            render();
+                            return;
+                        }
+                    }
+                }
+
+                if (jsonStr) {
+                    data = JSON.parse(jsonStr);
+
+                    // Migration: ensure all items have correct type
+                    let needsSave = false;
+                    data.sections.forEach(section => {
+                        // Handle old format with 'bookmarks' array
+                        if (section.bookmarks) {
+                            section.items = section.bookmarks.map(b => ({
+                                ...b,
+                                type: b.type || 'bookmark'
+                            }));
+                            delete section.bookmarks;
+                            needsSave = true;
+                        }
+                        if (!section.items) {
+                            section.items = [];
+                        }
+                        // Fix types for all items - infer from structure if missing/wrong
+                        section.items = section.items.map(item => {
+                            // Determine correct type based on item structure
+                            // Code notes have 'code' field, notes have 'content' field, bookmarks have 'url' field
+                            let correctType;
+                            if (item.code !== undefined) {
+                                correctType = 'code';
+                            } else if (item.url && !item.content) {
+                                correctType = 'bookmark';
+                            } else if (item.content !== undefined && !item.url) {
+                                correctType = 'note';
+                            } else {
+                                // Fall back to existing type or 'bookmark'
+                                correctType = item.type || 'bookmark';
+                            }
+                            if (correctType !== item.type) needsSave = true;
+                            return { ...item, type: correctType };
+                        });
+                    });
+
+                    // Save migrated data and clean up localStorage
+                    if (needsSave) {
+                        await saveData();
+                        // Clean up old localStorage entries after successful migration
+                        localStorage.removeItem(LEGACY_STORAGE_KEY);
+                        localStorage.removeItem('researchNotebook_compressed');
+                        console.log('Cleaned up legacy localStorage entries');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showToast('⚠️ Error loading data: ' + error.message);
             }
             render();
         }
 
-        // Save data to localStorage
-        function saveData() {
-            localStorage.setItem('researchNotebook', JSON.stringify(data));
+        // Storage configuration - using IndexedDB for reliable large dataset support
+        const IDB_NAME = 'ResearchNotebookDB';
+        const IDB_STORE = 'notebook';
+        const IDB_KEY = 'data';
+        const LEGACY_STORAGE_KEY = 'researchNotebook'; // For migration only
+
+        // IndexedDB helper functions
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(IDB_NAME, 1);
+
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(IDB_STORE)) {
+                        db.createObjectStore(IDB_STORE);
+                    }
+                };
+            });
+        }
+
+        // Save data to IndexedDB
+        async function saveData() {
+            try {
+                const jsonStr = JSON.stringify(data);
+                const db = await openDB();
+                const tx = db.transaction(IDB_STORE, 'readwrite');
+                const store = tx.objectStore(IDB_STORE);
+                store.put(jsonStr, IDB_KEY);
+
+                await new Promise((resolve, reject) => {
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+
+                db.close();
+                console.log(`Data saved to IndexedDB (${(jsonStr.length / 1024).toFixed(1)}KB)`);
+            } catch (error) {
+                console.error('Error saving data:', error);
+                showToast('⚠️ Error saving data: ' + error.message);
+                throw error;
+            }
         }
 
         // Show toast notification
@@ -1809,7 +1902,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
             document.getElementById('sectionName').value = '';
         }
 
-        function createSection() {
+        async function createSection() {
             const name = document.getElementById('sectionName').value.trim();
             if (!name) {
                 showToast('Please enter a section name');
@@ -1822,7 +1915,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
                 items: []
             });
 
-            saveData();
+            await saveData();
             render();
             closeSectionModal();
             showToast('Section created');
@@ -1923,7 +2016,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
             btn.innerHTML = originalText;
             btn.disabled = false;
 
-            saveData();
+            await saveData();
             render();
             closeBookmarkModal();
             showToast(editingBookmark ? 'Bookmark updated' : 'Bookmark added');
@@ -1983,7 +2076,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
             }
         }
 
-        function saveNote() {
+        async function saveNote() {
             const sectionId = document.getElementById('noteSection').value;
             const title = document.getElementById('noteTitle').value.trim();
             const content = document.getElementById('noteContent').value.trim();
@@ -2023,7 +2116,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
                 section.items.push(noteData);
             }
 
-            saveData();
+            await saveData();
             render();
             closeNoteModal();
             showToast(editingNote ? 'Note updated' : 'Note created');
@@ -2479,7 +2572,7 @@ sys.stderr = sys.__stderr__
                 section.items.push(codeData);
             }
 
-            saveData();
+            await saveData();
             render();
             closeCodeModal();
             submitBtn.disabled = false;
@@ -2564,7 +2657,7 @@ sys.stderr = sys.__stderr__
                     if (codeNote) {
                         codeNote.output = result;
                         codeNote.updatedAt = new Date().toISOString();
-                        saveData();
+                        await saveData();
                         render();
                     }
                 }
@@ -2848,14 +2941,14 @@ sys.stderr = sys.__stderr__
             render();
         }
 
-        function toggleCodeOutput(sectionId, codeId) {
+        async function toggleCodeOutput(sectionId, codeId) {
             const section = data.sections.find(s => s.id === sectionId);
             if (!section) return;
             const codeNote = section.items.find(item => item.id === codeId && item.type === 'code');
             if (!codeNote) return;
 
             codeNote.showOutput = !codeNote.showOutput;
-            saveData();
+            await saveData();
             render();
         }
 
@@ -2876,30 +2969,30 @@ sys.stderr = sys.__stderr__
         }
 
         // Delete section
-        function deleteSection(sectionId) {
+        async function deleteSection(sectionId) {
             if (!confirm('Delete this section?')) return;
             data.sections = data.sections.filter(s => s.id !== sectionId);
-            saveData();
+            await saveData();
             render();
             showToast('Section deleted');
         }
 
         // Delete item
-        function deleteItem(sectionId, itemId) {
+        async function deleteItem(sectionId, itemId) {
             const section = data.sections.find(s => s.id === sectionId);
             if (!section) return;
             section.items = section.items.filter(i => i.id !== itemId);
-            saveData();
+            await saveData();
             render();
             showToast('Item deleted');
         }
 
         // Update section name
-        function updateSectionName(sectionId, newName) {
+        async function updateSectionName(sectionId, newName) {
             const section = data.sections.find(s => s.id === sectionId);
             if (section && newName.trim()) {
                 section.name = newName.trim();
-                saveData();
+                await saveData();
             }
         }
 
@@ -2920,8 +3013,23 @@ sys.stderr = sys.__stderr__
             const file = event.target.files[0];
             if (!file) return;
 
+            // Check file size before processing
+            const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+            console.log(`Importing file: ${file.name} (${fileSizeMB}MB)`);
+
+            if (file.size > 50 * 1024 * 1024) { // 50MB limit
+                showToast(`❌ File too large (${fileSizeMB}MB). Maximum 50MB.`);
+                event.target.value = '';
+                return;
+            }
+
+            // Show loading indicator for large files
+            if (file.size > 1024 * 1024) {
+                showToast(`⏳ Importing ${fileSizeMB}MB file...`);
+            }
+
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = async (e) => {
                 try {
                     const imported = JSON.parse(e.target.result);
                     if (imported.sections && Array.isArray(imported.sections)) {
@@ -2933,14 +3041,26 @@ sys.stderr = sys.__stderr__
                                 type: b.type || 'bookmark'
                             }))
                         }));
-                        saveData();
+
+                        // Count items for user feedback
+                        const totalItems = data.sections.reduce((sum, s) => sum + s.items.length, 0);
+                        console.log(`Imported ${data.sections.length} sections with ${totalItems} items`);
+
+                        // Save (will use compression and fallback to IndexedDB if needed)
+                        await saveData();
                         render();
-                        showToast('Notebook imported');
+
+                        showToast(`✅ Imported ${data.sections.length} sections (${totalItems} items)`);
+
+                        // Show storage info
+                        const info = getStorageInfo();
+                        console.log(`Storage usage: ${info.percentage}% (${(info.used / 1024).toFixed(1)}KB / ${(info.limit / 1024).toFixed(1)}KB)`);
                     } else {
-                        showToast('Invalid file format');
+                        showToast('❌ Invalid file format');
                     }
-                } catch {
-                    showToast('Error reading file');
+                } catch (error) {
+                    console.error('Import error:', error);
+                    showToast('❌ Error reading file: ' + error.message);
                 }
             };
             reader.readAsText(file);

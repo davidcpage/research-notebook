@@ -17,7 +17,7 @@ This is a single-file HTML application called "Research Notebook" - a browser-ba
   - Pyodide for in-browser Python execution
 
 ### Data Model
-The application uses a hierarchical structure stored in localStorage:
+The application uses a hierarchical structure stored in IndexedDB:
 ```javascript
 data = {
   sections: [
@@ -44,10 +44,12 @@ data = {
 - Current viewing states: `currentViewingNote`, `currentViewingCode`
 - Pyodide runtime state: `pyodide`, `pyodideLoading`, `pyodideReady`
 
-**Data Persistence** (lines ~1614-1675):
-- `loadData()`: Reads from localStorage, handles migration from old formats
-- `saveData()`: Writes to localStorage after any modification
-- Migration logic handles old "Bookmark Curator" format and ensures type fields
+**Data Persistence** (lines ~1730-1870):
+- `loadData()`: Async function that reads from IndexedDB, handles migration from localStorage
+- `saveData()`: Async function that writes to IndexedDB (no size limits like localStorage)
+- Migration logic automatically moves data from localStorage to IndexedDB on first load
+- Handles old "Bookmark Curator" format and ensures type fields
+- **IMPORTANT**: All `saveData()` calls must use `await` since it's async
 
 **Core Rendering** (line ~2784):
 - `render()`: Main function that regenerates entire UI from data model
@@ -73,9 +75,15 @@ data = {
 - Matplotlib integration: plots rendered as base64 PNG images in output
 - Console logging enabled for debugging: `[Pyodide] ...` messages track initialization progress
 
-**Export/Import** (lines ~2714-2755):
-- Export: Downloads data as JSON file
-- Import: Reads JSON file, handles both old and new formats
+**Export/Import** (lines ~3000-3135):
+- **Export**: Downloads entire notebook as JSON file (data structure only, no IndexedDB metadata)
+- **Import**: Reads JSON file, validates format, handles large files
+  - File size validation: 50MB maximum for safety
+  - Progress feedback for files > 1MB
+  - Automatic format detection and migration
+  - Supports both old (bookmarks array) and new (items array) formats
+  - Console logging of import statistics (sections count, items count)
+  - Storage size reporting after import
 
 **Internal Linking** (lines ~2992-3002):
 - Supports `[[Section Name > Item Title]]` syntax in markdown
@@ -89,7 +97,8 @@ Since this is a single HTML file:
 - Open `research_notebook_with_code.html` directly in a browser
 - No build step or local server required
 - Use browser DevTools console for debugging
-- localStorage key: `researchNotebook`
+- Data stored in IndexedDB: Database `ResearchNotebookDB`, Store `notebook`
+- View data in DevTools → Application → IndexedDB
 
 ### Making Changes
 
@@ -106,16 +115,36 @@ Since this is a single HTML file:
 - Business logic: JavaScript functions (lines ~1614-3005)
 
 **Important Patterns**:
-- After any data modification, always call `saveData()` then `render()`
+- After any data modification, always call `await saveData()` then `render()` (saveData is async!)
 - Modal workflow: open modal → populate fields → save → close modal → render
 - Type safety: All items must have valid `type` field ('bookmark', 'note', or 'code')
 - Escape HTML in user input using `escapeHtml()` function
+- **Storage**: IndexedDB handles large datasets (GBs) without quota issues, unlike localStorage (5-10MB)
 
-### Data Migration
-The app includes migration logic for backwards compatibility:
+### Storage Architecture
+
+**IndexedDB Storage**:
+- Database name: `ResearchNotebookDB`
+- Object store: `notebook`
+- Key: `data`
+- Stores entire data structure as JSON string
+- **No size limits**: Can handle gigabytes of data (vs localStorage's 5-10MB quota)
+- **Asynchronous**: Non-blocking operations for better performance
+- **Persistent**: Survives browser restarts and crashes
+
+**Why IndexedDB?**
+- Research notebooks can grow very large with many bookmarks, notes, and code outputs
+- Python code execution outputs (especially matplotlib plots) can be data-heavy
+- IndexedDB is purpose-built for web applications storing structured data
+- No compression needed - browser handles storage optimization
+
+**Migration Logic**:
+- Automatically migrates data from localStorage to IndexedDB on first load
+- Cleans up old localStorage entries (`researchNotebook`, `researchNotebook_compressed`) after successful migration
+- Handles legacy "Bookmark Curator" format from previous versions
 - Old format used `bookmarks` array instead of `items` array
 - Migration auto-detects item types based on fields (url → bookmark, content → note, code → code)
-- Can import from legacy "Bookmark Curator" localStorage key
+- All migrations happen transparently without user intervention
 
 ### Pyodide Configuration
 **Version**: v0.28.2 (following stlite's proven approach)
