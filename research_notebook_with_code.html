@@ -1726,109 +1726,24 @@ print('Hello, World!')" spellcheck="false"></textarea>
             gfm: true
         });
 
-        // Load data from IndexedDB (with localStorage migration)
+        // Load data from IndexedDB
         async function loadData() {
             try {
-                let jsonStr = null;
+                const db = await openDB();
+                const tx = db.transaction(IDB_STORE, 'readonly');
+                const store = tx.objectStore(IDB_STORE);
 
-                // Try loading from IndexedDB first
-                try {
-                    const db = await openDB();
-                    const tx = db.transaction(IDB_STORE, 'readonly');
-                    const store = tx.objectStore(IDB_STORE);
+                const jsonStr = await new Promise((resolve, reject) => {
+                    const request = store.get(IDB_KEY);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
 
-                    jsonStr = await new Promise((resolve, reject) => {
-                        const request = store.get(IDB_KEY);
-                        request.onsuccess = () => resolve(request.result);
-                        request.onerror = () => reject(request.error);
-                    });
-
-                    db.close();
-
-                    if (jsonStr) {
-                        console.log(`Loaded data from IndexedDB (${(jsonStr.length / 1024).toFixed(1)}KB)`);
-                    }
-                } catch (error) {
-                    console.error('IndexedDB load error:', error);
-                }
-
-                // Migrate from legacy localStorage if IndexedDB is empty
-                if (!jsonStr) {
-                    const legacyData = localStorage.getItem(LEGACY_STORAGE_KEY);
-                    if (legacyData) {
-                        jsonStr = legacyData;
-                        console.log('Migrating data from localStorage to IndexedDB');
-                        // Will be saved to IndexedDB below
-                    }
-                }
-
-                // Also try to migrate from old bookmark manager
-                if (!jsonStr) {
-                    const oldData = localStorage.getItem('bookmarkCurator');
-                    if (oldData) {
-                        const parsed = JSON.parse(oldData);
-                        if (parsed.sections) {
-                            data.sections = parsed.sections.map(section => ({
-                                ...section,
-                                items: (section.bookmarks || []).map(b => ({
-                                    ...b,
-                                    type: 'bookmark'
-                                }))
-                            }));
-                            await saveData();
-                            showToast('Migrated data from Bookmark Curator');
-                            render();
-                            return;
-                        }
-                    }
-                }
+                db.close();
 
                 if (jsonStr) {
                     data = JSON.parse(jsonStr);
-
-                    // Migration: ensure all items have correct type
-                    let needsSave = false;
-                    data.sections.forEach(section => {
-                        // Handle old format with 'bookmarks' array
-                        if (section.bookmarks) {
-                            section.items = section.bookmarks.map(b => ({
-                                ...b,
-                                type: b.type || 'bookmark'
-                            }));
-                            delete section.bookmarks;
-                            needsSave = true;
-                        }
-                        if (!section.items) {
-                            section.items = [];
-                        }
-                        // Fix types for all items - infer from structure if missing/wrong
-                        section.items = section.items.map(item => {
-                            // Determine correct type based on item structure
-                            // Code notes have 'code' field, notes have 'content' field, bookmarks have 'url' field
-                            let correctType;
-                            if (item.code !== undefined) {
-                                correctType = 'code';
-                            } else if (item.url && !item.content) {
-                                correctType = 'bookmark';
-                            } else if (item.content !== undefined && !item.url) {
-                                correctType = 'note';
-                            } else {
-                                // Fall back to existing type or 'bookmark'
-                                correctType = item.type || 'bookmark';
-                            }
-                            if (correctType !== item.type) needsSave = true;
-                            return { ...item, type: correctType };
-                        });
-                    });
-
-                    // Save migrated data and clean up localStorage
-                    if (needsSave) {
-                        await saveData();
-                        // Clean up old localStorage entries after successful migration
-                        localStorage.removeItem(LEGACY_STORAGE_KEY);
-                        localStorage.removeItem('researchNotebook_compressed');
-                        console.log('Cleaned up legacy localStorage entries');
-                    }
+                    console.log(`Loaded data from IndexedDB (${(jsonStr.length / 1024).toFixed(1)}KB)`);
                 }
             } catch (error) {
                 console.error('Error loading data:', error);
@@ -1841,7 +1756,6 @@ print('Hello, World!')" spellcheck="false"></textarea>
         const IDB_NAME = 'ResearchNotebookDB';
         const IDB_STORE = 'notebook';
         const IDB_KEY = 'data';
-        const LEGACY_STORAGE_KEY = 'researchNotebook'; // For migration only
 
         // IndexedDB helper functions
         function openDB() {
@@ -3033,28 +2947,17 @@ sys.stderr = sys.__stderr__
                 try {
                     const imported = JSON.parse(e.target.result);
                     if (imported.sections && Array.isArray(imported.sections)) {
-                        // Handle both old and new format
-                        data.sections = imported.sections.map(section => ({
-                            ...section,
-                            items: section.items || (section.bookmarks || []).map(b => ({
-                                ...b,
-                                type: b.type || 'bookmark'
-                            }))
-                        }));
+                        data.sections = imported.sections;
 
                         // Count items for user feedback
                         const totalItems = data.sections.reduce((sum, s) => sum + s.items.length, 0);
                         console.log(`Imported ${data.sections.length} sections with ${totalItems} items`);
 
-                        // Save (will use compression and fallback to IndexedDB if needed)
+                        // Save to IndexedDB
                         await saveData();
                         render();
 
                         showToast(`✅ Imported ${data.sections.length} sections (${totalItems} items)`);
-
-                        // Show storage info
-                        const info = getStorageInfo();
-                        console.log(`Storage usage: ${info.percentage}% (${(info.used / 1024).toFixed(1)}KB / ${(info.limit / 1024).toFixed(1)}KB)`);
                     } else {
                         showToast('❌ Invalid file format');
                     }

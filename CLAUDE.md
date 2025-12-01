@@ -44,11 +44,9 @@ data = {
 - Current viewing states: `currentViewingNote`, `currentViewingCode`
 - Pyodide runtime state: `pyodide`, `pyodideLoading`, `pyodideReady`
 
-**Data Persistence** (lines ~1730-1870):
-- `loadData()`: Async function that reads from IndexedDB, handles migration from localStorage
+**Data Persistence** (lines ~1730-1800):
+- `loadData()`: Async function that reads from IndexedDB
 - `saveData()`: Async function that writes to IndexedDB (no size limits like localStorage)
-- Migration logic automatically moves data from localStorage to IndexedDB on first load
-- Handles old "Bookmark Curator" format and ensures type fields
 - **IMPORTANT**: All `saveData()` calls must use `await` since it's async
 
 **Core Rendering** (line ~2784):
@@ -75,15 +73,13 @@ data = {
 - Matplotlib integration: plots rendered as base64 PNG images in output
 - Console logging enabled for debugging: `[Pyodide] ...` messages track initialization progress
 
-**Export/Import** (lines ~3000-3135):
+**Export/Import** (lines ~2910-2972):
 - **Export**: Downloads entire notebook as JSON file (data structure only, no IndexedDB metadata)
 - **Import**: Reads JSON file, validates format, handles large files
   - File size validation: 50MB maximum for safety
   - Progress feedback for files > 1MB
-  - Automatic format detection and migration
-  - Supports both old (bookmarks array) and new (items array) formats
+  - Expects current format with `sections` array containing `items` arrays
   - Console logging of import statistics (sections count, items count)
-  - Storage size reporting after import
 
 **Internal Linking** (lines ~2992-3002):
 - Supports `[[Section Name > Item Title]]` syntax in markdown
@@ -138,13 +134,10 @@ Since this is a single HTML file:
 - IndexedDB is purpose-built for web applications storing structured data
 - No compression needed - browser handles storage optimization
 
-**Migration Logic**:
-- Automatically migrates data from localStorage to IndexedDB on first load
-- Cleans up old localStorage entries (`researchNotebook`, `researchNotebook_compressed`) after successful migration
-- Handles legacy "Bookmark Curator" format from previous versions
-- Old format used `bookmarks` array instead of `items` array
-- Migration auto-detects item types based on fields (url → bookmark, content → note, code → code)
-- All migrations happen transparently without user intervention
+**Data Format**:
+- Sections contain `items` arrays where each item has a `type` field ('bookmark', 'note', or 'code')
+- All data must be in current format - legacy format support has been removed for simplicity
+- Export and import use the same clean JSON structure
 
 ### Pyodide Configuration
 **Version**: v0.28.2 (following stlite's proven approach)
