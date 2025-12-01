@@ -20,6 +20,8 @@ This is a single-file HTML application called "Research Notebook" - a browser-ba
 The application uses a hierarchical structure stored in IndexedDB:
 ```javascript
 data = {
+  title: string,        // Notebook title (displayed in header and browser tab)
+  subtitle: string,     // Notebook subtitle (displayed below title)
   sections: [
     {
       id: string,
@@ -73,12 +75,19 @@ data = {
 - Matplotlib integration: plots rendered as base64 PNG images in output
 - Console logging enabled for debugging: `[Pyodide] ...` messages track initialization progress
 
+**Settings** (lines ~1868-1891):
+- **Settings Modal**: Accessible via ⚙ icon in toolbar (far right, grey/muted color)
+- Allows customization of notebook title and subtitle
+- `openSettingsModal()`: Opens modal with current title/subtitle values
+- `saveSettings()`: Saves changes to data model, updates header and browser tab title
+- Backwards compatible: loads default values if title/subtitle missing from saved data
+
 **Export/Import** (lines ~2910-2972):
 - **Export**: Downloads entire notebook as JSON file (data structure only, no IndexedDB metadata)
 - **Import**: Reads JSON file, validates format, handles large files
   - File size validation: 50MB maximum for safety
   - Progress feedback for files > 1MB
-  - Expects current format with `sections` array containing `items` arrays
+  - Expects current format with `title`, `subtitle`, and `sections` fields
   - Console logging of import statistics (sections count, items count)
 
 **Internal Linking** (lines ~2992-3002):

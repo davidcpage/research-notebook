@@ -1462,8 +1462,8 @@
 <body>
     <header>
         <div class="header-content">
-            <h1>Research Notebook</h1>
-            <p class="tagline">Bookmarks, notes, and connections</p>
+            <h1 id="headerTitle">Research Notebook</h1>
+            <p class="tagline" id="headerSubtitle">Bookmarks, notes, and connections</p>
         </div>
     </header>
 
@@ -1473,7 +1473,6 @@
                 <span class="btn-icon">+</span> New Section
             </button>
         </div>
-        <div class="toolbar-divider"></div>
         <div class="toolbar-group">
             <button class="btn btn-secondary" onclick="exportData()">
                 <span class="btn-icon">↓</span> Export
@@ -1482,6 +1481,11 @@
                 <span class="btn-icon">↑</span> Import
             </button>
             <input type="file" id="importFile" accept=".json" style="display: none" onchange="importData(event)">
+        </div>
+        <div class="toolbar-group" style="margin-left: auto;">
+            <button class="btn btn-secondary" onclick="openSettingsModal()" title="Settings" style="color: var(--text-muted);">
+                <span class="btn-icon">⚙</span>
+            </button>
         </div>
     </div>
 
@@ -1692,12 +1696,38 @@ print('Hello, World!')" spellcheck="false"></textarea>
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="modal-close" onclick="closeSettingsModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="settingsTitle">Notebook Title</label>
+                    <input type="text" id="settingsTitle" placeholder="Research Notebook">
+                </div>
+                <div class="form-group">
+                    <label for="settingsSubtitle">Subtitle</label>
+                    <input type="text" id="settingsSubtitle" placeholder="Bookmarks, notes, and connections">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeSettingsModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
     <script>
         // Data structure
         let data = {
+            title: 'Research Notebook',
+            subtitle: 'Bookmarks, notes, and connections',
             sections: [],
             // Notes are stored in sections alongside bookmarks
             // Each item has a 'type' field: 'bookmark', 'note', or 'code'
@@ -1743,6 +1773,9 @@ print('Hello, World!')" spellcheck="false"></textarea>
 
                 if (jsonStr) {
                     data = JSON.parse(jsonStr);
+                    // Ensure title and subtitle exist (backwards compatibility)
+                    if (!data.title) data.title = 'Research Notebook';
+                    if (!data.subtitle) data.subtitle = 'Bookmarks, notes, and connections';
                     console.log(`Loaded data from IndexedDB (${(jsonStr.length / 1024).toFixed(1)}KB)`);
                 }
             } catch (error) {
@@ -1833,6 +1866,31 @@ print('Hello, World!')" spellcheck="false"></textarea>
             render();
             closeSectionModal();
             showToast('Section created');
+        }
+
+        // Settings Modal
+        function openSettingsModal() {
+            document.getElementById('settingsTitle').value = data.title || 'Research Notebook';
+            document.getElementById('settingsSubtitle').value = data.subtitle || 'Bookmarks, notes, and connections';
+            document.getElementById('settingsModal').classList.add('active');
+            document.getElementById('settingsTitle').focus();
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.remove('active');
+        }
+
+        async function saveSettings() {
+            const title = document.getElementById('settingsTitle').value.trim();
+            const subtitle = document.getElementById('settingsSubtitle').value.trim();
+
+            data.title = title || 'Research Notebook';
+            data.subtitle = subtitle || 'Bookmarks, notes, and connections';
+
+            await saveData();
+            render();
+            closeSettingsModal();
+            showToast('Settings saved');
         }
 
         // Bookmark Modal
@@ -2998,6 +3056,12 @@ sys.stderr = sys.__stderr__
 
         // Render the UI
         function render() {
+            // Update header and page title with current title and subtitle
+            const title = data.title || 'Research Notebook';
+            document.getElementById('headerTitle').textContent = title;
+            document.getElementById('headerSubtitle').textContent = data.subtitle || 'Bookmarks, notes, and connections';
+            document.title = title;
+
             const content = document.getElementById('content');
 
             if (data.sections.length === 0) {
