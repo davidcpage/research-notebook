@@ -58,12 +58,18 @@ data = {
 1. **Bookmarks** (lines ~1716-1815): URL, title, description, auto-fetches metadata
 2. **Notes** (lines ~1817-1960): Markdown content with LaTeX support, preview/edit modes
 3. **Code** (lines ~2219-2465): Python code snippets with in-browser execution via Pyodide
+   - Each code item has optional `showOutput` boolean field to toggle between showing code vs output in preview
+   - Output includes HTML (text, images for plots) stored in `output` field
 
 **Python Execution** (lines ~2046-2218):
-- Lazy-loads Pyodide (32MB) only when first Python code is run
-- `loadPyodide()`: Downloads and initializes Python runtime
+- **CRITICAL**: Function is named `initPyodide()` NOT `loadPyodide()` to avoid collision with global `window.loadPyodide()`
+- Uses Pyodide v0.28.2 (same stable version as stlite project)
+- Lazy-loads on first Python code execution (~10MB initial download)
+- Pre-loads numpy, pandas, matplotlib packages during initialization
+- `initPyodide()`: Downloads and initializes Python runtime with proper indexURL configuration
 - `executePythonCode()`: Runs code in isolated context, captures stdout/stderr
-- Matplotlib integration for data visualization
+- Matplotlib integration: plots rendered as base64 PNG images in output
+- Console logging enabled for debugging: `[Pyodide] ...` messages track initialization progress
 
 **Export/Import** (lines ~2714-2755):
 - Export: Downloads data as JSON file
@@ -109,8 +115,25 @@ The app includes migration logic for backwards compatibility:
 - Migration auto-detects item types based on fields (url → bookmark, content → note, code → code)
 - Can import from legacy "Bookmark Curator" localStorage key
 
-### Pyodide Notes
-- 32MB download, only loaded on first Python execution
-- Status updates via `updatePyodideStatus()` during load
-- Code runs in web worker for better performance
-- Matplotlib charts rendered as base64 PNG images
+### Pyodide Configuration
+**Version**: v0.28.2 (following stlite's proven approach)
+- Script loaded in HTML `<head>` from jsDelivr CDN
+- Runtime initialization with `indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.28.2/full/'`
+- **Avoid function name collision**: Never name wrapper functions `loadPyodide` - use `initPyodide` instead
+
+**Loading Behavior**:
+- First execution: ~10-20 seconds (downloads runtime + numpy/pandas/matplotlib)
+- Subsequent loads: 1-2 seconds (cached by browser)
+- Status updates via `updatePyodideStatus()` show progress in UI
+- Console logs all initialization steps for debugging
+- **Note**: If loading hangs, check for function name collisions or incorrect CDN URLs
+
+**Pre-loaded Packages**:
+- numpy, pandas, matplotlib loaded during initialization
+- Additional packages auto-download when imported via `import` statements
+- Matplotlib configured for inline display with base64 PNG output
+
+**Code Cell UI**:
+- Action buttons (toggle ▶/{ }, edit ✎, delete ×) appear on hover
+- Toggle button switches between code/output view (only shown if output exists)
+- `showOutput` field persisted per code cell in localStorage
