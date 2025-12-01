@@ -12,6 +12,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+    <!-- Pyodide for Python execution -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.28.2/full/pyodide.js"></script>
     <style>
         :root {
             --bg-primary: #f8f6f3;
@@ -424,7 +426,8 @@
         }
 
         .bookmark-card:hover .card-actions,
-        .note-card:hover .card-actions {
+        .note-card:hover .card-actions,
+        .code-card:hover .card-actions {
             opacity: 1;
         }
 
@@ -618,8 +621,8 @@
             color: var(--text-secondary);
             border-top: 1px dashed #d0dcd0;
             background: #fff;
-            max-height: 60px;
-            overflow: hidden;
+            max-height: 300px;
+            overflow: auto;
         }
 
         .code-output-preview:empty {
@@ -627,8 +630,15 @@
         }
 
         .code-output-preview img {
-            max-height: 50px;
+            max-height: 250px;
             max-width: 100%;
+            margin: 0.5rem 0;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+
+        .code-output-preview pre {
+            margin: 0;
         }
 
         .code-meta {
@@ -1353,12 +1363,6 @@
             <button class="btn btn-primary" onclick="openSectionModal()">
                 <span class="btn-icon">+</span> New Section
             </button>
-            <button class="btn btn-note" onclick="openNoteModal()">
-                <span class="btn-icon">📝</span> New Note
-            </button>
-            <button class="btn btn-code" onclick="openCodeModal()">
-                <span class="btn-icon">🐍</span> New Code
-            </button>
         </div>
         <div class="toolbar-divider"></div>
         <div class="toolbar-group">
@@ -1592,6 +1596,9 @@ print('Hello, World!')" spellcheck="false"></textarea>
 
         // Track collapsed sections (not persisted)
         let collapsedSections = new Set();
+
+        // Track code display mode: 'code' or 'output'
+        let codeDisplayMode = 'code';
 
         let editingBookmark = null;
         let editingNote = null;
@@ -2043,7 +2050,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
         // ============ Pyodide / Code Notes ============
 
         // Load Pyodide lazily
-        async function loadPyodide() {
+        async function initPyodide() {
             if (pyodideReady) return pyodide;
             if (pyodideLoading) {
                 // Wait for existing load to complete
@@ -2054,37 +2061,60 @@ print('Hello, World!')" spellcheck="false"></textarea>
             }
 
             pyodideLoading = true;
-            updatePyodideStatus('loading', 'Loading Python...');
+            updatePyodideStatus('loading', 'Initializing Python runtime...');
+            console.log('[Pyodide] Starting to initialize Pyodide runtime...');
 
             try {
-                // Load Pyodide script dynamically
+                // Check if loadPyodide is available
                 if (!window.loadPyodide) {
-                    await new Promise((resolve, reject) => {
-                        const script = document.createElement('script');
-                        script.src = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
-                        script.onload = resolve;
-                        script.onerror = reject;
-                        document.head.appendChild(script);
-                    });
+                    throw new Error('Pyodide script not loaded. Please refresh the page.');
                 }
 
-                pyodide = await window.loadPyodide({
-                    indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/'
+                console.log('[Pyodide] Calling window.loadPyodide...');
+                const startTime = Date.now();
+
+                // Add timeout wrapper to prevent infinite hanging (120 seconds for slow connections)
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Pyodide initialization timed out after 120 seconds. Please check your internet connection.')), 120000);
                 });
 
+                pyodide = await Promise.race([
+                    window.loadPyodide({
+                        indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.28.2/full/',
+                        stdout: console.log,
+                        stderr: console.error
+                    }),
+                    timeoutPromise
+                ]);
+
+                const loadTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                console.log(`[Pyodide] Runtime initialized successfully in ${loadTime}s`);
+
                 // Load common packages
-                updatePyodideStatus('loading', 'Loading packages...');
+                console.log('[Pyodide] Loading numpy, pandas, matplotlib...');
+                updatePyodideStatus('loading', 'Loading Python packages (this may take 1-2 minutes)...');
+                const pkgStart = Date.now();
+
                 await pyodide.loadPackage(['numpy', 'pandas', 'matplotlib']);
 
-                // Set up matplotlib for inline display
+                const pkgTime = ((Date.now() - pkgStart) / 1000).toFixed(2);
+                console.log(`[Pyodide] Packages loaded in ${pkgTime}s`);
+
+                // Set up Python environment
+                console.log('[Pyodide] Setting up Python environment...');
+                updatePyodideStatus('loading', 'Setting up Python environment...');
                 await pyodide.runPythonAsync(`
+import sys
+import io
+import numpy as np
+import pandas as pd
 import matplotlib
 matplotlib.use('AGG')
 import matplotlib.pyplot as plt
-import io
-import base64
 
+# Helper function for matplotlib plots
 def _get_plot_as_base64():
+    import base64
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
     buf.seek(0)
@@ -2096,10 +2126,13 @@ def _get_plot_as_base64():
                 pyodideReady = true;
                 pyodideLoading = false;
                 updatePyodideStatus('ready', 'Python ready');
+                console.log('[Pyodide] Ready to execute Python code');
+                console.log('[Pyodide] Available packages: numpy, pandas, matplotlib');
                 return pyodide;
             } catch (error) {
+                console.error('[Pyodide] Load failed:', error);
                 pyodideLoading = false;
-                updatePyodideStatus('error', 'Failed to load Python');
+                updatePyodideStatus('error', 'Failed to load Python: ' + error.message);
                 throw error;
             }
         }
@@ -2132,7 +2165,7 @@ def _get_plot_as_base64():
             outputEl.innerHTML = '<span style="color: var(--text-muted);">Running...</span>';
 
             try {
-                const py = await loadPyodide();
+                const py = await initPyodide();
                 const result = await executePythonCode(py, code);
                 outputEl.innerHTML = result;
             } catch (error) {
@@ -2145,7 +2178,7 @@ def _get_plot_as_base64():
 
         async function executePythonCode(py, code) {
             let output = '';
-            
+
             // Capture stdout
             await py.runPythonAsync(`
 import sys
@@ -2165,35 +2198,59 @@ sys.stderr = _stderr_capture
                 const stderr = await py.runPythonAsync('_stderr_capture.getvalue()');
 
                 // Check for matplotlib figures
-                const hasFigure = await py.runPythonAsync('len(plt.get_fignums()) > 0');
-                
+                let hasFigure = false;
+                try {
+                    hasFigure = await py.runPythonAsync(`len(plt.get_fignums()) > 0`);
+                } catch (e) {
+                    // matplotlib not available or error, skip figure checking
+                }
+
+                // Show stdout
                 if (stdout) {
                     output += `<pre>${escapeHtml(stdout)}</pre>`;
                 }
-                
+
+                // Show stderr
                 if (stderr) {
                     output += `<pre class="stderr">${escapeHtml(stderr)}</pre>`;
                 }
 
+                // Show matplotlib plots
                 if (hasFigure) {
                     const imgBase64 = await py.runPythonAsync('_get_plot_as_base64()');
                     output += `<img src="data:image/png;base64,${imgBase64}" alt="Plot">`;
                 }
 
-                // Check if result is a DataFrame
-                if (result && await py.runPythonAsync(`'DataFrame' in str(type(${code.trim().split('\\n').pop()}))`).catch(() => false)) {
+                // Check if last line result is a DataFrame
+                if (result && !hasFigure) {
                     try {
-                        const html = await py.runPythonAsync(`${code.trim().split('\\n').pop()}.to_html(max_rows=20)`);
-                        output += html;
+                        const isDataFrame = await py.runPythonAsync(`
+import pandas as pd
+isinstance(${code.trim().split('\n').pop()}, pd.DataFrame) if '${code.trim().split('\n').pop()}' else False
+                        `).catch(() => false);
+
+                        if (isDataFrame) {
+                            const html = await py.runPythonAsync(`${code.trim().split('\n').pop()}.to_html(max_rows=20)`);
+                            output += html;
+                        }
                     } catch (e) {
-                        // Not a DataFrame or error getting HTML
+                        // Not a DataFrame or error
                     }
                 }
 
-                // If there's a return value and no other output, show it
-                if (result !== undefined && result !== null && !output) {
+                // Show return value only if:
+                // - There's a result
+                // - No matplotlib figure was created
+                // - No other output was generated
+                // - Result is not a matplotlib object
+                if (result !== undefined && result !== null && !output && !hasFigure) {
                     const resultStr = result.toString();
-                    if (resultStr && resultStr !== 'undefined') {
+                    // Don't show matplotlib objects
+                    if (resultStr &&
+                        resultStr !== 'undefined' &&
+                        !resultStr.includes('matplotlib') &&
+                        !resultStr.includes('<') &&
+                        !resultStr.includes('object at 0x')) {
                         output += `<pre>${escapeHtml(resultStr)}</pre>`;
                     }
                 }
@@ -2371,7 +2428,7 @@ sys.stderr = sys.__stderr__
             outputEl.innerHTML = '<span style="color: var(--text-muted);">Running...</span>';
 
             try {
-                const py = await loadPyodide();
+                const py = await initPyodide();
                 const result = await executePythonCode(py, currentViewingCode.code);
                 outputEl.innerHTML = result;
 
@@ -2666,6 +2723,17 @@ sys.stderr = sys.__stderr__
             render();
         }
 
+        function toggleCodeOutput(sectionId, codeId) {
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return;
+            const codeNote = section.items.find(item => item.id === codeId && item.type === 'code');
+            if (!codeNote) return;
+
+            codeNote.showOutput = !codeNote.showOutput;
+            saveData();
+            render();
+        }
+
         // Edit bookmark - find bookmark and open modal
         function editBookmark(sectionId, bookmarkId) {
             const section = data.sections.find(s => s.id === sectionId);
@@ -2897,9 +2965,16 @@ sys.stderr = sys.__stderr__
         function renderCodeCard(sectionId, codeNote) {
             const codePreview = codeNote.code ? escapeHtml(codeNote.code.substring(0, 200)) : '';
             const hasOutput = codeNote.output && codeNote.output.trim();
+            const showOutput = codeNote.showOutput || false;
+
             return `
                 <div class="code-card" data-item-id="${codeNote.id}" data-section-id="${sectionId}">
                     <div class="card-actions">
+                        ${hasOutput ? `
+                            <button class="btn-icon-only" onclick="event.stopPropagation(); toggleCodeOutput('${sectionId}', '${codeNote.id}')" title="${showOutput ? 'Show code' : 'Show output'}">
+                                ${showOutput ? '{ }' : '▶'}
+                            </button>
+                        ` : ''}
                         <button class="btn-icon-only" onclick="event.stopPropagation(); openCodeModal('${sectionId}', findCode('${sectionId}', '${codeNote.id}'))" title="Edit">✎</button>
                         <button class="btn-icon-only" onclick="event.stopPropagation(); confirmDeleteItem('${sectionId}', '${codeNote.id}', 'code note')" title="Delete">×</button>
                     </div>
@@ -2907,11 +2982,16 @@ sys.stderr = sys.__stderr__
                         <span class="code-icon">🐍</span>
                         <span class="code-title">${escapeHtml(codeNote.title)}</span>
                     </div>
-                    <div class="code-preview">${codePreview || '<em style="color: var(--text-muted);">Empty code</em>'}</div>
-                    ${hasOutput ? `<div class="code-output-preview">${codeNote.output.substring(0, 500)}</div>` : ''}
+                    ${showOutput && hasOutput ?
+                        `<div class="code-output-preview">${codeNote.output}</div>` :
+                        `<div class="code-preview">${codePreview || '<em style="color: var(--text-muted);">Empty code</em>'}</div>`
+                    }
+                    ${showOutput && !hasOutput ?
+                        `<div class="code-preview" style="color: var(--text-muted); font-style: italic;">No output available</div>` : ''
+                    }
                     <div class="code-meta">
                         <span>${formatDate(codeNote.createdAt)}</span>
-                        ${codeNote.updatedAt && codeNote.updatedAt !== codeNote.createdAt ? 
+                        ${codeNote.updatedAt && codeNote.updatedAt !== codeNote.createdAt ?
                             `<span>Updated ${formatDate(codeNote.updatedAt)}</span>` : ''
                         }
                     </div>
