@@ -14,6 +14,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
     <!-- Pyodide for Python execution -->
     <script src="https://cdn.jsdelivr.net/pyodide/v0.28.2/full/pyodide.js"></script>
+    <!-- Highlight.js for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
     <style>
         :root {
             --bg-primary: #f8f6f3;
@@ -596,6 +600,16 @@
             position: relative;
             white-space: pre-wrap;
             word-break: break-all;
+            margin: 0;
+            padding: 0;
+        }
+
+        .code-preview-content code {
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
+            background: transparent !important;
+            padding: 0;
         }
 
         .code-preview-content::after {
@@ -733,23 +747,31 @@
             gap: 1rem;
         }
 
-        .code-editor {
+        .form-group textarea.code-editor {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.9rem;
             line-height: 1.5;
             min-height: 200px;
             padding: 1rem;
             background: #1e1e1e;
-            color: #d4d4d4;
+            color: #ffffff;
             border: 1px solid var(--border);
             border-radius: 4px;
             resize: vertical;
             tab-size: 4;
+            font-weight: 500;
         }
 
-        .code-editor:focus {
+        .form-group textarea.code-editor::placeholder {
+            color: #666;
+            font-weight: 300;
+            opacity: 0.7;
+        }
+
+        .form-group textarea.code-editor:focus {
             outline: none;
             border-color: #4a7c4a;
+            background: #1e1e1e;
         }
 
         .code-output {
@@ -901,6 +923,18 @@
             overflow: auto;
             white-space: pre-wrap;
             word-break: break-word;
+        }
+
+        .code-viewer-code pre {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+        }
+
+        .code-viewer-code code {
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
         }
 
         .code-viewer-output {
@@ -2167,7 +2201,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
 
                 // Load common packages
                 console.log('[Pyodide] Loading numpy, pandas, matplotlib...');
-                updatePyodideStatus('loading', 'Loading Python packages (this may take 1-2 minutes)...');
+                updatePyodideStatus('loading', 'Loading Python packages...');
                 const pkgStart = Date.now();
 
                 await pyodide.loadPackage(['numpy', 'pandas', 'matplotlib']);
@@ -2457,15 +2491,19 @@ sys.stderr = sys.__stderr__
         function openCodeViewer(sectionId, codeId) {
             const section = data.sections.find(s => s.id === sectionId);
             if (!section) return;
-            
+
             const codeNote = section.items.find(c => c.id === codeId);
             if (!codeNote) return;
 
             currentViewingCode = { ...codeNote, sectionId };
 
             document.getElementById('codeViewerTitle').textContent = codeNote.title;
-            document.getElementById('codeViewerCode').textContent = codeNote.code;
+            const codeViewerEl = document.getElementById('codeViewerCode');
+            codeViewerEl.innerHTML = `<pre><code class="language-python">${escapeHtml(codeNote.code)}</code></pre>`;
             document.getElementById('codeViewerOutput').innerHTML = codeNote.output || '';
+
+            // Apply syntax highlighting to the code viewer
+            hljs.highlightElement(codeViewerEl.querySelector('code'));
 
             // Add backlinks
             const backlinks = findBacklinks(codeId);
@@ -2953,14 +2991,14 @@ sys.stderr = sys.__stderr__
             content.innerHTML = data.sections.map(section => {
                 const isCollapsed = collapsedSections.has(section.id);
                 const itemCount = section.items.length;
-                
+
                 return `
                 <div class="section" data-section-id="${section.id}">
                     ${itemCount === 0 ? `<button class="section-delete" onclick="deleteSection('${section.id}')" title="Delete empty section">×</button>` : ''}
                     <div class="section-header">
                         <button class="section-toggle ${isCollapsed ? 'collapsed' : ''}" onclick="toggleSection('${section.id}')" title="${isCollapsed ? 'Expand' : 'Collapse'}">▼</button>
                         <h2 class="section-title">
-                            <input type="text" value="${escapeHtml(section.name)}" 
+                            <input type="text" value="${escapeHtml(section.name)}"
                                 onchange="updateSectionName('${section.id}', this.value)"
                                 onblur="updateSectionName('${section.id}', this.value)">
                             ${isCollapsed && itemCount > 0 ? `<span class="section-count">(${itemCount})</span>` : ''}
@@ -2978,7 +3016,7 @@ sys.stderr = sys.__stderr__
                         </div>
                     </div>
                     <div class="items-grid ${isCollapsed ? 'collapsed' : ''}">
-                        ${itemCount === 0 ? 
+                        ${itemCount === 0 ?
                             '<p style="color: var(--text-muted); grid-column: 1/-1;">No items yet. Add a bookmark, note, or code!</p>' :
                             section.items.map(item => {
                                 if (item.type === 'note') {
@@ -2993,6 +3031,9 @@ sys.stderr = sys.__stderr__
                     </div>
                 </div>
             `}).join('');
+
+            // Apply syntax highlighting to all code blocks
+            hljs.highlightAll();
         }
 
         function renderBookmarkCard(sectionId, bookmark) {
@@ -3074,13 +3115,13 @@ sys.stderr = sys.__stderr__
                                     <div class="code-output-content">${codeNote.output}</div>
                                 </div>
                                 <div class="code-output-code-pane">
-                                    <div class="code-preview-content">${codePreview || 'No code'}</div>
+                                    <pre class="code-preview-content"><code class="language-python">${codePreview || 'No code'}</code></pre>
                                 </div>
                             </div>
                         </div>` :
                         `<div class="code-preview-frame">
                             ${codePreview ?
-                                `<div class="code-preview-content">${codePreview}</div>` :
+                                `<pre class="code-preview-content"><code class="language-python">${codePreview}</code></pre>` :
                                 '<div class="code-preview-placeholder">🐍</div>'
                             }
                         </div>`
