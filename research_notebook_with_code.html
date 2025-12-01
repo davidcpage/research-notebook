@@ -1125,6 +1125,63 @@
             margin-top: 0.5rem;
         }
 
+        .bookmark-thumbnail-preview {
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--border) 100%);
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .bookmark-thumbnail-preview:hover {
+            border-color: var(--accent);
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--border) 100%);
+        }
+
+        .bookmark-thumbnail-preview.drag-over {
+            border-color: var(--accent);
+            border-style: solid;
+            background: var(--bg-secondary);
+            transform: scale(1.02);
+        }
+
+        .bookmark-thumbnail-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center top;
+        }
+
+        .bookmark-thumbnail-placeholder {
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .thumbnail-icon {
+            font-size: 3rem;
+            opacity: 0.3;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .thumbnail-hint {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .bookmark-thumbnail-preview.has-image .bookmark-thumbnail-placeholder {
+            display: none;
+        }
+
         .modal-footer {
             padding: 1rem 1.5rem;
             border-top: 1px solid var(--border);
@@ -1530,6 +1587,16 @@
                     <select id="bookmarkSection"></select>
                 </div>
                 <div class="form-group">
+                    <label for="bookmarkThumbnailPreview">Thumbnail (optional)</label>
+                    <div class="bookmark-thumbnail-preview" id="bookmarkThumbnailPreview">
+                        <div class="bookmark-thumbnail-placeholder">
+                            <span class="thumbnail-icon">🖼️</span>
+                            <p class="thumbnail-hint">Drag & drop screenshot here<br>or click to upload</p>
+                        </div>
+                        <input type="file" id="bookmarkThumbnailFile" accept="image/*" style="display: none">
+                    </div>
+                </div>
+                <div class="form-group">
                     <label for="bookmarkUrl">URL</label>
                     <input type="url" id="bookmarkUrl" placeholder="https://example.com">
                 </div>
@@ -1744,6 +1811,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
         let editingCode = null;
         let currentViewingNote = null;
         let currentViewingCode = null;
+        let manualThumbnail = null; // Track manually uploaded thumbnail
 
         // Pyodide state
         let pyodide = null;
@@ -1893,6 +1961,112 @@ print('Hello, World!')" spellcheck="false"></textarea>
             showToast('Settings saved');
         }
 
+        // Initialize thumbnail drag-and-drop handlers
+        function initThumbnailDragDrop() {
+            const preview = document.getElementById('bookmarkThumbnailPreview');
+            const fileInput = document.getElementById('bookmarkThumbnailFile');
+
+            // Prevent default drag behaviors on the entire document
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                preview.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            // Highlight drop area when dragging over it
+            ['dragenter', 'dragover'].forEach(eventName => {
+                preview.addEventListener(eventName, () => {
+                    preview.classList.add('drag-over');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                preview.addEventListener(eventName, () => {
+                    preview.classList.remove('drag-over');
+                }, false);
+            });
+
+            // Handle dropped files
+            preview.addEventListener('drop', handleDrop, false);
+
+            // Handle click to upload
+            preview.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            // Handle file selection from file input
+            fileInput.addEventListener('change', (e) => {
+                const files = e.target.files;
+                if (files.length > 0) {
+                    handleFiles(files);
+                }
+            });
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+
+            const file = files[0];
+
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                showToast('Please upload an image file');
+                return;
+            }
+
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('Image file too large (max 5MB)');
+                return;
+            }
+
+            // Read the file and display it
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const dataUrl = e.target.result;
+                displayThumbnailPreview(dataUrl);
+                manualThumbnail = dataUrl;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function displayThumbnailPreview(dataUrl) {
+            const preview = document.getElementById('bookmarkThumbnailPreview');
+            preview.classList.add('has-image');
+
+            // Remove existing image if any
+            const existingImg = preview.querySelector('img');
+            if (existingImg) {
+                existingImg.remove();
+            }
+
+            // Add new image
+            const img = document.createElement('img');
+            img.src = dataUrl;
+            preview.appendChild(img);
+        }
+
+        function clearThumbnailPreview() {
+            const preview = document.getElementById('bookmarkThumbnailPreview');
+            preview.classList.remove('has-image');
+
+            const existingImg = preview.querySelector('img');
+            if (existingImg) {
+                existingImg.remove();
+            }
+
+            manualThumbnail = null;
+        }
+
         // Bookmark Modal
         function openBookmarkModal(sectionId = null, bookmark = null) {
             editingBookmark = bookmark ? { ...bookmark, sectionId } : null;
@@ -1909,10 +2083,18 @@ print('Hello, World!')" spellcheck="false"></textarea>
 
             document.getElementById('bookmarkModalTitle').textContent = bookmark ? 'Edit Bookmark' : 'Add Bookmark';
             document.getElementById('bookmarkSubmitBtn').textContent = bookmark ? 'Save Changes' : 'Add Bookmark';
-            
+
             document.getElementById('bookmarkUrl').value = bookmark?.url || '';
             document.getElementById('bookmarkTitle').value = bookmark?.title || '';
             document.getElementById('bookmarkDescription').value = bookmark?.description || '';
+
+            // Display existing thumbnail or clear preview
+            if (bookmark?.thumbnail) {
+                displayThumbnailPreview(bookmark.thumbnail);
+                manualThumbnail = bookmark.thumbnail; // Preserve existing thumbnail
+            } else {
+                clearThumbnailPreview();
+            }
 
             document.getElementById('bookmarkModal').classList.add('active');
             document.getElementById('bookmarkUrl').focus();
@@ -1923,6 +2105,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
             document.getElementById('bookmarkUrl').value = '';
             document.getElementById('bookmarkTitle').value = '';
             document.getElementById('bookmarkDescription').value = '';
+            clearThumbnailPreview();
             editingBookmark = null;
         }
 
@@ -1953,8 +2136,13 @@ print('Hello, World!')" spellcheck="false"></textarea>
             btn.innerHTML = '<span class="loading-spinner"></span> Saving...';
             btn.disabled = true;
 
-            // Generate thumbnail
-            const thumbnail = await generateThumbnail(url);
+            // Use manual thumbnail if provided, otherwise auto-generate
+            let thumbnail;
+            if (manualThumbnail) {
+                thumbnail = manualThumbnail;
+            } else {
+                thumbnail = await generateThumbnail(url);
+            }
 
             const bookmarkData = {
                 id: editingBookmark?.id || Date.now().toString(),
@@ -3322,6 +3510,7 @@ sys.stderr = sys.__stderr__
 
         // Initialize
         loadData();
+        initThumbnailDragDrop();
     </script>
 </body>
 </html>

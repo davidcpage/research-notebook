@@ -44,6 +44,7 @@ data = {
 - `collapsedSections` Set tracks UI state (not persisted)
 - Modal editing states: `editingBookmark`, `editingNote`, `editingCode`
 - Current viewing states: `currentViewingNote`, `currentViewingCode`
+- `manualThumbnail`: Tracks manually uploaded thumbnail (data URL) during bookmark creation/editing
 - Pyodide runtime state: `pyodide`, `pyodideLoading`, `pyodideReady`
 
 **Data Persistence** (lines ~1730-1800):
@@ -58,6 +59,16 @@ data = {
 
 **Item Types**:
 1. **Bookmarks** (lines ~1716-1815): URL, title, description, auto-fetches metadata
+   - **Thumbnail Generation**: Automatically generates thumbnails via microlink API or PDF.js
+   - **Manual Thumbnail Upload**: Drag-and-drop or click-to-upload screenshot fallback
+     - Preview area in bookmark modal (180px height, matches card thumbnails)
+     - Supports drag-and-drop of image files with visual feedback
+     - Click preview area to open file picker (mobile/accessibility)
+     - File validation: Image types only, 5MB max size
+     - Manual thumbnails take priority over auto-generation
+     - Preserved in edit mode, can replace failed auto-generation
+   - State tracking via `manualThumbnail` variable
+   - `initThumbnailDragDrop()`: Initializes drag-and-drop handlers on page load
 2. **Notes** (lines ~1817-1960): Markdown content with LaTeX support, preview/edit modes
 3. **Code** (lines ~2219-2465): Python code snippets with in-browser execution via Pyodide
    - Each code item has `showOutput` boolean field (defaults to `true` when output exists)
