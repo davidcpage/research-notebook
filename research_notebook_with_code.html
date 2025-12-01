@@ -346,6 +346,7 @@
             overflow: hidden;
             transition: all 0.3s ease;
             position: relative;
+            cursor: pointer;
         }
 
         .bookmark-card:hover {
@@ -463,6 +464,7 @@
             overflow: hidden;
             transition: all 0.3s ease;
             position: relative;
+            cursor: pointer;
         }
 
         .note-card:hover {
@@ -526,6 +528,8 @@
         .note-preview-content .internal-link {
             position: relative;
             z-index: 5;
+            pointer-events: none;
+            cursor: default;
         }
 
         .note-preview-content .katex {
@@ -566,6 +570,7 @@
             overflow: hidden;
             transition: all 0.3s ease;
             position: relative;
+            cursor: pointer;
         }
 
         .code-card:hover {
@@ -885,19 +890,23 @@
         }
 
         /* Code Viewer Modal */
-        .code-viewer {
+        .modal.code-viewer {
             background: #f8faf8;
             border: 1px solid #d0dcd0;
-            max-width: 800px;
+            max-width: 900px;
+            min-height: 60vh;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
         }
 
         .code-viewer .modal-header {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid #d0dcd0;
+            padding: 1.25rem 1.25rem 1rem;
+            background: var(--bg-secondary);
+            border-bottom: none;
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            background: #f0f4f0;
         }
 
         .code-viewer .modal-header h2 {
@@ -910,43 +919,114 @@
 
         .code-viewer-content {
             padding: 0;
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
         }
 
-        .code-viewer-code {
-            padding: 1rem 1.25rem;
-            background: #1e1e1e;
-            color: #d4d4d4;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.85rem;
-            line-height: 1.5;
-            max-height: 250px;
+        /* Code viewer uses same split-pane layout as cards, but larger */
+        .code-viewer-main {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .code-viewer-split-pane {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: row;
+            background: #eef4ee;
+        }
+
+        .code-viewer-output-pane {
+            flex: 0 0 60%;
+            padding: 2rem;
             overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid #d0dcd0;
+            background: #eef4ee;
+        }
+
+        .code-viewer-code-pane {
+            flex: 1;
+            background: #f8faf8;
+            padding: 1.5rem;
+            overflow: auto;
+        }
+
+        .code-viewer-code-pane pre {
+            margin: 0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.75rem;
+            line-height: 1.4;
             white-space: pre-wrap;
             word-break: break-word;
+            color: #2d5016;
         }
 
-        .code-viewer-code pre {
-            margin: 0;
-            padding: 0;
-            background: transparent;
+        .code-viewer-code-pane code {
+            background: transparent !important;
         }
 
-        .code-viewer-code code {
+        .code-viewer-code-pane code {
             font-family: inherit;
             font-size: inherit;
             line-height: inherit;
         }
 
-        .code-viewer-output {
-            padding: 1rem 1.25rem;
-            border-top: 1px solid #d0dcd0;
-            max-height: 300px;
+        /* Code-only view (when no output) */
+        .code-viewer-code-only {
+            flex: 1;
+            min-height: 0;
+            padding: 2rem;
+            background: #f8faf8;
             overflow: auto;
-            background: #fff;
         }
 
-        .code-viewer-output:empty {
-            display: none;
+        .code-viewer-code-only pre {
+            margin: 0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #2d5016;
+        }
+
+        .code-viewer-code-only code {
+            background: transparent !important;
+        }
+
+        .code-viewer-output-content {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            max-width: 100%;
+        }
+
+        .code-viewer-output-content img {
+            max-height: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+            display: block;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        .code-viewer-output-content pre {
+            margin: 0;
+            text-align: left;
+        }
+
+        /* Override highlight.js dark theme for code viewer */
+        .code-viewer-code-pane .hljs,
+        .code-viewer-code-only .hljs {
+            background: transparent !important;
+            color: #2d5016 !important;
         }
 
         /* Internal Links */
@@ -1227,12 +1307,17 @@
         .note-viewer {
             background: var(--note-bg);
             border: 1px solid var(--note-border);
-            max-width: 700px;
+            max-width: 900px;
+            min-height: 60vh;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
         }
 
         .note-viewer .modal-header {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid var(--note-border);
+            padding: 1.25rem 1.25rem 1rem;
+            background: var(--bg-secondary);
+            border-bottom: none;
             display: flex;
             align-items: center;
             gap: 0.75rem;
@@ -1249,10 +1334,11 @@
         .note-viewer-content {
             padding: 1.25rem;
             line-height: 1.7;
-            max-height: 60vh;
             overflow-y: auto;
             font-size: 0.925rem;
             color: var(--text-secondary);
+            flex: 1;
+            min-height: 0;
         }
 
         .note-viewer-content h1 {
@@ -1330,7 +1416,8 @@
 
         .note-viewer-meta {
             padding: 0.75rem 1.25rem;
-            border-top: 1px solid var(--note-border);
+            background: var(--bg-secondary);
+            border-top: none;
             font-size: 0.75rem;
             color: var(--text-muted);
             display: flex;
@@ -1350,15 +1437,20 @@
         }
 
         /* Bookmark Viewer Modal - styled like a card */
-        .bookmark-viewer {
+        .modal.bookmark-viewer {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
-            max-width: 500px;
+            max-width: 900px;
+            min-height: 60vh;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
         }
 
         .bookmark-viewer .modal-header {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid var(--border);
+            padding: 1.25rem 1.25rem 1rem;
+            background: var(--bg-secondary);
+            border-bottom: none;
             display: flex;
             align-items: center;
             gap: 0.75rem;
@@ -1377,21 +1469,27 @@
 
         .bookmark-viewer-content {
             padding: 0;
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
         }
 
         .bookmark-viewer-thumbnail {
             width: 100%;
-            height: 180px;
+            flex: 1;
+            min-height: 0;
             background: linear-gradient(135deg, var(--bg-primary) 0%, var(--border) 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            position: relative;
         }
 
         .bookmark-viewer-thumbnail img {
-            width: 100%;
-            height: 100%;
+            max-width: 80%;
+            max-height: 80%;
             object-fit: contain;
             object-position: center top;
         }
@@ -1403,25 +1501,11 @@
         }
 
         .bookmark-viewer-url {
-            padding: 1rem 1.25rem 0.5rem;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .bookmark-viewer-url a {
-            color: var(--link-color);
-            text-decoration: none;
-        }
-
-        .bookmark-viewer-url a:hover {
-            text-decoration: underline;
+            display: none;
         }
 
         .bookmark-viewer-description {
-            padding: 0.5rem 1.25rem 1rem;
+            padding: 1.25rem 1.25rem 1rem;
             font-size: 0.9rem;
             color: var(--text-secondary);
             line-height: 1.6;
@@ -1659,7 +1743,6 @@ Use $x^2$ for inline math, $$E=mc^2$$ for display math."></textarea>
     <div class="modal-overlay" id="noteViewerModal">
         <div class="modal note-viewer">
             <div class="modal-header">
-                <span class="note-icon">📝</span>
                 <h2 id="noteViewerTitle">Note</h2>
                 <button class="modal-close" onclick="closeNoteViewer()">×</button>
             </div>
@@ -1668,6 +1751,7 @@ Use $x^2$ for inline math, $$E=mc^2$$ for display math."></textarea>
                 <span id="noteViewerMeta"></span>
                 <div class="note-viewer-actions">
                     <button class="btn btn-secondary btn-small" onclick="editCurrentNote()">✎ Edit</button>
+                    <button class="btn btn-secondary btn-small" onclick="deleteCurrentNote()">× Delete</button>
                 </div>
             </div>
         </div>
@@ -1677,7 +1761,6 @@ Use $x^2$ for inline math, $$E=mc^2$$ for display math."></textarea>
     <div class="modal-overlay" id="bookmarkViewerModal">
         <div class="modal bookmark-viewer">
             <div class="modal-header">
-                <span class="note-icon">🔗</span>
                 <h2 id="bookmarkViewerTitle">Bookmark</h2>
                 <button class="modal-close" onclick="closeBookmarkViewer()">×</button>
             </div>
@@ -1692,6 +1775,7 @@ Use $x^2$ for inline math, $$E=mc^2$$ for display math."></textarea>
                 <div class="note-viewer-actions">
                     <a id="bookmarkViewerLink" href="#" target="_blank" class="btn btn-primary btn-small">Open ↗</a>
                     <button class="btn btn-secondary btn-small" onclick="editCurrentBookmark()">✎ Edit</button>
+                    <button class="btn btn-secondary btn-small" onclick="deleteCurrentBookmark()">× Delete</button>
                 </div>
             </div>
         </div>
@@ -1744,13 +1828,11 @@ print('Hello, World!')" spellcheck="false"></textarea>
     <div class="modal-overlay" id="codeViewerModal">
         <div class="modal code-viewer">
             <div class="modal-header">
-                <span class="code-icon">🐍</span>
                 <h2 id="codeViewerTitle">Code</h2>
                 <button class="modal-close" onclick="closeCodeViewer()">×</button>
             </div>
             <div class="code-viewer-content">
-                <div class="code-viewer-code" id="codeViewerCode"></div>
-                <div class="code-viewer-output" id="codeViewerOutput"></div>
+                <div class="code-viewer-main" id="codeViewerMain"></div>
                 <div id="codeViewerBacklinks" style="padding: 0 1.25rem 1rem;"></div>
             </div>
             <div class="note-viewer-meta">
@@ -1758,6 +1840,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
                 <div class="note-viewer-actions">
                     <button class="btn btn-run btn-small" onclick="runCurrentCode()">▶ Run</button>
                     <button class="btn btn-secondary btn-small" onclick="editCurrentCode()">✎ Edit</button>
+                    <button class="btn btn-secondary btn-small" onclick="deleteCurrentCode()">× Delete</button>
                 </div>
             </div>
         </div>
@@ -2336,6 +2419,14 @@ print('Hello, World!')" spellcheck="false"></textarea>
             openNoteModal(sectionId, note);
         }
 
+        async function deleteCurrentNote() {
+            if (!currentViewingNote) return;
+            const sectionId = currentViewingNote.sectionId;
+            const noteId = currentViewingNote.id;
+            closeNoteViewer();
+            await confirmDeleteItem(sectionId, noteId, 'note');
+        }
+
         // Bookmark Viewer
         let currentViewingBookmark = null;
 
@@ -2407,6 +2498,14 @@ print('Hello, World!')" spellcheck="false"></textarea>
             const bookmark = { ...currentViewingBookmark };
             closeBookmarkViewer();
             openBookmarkModal(sectionId, bookmark);
+        }
+
+        async function deleteCurrentBookmark() {
+            if (!currentViewingBookmark) return;
+            const sectionId = currentViewingBookmark.sectionId;
+            const bookmarkId = currentViewingBookmark.id;
+            closeBookmarkViewer();
+            await confirmDeleteItem(sectionId, bookmarkId, 'bookmark');
         }
 
         // ============ Pyodide / Code Notes ============
@@ -2751,12 +2850,36 @@ sys.stderr = sys.__stderr__
             currentViewingCode = { ...codeNote, sectionId };
 
             document.getElementById('codeViewerTitle').textContent = codeNote.title;
-            const codeViewerEl = document.getElementById('codeViewerCode');
-            codeViewerEl.innerHTML = `<pre><code class="language-python">${escapeHtml(codeNote.code)}</code></pre>`;
-            document.getElementById('codeViewerOutput').innerHTML = codeNote.output || '';
 
-            // Apply syntax highlighting to the code viewer
-            hljs.highlightElement(codeViewerEl.querySelector('code'));
+            // Render same layout as card: split-pane if output exists, code-only otherwise
+            const mainEl = document.getElementById('codeViewerMain');
+            const hasOutput = codeNote.output && codeNote.output.trim();
+
+            if (hasOutput) {
+                // Split-pane view: output (60%) + code (40%)
+                mainEl.innerHTML = `
+                    <div class="code-viewer-split-pane">
+                        <div class="code-viewer-output-pane">
+                            <div class="code-viewer-output-content">${codeNote.output}</div>
+                        </div>
+                        <div class="code-viewer-code-pane">
+                            <pre><code class="language-python">${escapeHtml(codeNote.code)}</code></pre>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Code-only view
+                mainEl.innerHTML = `
+                    <div class="code-viewer-code-only">
+                        <pre><code class="language-python">${escapeHtml(codeNote.code)}</code></pre>
+                    </div>
+                `;
+            }
+
+            // Apply syntax highlighting to code
+            mainEl.querySelectorAll('code.language-python').forEach(el => {
+                hljs.highlightElement(el);
+            });
 
             // Add backlinks
             const backlinks = findBacklinks(codeId);
@@ -2799,16 +2922,24 @@ sys.stderr = sys.__stderr__
             openCodeModal(sectionId, code);
         }
 
+        async function deleteCurrentCode() {
+            if (!currentViewingCode) return;
+            const sectionId = currentViewingCode.sectionId;
+            const codeId = currentViewingCode.id;
+            closeCodeViewer();
+            await confirmDeleteItem(sectionId, codeId, 'code note');
+        }
+
         async function runCurrentCode() {
             if (!currentViewingCode) return;
-            
-            const outputEl = document.getElementById('codeViewerOutput');
-            outputEl.innerHTML = '<span style="color: var(--text-muted);">Running...</span>';
+
+            // Show running status
+            const mainEl = document.getElementById('codeViewerMain');
+            mainEl.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">Running...</div>';
 
             try {
                 const py = await initPyodide();
                 const result = await executePythonCode(py, currentViewingCode.code);
-                outputEl.innerHTML = result;
 
                 // Update stored output
                 const section = data.sections.find(s => s.id === currentViewingCode.sectionId);
@@ -2817,12 +2948,16 @@ sys.stderr = sys.__stderr__
                     if (codeNote) {
                         codeNote.output = result;
                         codeNote.updatedAt = new Date().toISOString();
+                        currentViewingCode.output = result;
                         await saveData();
                         render();
+
+                        // Re-render the viewer with new output
+                        openCodeViewer(currentViewingCode.sectionId, currentViewingCode.id);
                     }
                 }
             } catch (error) {
-                outputEl.innerHTML = `<pre class="error">${escapeHtml(error.toString())}</pre>`;
+                mainEl.innerHTML = `<div style="padding: 2rem;"><pre class="error">${escapeHtml(error.toString())}</pre></div>`;
             }
         }
 
@@ -3325,11 +3460,7 @@ sys.stderr = sys.__stderr__
 
         function renderBookmarkCard(sectionId, bookmark) {
             return `
-                <div class="bookmark-card" data-item-id="${bookmark.id}">
-                    <div class="card-actions">
-                        <button class="btn-icon-only" onclick="editBookmark('${sectionId}', '${bookmark.id}')" title="Edit">✎</button>
-                        <button class="btn-icon-only" onclick="confirmDeleteItem('${sectionId}', '${bookmark.id}', 'bookmark')" title="Delete">×</button>
-                    </div>
+                <div class="bookmark-card" data-item-id="${bookmark.id}" onclick="openBookmarkViewer('${sectionId}', '${bookmark.id}')">
                     <div class="bookmark-thumbnail">
                         ${bookmark.thumbnail ?
                             `<img src="${bookmark.thumbnail}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'bookmark-thumbnail-placeholder\\'>🌐</div>'">` :
@@ -3337,14 +3468,10 @@ sys.stderr = sys.__stderr__
                         }
                     </div>
                     <div class="bookmark-content">
-                        <h3 class="bookmark-title">
-                            <a href="${escapeHtml(bookmark.url)}" target="_blank" rel="noopener noreferrer">
-                                ${escapeHtml(bookmark.title)}
-                            </a>
-                        </h3>
+                        <h3 class="bookmark-title">${escapeHtml(bookmark.title)}</h3>
                         <div class="bookmark-url">${escapeHtml(bookmark.url)}</div>
-                        ${bookmark.description ? 
-                            `<p class="bookmark-description">${escapeHtml(bookmark.description)}</p>` : 
+                        ${bookmark.description ?
+                            `<p class="bookmark-description">${escapeHtml(bookmark.description)}</p>` :
                             ''
                         }
                     </div>
@@ -3355,11 +3482,7 @@ sys.stderr = sys.__stderr__
         function renderNoteCard(sectionId, note) {
             const previewHtml = renderNotePreview(note.content);
             return `
-                <div class="note-card" data-item-id="${note.id}" data-section-id="${sectionId}">
-                    <div class="card-actions">
-                        <button class="btn-icon-only" onclick="event.stopPropagation(); openNoteModal('${sectionId}', findNote('${sectionId}', '${note.id}'))" title="Edit">✎</button>
-                        <button class="btn-icon-only" onclick="event.stopPropagation(); confirmDeleteItem('${sectionId}', '${note.id}', 'note')" title="Delete">×</button>
-                    </div>
+                <div class="note-card" data-item-id="${note.id}" data-section-id="${sectionId}" onclick="openNoteViewer('${sectionId}', '${note.id}')">
                     <div class="note-preview-frame">
                         ${previewHtml ?
                             `<div class="note-preview-content">${previewHtml}</div>` :
@@ -3385,16 +3508,7 @@ sys.stderr = sys.__stderr__
             const showOutput = codeNote.showOutput !== undefined ? codeNote.showOutput : (hasOutput ? true : false);
 
             return `
-                <div class="code-card" data-item-id="${codeNote.id}" data-section-id="${sectionId}">
-                    <div class="card-actions">
-                        ${hasOutput ? `
-                            <button class="btn-icon-only" onclick="event.stopPropagation(); toggleCodeOutput('${sectionId}', '${codeNote.id}')" title="${showOutput ? 'Show code only' : 'Show output'}">
-                                ${showOutput ? '{ }' : '▶'}
-                            </button>
-                        ` : ''}
-                        <button class="btn-icon-only" onclick="event.stopPropagation(); openCodeModal('${sectionId}', findCode('${sectionId}', '${codeNote.id}'))" title="Edit">✎</button>
-                        <button class="btn-icon-only" onclick="event.stopPropagation(); confirmDeleteItem('${sectionId}', '${codeNote.id}', 'code note')" title="Delete">×</button>
-                    </div>
+                <div class="code-card" data-item-id="${codeNote.id}" data-section-id="${sectionId}" onclick="openCodeViewer('${sectionId}', '${codeNote.id}')">
                     ${showOutput && hasOutput ?
                         `<div class="code-output-frame">
                             <div class="code-output-split-pane">
@@ -3496,15 +3610,19 @@ sys.stderr = sys.__stderr__
             }
         });
 
-        // Event delegation for internal links
+        // Event delegation for internal links (only in viewer modals, not in card previews)
         document.addEventListener('click', (e) => {
             const link = e.target.closest('.internal-link[data-link-section][data-link-item]');
             if (link) {
-                e.preventDefault();
-                e.stopPropagation();
-                const sectionId = link.dataset.linkSection;
-                const itemId = link.dataset.linkItem;
-                navigateToItem(sectionId, itemId);
+                // Only handle clicks if the link is inside a viewer modal
+                const isInViewer = link.closest('#noteViewerModal, #bookmarkViewerModal, #codeViewerModal');
+                if (isInViewer) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const sectionId = link.dataset.linkSection;
+                    const itemId = link.dataset.linkItem;
+                    navigateToItem(sectionId, itemId);
+                }
             }
         });
 

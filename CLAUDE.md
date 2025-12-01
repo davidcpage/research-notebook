@@ -202,3 +202,56 @@ All card types (bookmarks, notes, code) follow a unified design pattern:
 - Button shows "⏳ Running & Saving..." during execution
 - Ensures output is always available for split pane view
 - Errors are captured and displayed in output
+
+### Viewer Modals
+
+**Design Philosophy**:
+All three item types (notes, bookmarks, code) follow a consistent card-to-viewer pattern:
+- **Cards**: Compact previews showing main content in 180px frame
+- **Viewers**: Large modals (900px width, 60vh-90vh height) showing same content layout, just bigger
+- **Principle**: Viewers are "zoomed in" versions of cards, not different views
+
+**Card Interaction**:
+- Entire card is clickable → opens viewer modal
+- No action buttons on cards (edit/delete moved to viewer)
+- Only interaction: click to open + hover shadow effect
+- Internal links in note/bookmark card previews are non-interactive (visual only)
+
+**Viewer Modal Structure**:
+All viewers share consistent styling:
+- **Width**: 900px max-width (note, code) or 700px (bookmark, though can be 900px)
+- **Height**: 60vh minimum, 90vh maximum
+- **Header**: White background, no icons, just title + close button (×)
+- **Footer**: White background, metadata + action buttons (Edit, Delete, etc.)
+- **No borders**: Between header/content/footer for seamless appearance
+
+**Note Viewer**:
+- Large markdown preview with full LaTeX rendering
+- Internal links are clickable (navigate between items)
+- Backlinks section shows items that link to this note
+- Actions: Edit, Delete
+
+**Bookmark Viewer**:
+- Large thumbnail fills main area (80% size to show gradient background)
+- Same gradient background as card: `linear-gradient(135deg, var(--bg-primary) 0%, var(--border) 100%)`
+- Description shown below thumbnail (URL hidden - available via Open button)
+- Backlinks section shows items that link to this bookmark
+- Actions: Open ↗, Edit, Delete
+
+**Code Viewer**:
+- Uses same layout as code card: split-pane (60/40) if output exists, code-only otherwise
+- **Split-pane**: Output on left (60%), code context on right (40%)
+- **Code-only**: Full code display when no output
+- Light backgrounds (#f8faf8) with dark green text (#2d5016) - no dark syntax highlighting
+- Backlinks section shows items that link to this code
+- Actions: Run (re-execute), Edit, Delete
+
+**CSS Specificity**:
+- Viewer classes need `.modal.{viewer-type}` selector for proper specificity
+- Base `.modal` class (500px width) comes after some viewer definitions
+- Use combined selector to override: `.modal.code-viewer`, `.modal.bookmark-viewer`, etc.
+
+**Internal Link Behavior**:
+- Event delegation checks if link is inside viewer modal: `link.closest('#noteViewerModal, #bookmarkViewerModal, #codeViewerModal')`
+- Links only work in viewer modals, not in card previews
+- Clicking internal link closes current viewer and opens target item's viewer
