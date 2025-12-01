@@ -58,8 +58,10 @@ data = {
 1. **Bookmarks** (lines ~1716-1815): URL, title, description, auto-fetches metadata
 2. **Notes** (lines ~1817-1960): Markdown content with LaTeX support, preview/edit modes
 3. **Code** (lines ~2219-2465): Python code snippets with in-browser execution via Pyodide
-   - Each code item has optional `showOutput` boolean field to toggle between showing code vs output in preview
+   - Each code item has `showOutput` boolean field (defaults to `true` when output exists)
    - Output includes HTML (text, images for plots) stored in `output` field
+   - **Auto-execute**: Code automatically runs on save to generate output
+   - Split pane view shows output (60% left) and code context (40% right)
 
 **Python Execution** (lines ~2046-2218):
 - **CRITICAL**: Function is named `initPyodide()` NOT `loadPyodide()` to avoid collision with global `window.loadPyodide()`
@@ -133,7 +135,28 @@ The app includes migration logic for backwards compatibility:
 - Additional packages auto-download when imported via `import` statements
 - Matplotlib configured for inline display with base64 PNG output
 
-**Code Cell UI**:
+**Card Styling**:
+All card types (bookmarks, notes, code) follow a unified design pattern:
+- Large preview frame at top (180px height) displaying primary content
+- Title and metadata below the preview frame
+- Consistent hover effects and action buttons
+
+**Note Cards**:
+- Preview frame: Rendered markdown with richer parchment background (#f0ebe0)
+- Subtle styling via warm cream tones to distinguish from bookmarks
+- Empty notes show 📝 placeholder icon
+
+**Code Cards**:
+- Preview frame: Code text with light green-gray background (#f8faf8)
+- Split pane output view: Output (60%, left, #eef4ee background) + code context (40%, right)
+- Code font in split pane: 0.4rem to minimize wrapping (context only, full view available)
 - Action buttons (toggle ▶/{ }, edit ✎, delete ×) appear on hover
-- Toggle button switches between code/output view (only shown if output exists)
-- `showOutput` field persisted per code cell in localStorage
+- Toggle button switches between code-only and split pane view (only shown if output exists)
+- `showOutput` field defaults to `true` when output is available
+- Empty code cells show 🐍 placeholder icon
+
+**Auto-Execute Behavior**:
+- `saveCode()` function automatically runs code via `runCode()` before saving
+- Button shows "⏳ Running & Saving..." during execution
+- Ensures output is always available for split pane view
+- Errors are captured and displayed in output

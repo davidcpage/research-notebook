@@ -454,7 +454,7 @@
 
         /* Note Card Styles */
         .note-card {
-            background: var(--note-bg);
+            background: var(--bg-secondary);
             border: 1px solid var(--note-border);
             overflow: hidden;
             transition: all 0.3s ease;
@@ -476,72 +476,79 @@
             100% { box-shadow: 0 8px 30px var(--shadow); }
         }
 
-        .note-header {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid var(--note-border);
+        .note-preview-frame {
+            width: 100%;
+            height: 180px;
+            background: #f0ebe0;
             display: flex;
-            align-items: center;
-            gap: 0.75rem;
+            align-items: flex-start;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            padding: 1.25rem;
         }
 
-        .note-icon {
-            font-size: 1.25rem;
-            opacity: 0.6;
+        .note-preview-content {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .note-preview-content::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(transparent, #f0ebe0);
+            pointer-events: none;
+        }
+
+        .note-preview-content p {
+            margin-bottom: 0.5rem;
+        }
+
+        .note-preview-content h1, .note-preview-content h2, .note-preview-content h3 {
+            font-family: 'Playfair Display', serif;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .note-preview-content .internal-link {
+            position: relative;
+            z-index: 5;
+        }
+
+        .note-preview-content .katex {
+            font-size: 0.9em;
+        }
+
+        .note-preview-placeholder {
+            font-size: 3rem;
+            color: var(--text-muted);
+            opacity: 0.2;
+        }
+
+        .note-content {
+            padding: 1.25rem;
         }
 
         .note-title {
             font-family: 'Playfair Display', serif;
             font-size: 1.1rem;
             font-weight: 600;
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .note-preview {
-            padding: 1.25rem;
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            line-height: 1.6;
-            max-height: 150px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .note-preview::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 40px;
-            background: linear-gradient(transparent, var(--note-bg));
-            pointer-events: none;
-        }
-
-        .note-preview p {
             margin-bottom: 0.5rem;
-        }
-
-        .note-preview h1, .note-preview h2, .note-preview h3 {
-            font-family: 'Playfair Display', serif;
-            margin-bottom: 0.5rem;
-            font-size: 1rem;
-        }
-
-        .note-preview .internal-link {
-            position: relative;
-            z-index: 5;
-        }
-
-        .note-preview .katex {
-            font-size: 0.9em;
+            line-height: 1.4;
+            color: var(--text-primary);
         }
 
         .note-meta {
-            padding: 0.75rem 1.25rem;
-            border-top: 1px solid var(--note-border);
+            padding: 0 1.25rem 0.75rem 1.25rem;
             font-size: 0.75rem;
             color: var(--text-muted);
             display: flex;
@@ -550,7 +557,7 @@
 
         /* Code Card Styles */
         .code-card {
-            background: #f8faf8;
+            background: var(--bg-secondary);
             border: 1px solid #d0dcd0;
             overflow: hidden;
             transition: all 0.3s ease;
@@ -566,89 +573,157 @@
             animation: highlightPulse 2s ease-out;
         }
 
-        .code-header {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid #d0dcd0;
+        .code-preview-frame {
+            width: 100%;
+            height: 180px;
+            background: #f8faf8;
             display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            background: #f0f4f0;
-        }
-
-        .code-icon {
-            font-size: 1.25rem;
-            opacity: 0.7;
-        }
-
-        .code-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.1rem;
-            font-weight: 600;
-            flex: 1;
+            align-items: flex-start;
+            justify-content: center;
             overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            position: relative;
+            padding: 1.25rem;
         }
 
-        .code-preview {
-            padding: 1rem 1.25rem;
+        .code-preview-content {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.8rem;
             color: var(--text-secondary);
             line-height: 1.5;
-            max-height: 120px;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
             position: relative;
-            background: #fafcfa;
             white-space: pre-wrap;
             word-break: break-all;
         }
 
-        .code-preview::after {
+        .code-preview-content::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(transparent, #f8faf8);
+            pointer-events: none;
+        }
+
+        .code-output-frame {
+            width: 100%;
+            height: 180px;
+            background: #eef4ee;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .code-output-split-pane {
+            display: flex;
+            flex-direction: row;
+            width: 100%;
+            height: 100%;
+            gap: 1px;
+        }
+
+        .code-output-result-pane {
+            flex: 0 0 60%;
+            padding: 1rem;
+            overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid #d0dcd0;
+        }
+
+        .code-output-code-pane {
+            flex: 1;
+            background: #f8faf8;
+            padding: 0.75rem;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .code-output-code-pane .code-preview-content {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.4rem;
+            color: var(--text-secondary);
+            line-height: 1.2;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .code-output-code-pane .code-preview-content::after {
             content: '';
             position: absolute;
             bottom: 0;
             left: 0;
             right: 0;
             height: 40px;
-            background: linear-gradient(transparent, #fafcfa);
+            background: linear-gradient(transparent, #f8faf8);
             pointer-events: none;
         }
 
-        .code-output-preview {
-            padding: 0.75rem 1.25rem;
+        .code-output-content {
             font-size: 0.75rem;
             color: var(--text-secondary);
-            border-top: 1px dashed #d0dcd0;
-            background: #fff;
-            max-height: 300px;
-            overflow: auto;
-        }
-
-        .code-output-preview:empty {
-            display: none;
-        }
-
-        .code-output-preview img {
-            max-height: 250px;
+            text-align: center;
             max-width: 100%;
-            margin: 0.5rem 0;
+        }
+
+        .code-output-content img {
+            max-height: 160px;
+            max-width: 100%;
+            margin: 0 auto;
+            display: block;
             border-radius: 4px;
             box-shadow: 0 2px 4px var(--shadow);
         }
 
-        .code-output-preview pre {
+        .code-output-content pre {
             margin: 0;
+            text-align: left;
+        }
+
+        .code-preview-placeholder {
+            font-size: 3rem;
+            color: var(--text-muted);
+            opacity: 0.2;
+        }
+
+        .code-content {
+            padding: 1.25rem;
+        }
+
+        .code-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+            color: var(--text-primary);
+        }
+
+        .code-description {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
         .code-meta {
-            padding: 0.75rem 1.25rem;
-            border-top: 1px solid #d0dcd0;
+            padding: 0 1.25rem 0.75rem 1.25rem;
             font-size: 0.75rem;
             color: var(--text-muted);
             display: flex;
             justify-content: space-between;
-            background: #f0f4f0;
         }
 
         /* Code Editor Modal */
@@ -2314,11 +2389,10 @@ sys.stderr = sys.__stderr__
             editingCode = null;
         }
 
-        function saveCode() {
+        async function saveCode() {
             const sectionId = document.getElementById('codeSection').value;
             const title = document.getElementById('codeTitle').value.trim();
             const code = document.getElementById('codeContent').value;
-            const output = document.getElementById('codeOutput').innerHTML;
 
             if (!title) {
                 showToast('Please enter a title');
@@ -2330,6 +2404,16 @@ sys.stderr = sys.__stderr__
                 return;
             }
 
+            // Automatically run code before saving to generate output
+            const submitBtn = document.getElementById('codeSubmitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Running & Saving...';
+
+            await runCode();
+
+            // Get the output after running
+            const output = document.getElementById('codeOutput').innerHTML;
+
             const section = data.sections.find(s => s.id === sectionId);
             if (!section) return;
 
@@ -2339,6 +2423,7 @@ sys.stderr = sys.__stderr__
                 title,
                 code,
                 output,
+                showOutput: editingCode?.showOutput !== undefined ? editingCode.showOutput : (output.trim() ? true : false),
                 createdAt: editingCode?.createdAt || new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
@@ -2363,6 +2448,8 @@ sys.stderr = sys.__stderr__
             saveData();
             render();
             closeCodeModal();
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Code Note';
             showToast(editingCode ? 'Code note updated' : 'Code note created');
         }
 
@@ -2945,16 +3032,18 @@ sys.stderr = sys.__stderr__
                         <button class="btn-icon-only" onclick="event.stopPropagation(); openNoteModal('${sectionId}', findNote('${sectionId}', '${note.id}'))" title="Edit">✎</button>
                         <button class="btn-icon-only" onclick="event.stopPropagation(); confirmDeleteItem('${sectionId}', '${note.id}', 'note')" title="Delete">×</button>
                     </div>
-                    <div class="note-header">
-                        <span class="note-icon">📝</span>
-                        <span class="note-title">${escapeHtml(note.title)}</span>
+                    <div class="note-preview-frame">
+                        ${previewHtml ?
+                            `<div class="note-preview-content">${previewHtml}</div>` :
+                            '<div class="note-preview-placeholder">📝</div>'
+                        }
                     </div>
-                    <div class="note-preview">
-                        ${previewHtml || '<em style="color: var(--text-muted);">Empty note</em>'}
+                    <div class="note-content">
+                        <h3 class="note-title">${escapeHtml(note.title)}</h3>
                     </div>
                     <div class="note-meta">
                         <span>${formatDate(note.createdAt)}</span>
-                        ${note.updatedAt && note.updatedAt !== note.createdAt ? 
+                        ${note.updatedAt && note.updatedAt !== note.createdAt ?
                             `<span>Updated ${formatDate(note.updatedAt)}</span>` : ''
                         }
                     </div>
@@ -2963,32 +3052,42 @@ sys.stderr = sys.__stderr__
         }
 
         function renderCodeCard(sectionId, codeNote) {
-            const codePreview = codeNote.code ? escapeHtml(codeNote.code.substring(0, 200)) : '';
+            const codePreview = codeNote.code ? escapeHtml(codeNote.code.substring(0, 400)) : '';
             const hasOutput = codeNote.output && codeNote.output.trim();
-            const showOutput = codeNote.showOutput || false;
+            const showOutput = codeNote.showOutput !== undefined ? codeNote.showOutput : (hasOutput ? true : false);
 
             return `
                 <div class="code-card" data-item-id="${codeNote.id}" data-section-id="${sectionId}">
                     <div class="card-actions">
                         ${hasOutput ? `
-                            <button class="btn-icon-only" onclick="event.stopPropagation(); toggleCodeOutput('${sectionId}', '${codeNote.id}')" title="${showOutput ? 'Show code' : 'Show output'}">
+                            <button class="btn-icon-only" onclick="event.stopPropagation(); toggleCodeOutput('${sectionId}', '${codeNote.id}')" title="${showOutput ? 'Show code only' : 'Show output'}">
                                 ${showOutput ? '{ }' : '▶'}
                             </button>
                         ` : ''}
                         <button class="btn-icon-only" onclick="event.stopPropagation(); openCodeModal('${sectionId}', findCode('${sectionId}', '${codeNote.id}'))" title="Edit">✎</button>
                         <button class="btn-icon-only" onclick="event.stopPropagation(); confirmDeleteItem('${sectionId}', '${codeNote.id}', 'code note')" title="Delete">×</button>
                     </div>
-                    <div class="code-header">
-                        <span class="code-icon">🐍</span>
-                        <span class="code-title">${escapeHtml(codeNote.title)}</span>
-                    </div>
                     ${showOutput && hasOutput ?
-                        `<div class="code-output-preview">${codeNote.output}</div>` :
-                        `<div class="code-preview">${codePreview || '<em style="color: var(--text-muted);">Empty code</em>'}</div>`
+                        `<div class="code-output-frame">
+                            <div class="code-output-split-pane">
+                                <div class="code-output-result-pane">
+                                    <div class="code-output-content">${codeNote.output}</div>
+                                </div>
+                                <div class="code-output-code-pane">
+                                    <div class="code-preview-content">${codePreview || 'No code'}</div>
+                                </div>
+                            </div>
+                        </div>` :
+                        `<div class="code-preview-frame">
+                            ${codePreview ?
+                                `<div class="code-preview-content">${codePreview}</div>` :
+                                '<div class="code-preview-placeholder">🐍</div>'
+                            }
+                        </div>`
                     }
-                    ${showOutput && !hasOutput ?
-                        `<div class="code-preview" style="color: var(--text-muted); font-style: italic;">No output available</div>` : ''
-                    }
+                    <div class="code-content">
+                        <h3 class="code-title">${escapeHtml(codeNote.title)}</h3>
+                    </div>
                     <div class="code-meta">
                         <span>${formatDate(codeNote.createdAt)}</span>
                         ${codeNote.updatedAt && codeNote.updatedAt !== codeNote.createdAt ?
