@@ -410,13 +410,38 @@
         }
 
         .bookmark-description {
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             color: var(--text-secondary);
             line-height: 1.5;
             display: -webkit-box;
             -webkit-line-clamp: 3;
             -webkit-box-orient: vertical;
             overflow: hidden;
+        }
+
+        .bookmark-description p,
+        .bookmark-description ul,
+        .bookmark-description ol,
+        .bookmark-description li,
+        .bookmark-description a,
+        .bookmark-description strong,
+        .bookmark-description em,
+        .bookmark-description code {
+            font-size: inherit;
+        }
+
+        .bookmark-description p {
+            margin: 0;
+        }
+
+        .bookmark-description ul,
+        .bookmark-description ol {
+            margin: 0;
+            padding-left: 1.2em;
+        }
+
+        .bookmark-description li {
+            margin: 0;
         }
 
         .card-actions {
@@ -2454,7 +2479,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
             
             // Set description
             const descEl = document.getElementById('bookmarkViewerDescription');
-            descEl.textContent = bookmark.description || '';
+            descEl.innerHTML = bookmark.description ? renderMarkdownWithLinks(bookmark.description) : '';
             
             // Set link button
             document.getElementById('bookmarkViewerLink').href = bookmark.url;
@@ -3473,7 +3498,7 @@ sys.stderr = sys.__stderr__
                         </h3>
                         <div class="bookmark-url">${escapeHtml(bookmark.url)}</div>
                         ${bookmark.description ?
-                            `<p class="bookmark-description">${escapeHtml(bookmark.description)}</p>` :
+                            `<div class="bookmark-description">${renderMarkdownWithLinks(bookmark.description)}</div>` :
                             ''
                         }
                     </div>
