@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+package.json
+
+# Utility scripts (one-time use for existing notebooks)
+convert_thumbnails.js
+THUMBNAIL_CONVERTER_README.md
+
+# Notebook exports
+*_notebook*.json
+my_notebook*.json
