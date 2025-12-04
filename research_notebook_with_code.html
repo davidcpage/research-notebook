@@ -2329,6 +2329,8 @@ Create \`sections/{section-name}/{slug}.code.py\`:
         // Parse markdown with YAML frontmatter to note object
         function markdownToNote(content, filename) {
             const note = { type: 'note' };
+            // Store original filename for reliable deletion when title changes
+            note._filename = filename;
             const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
 
             if (frontmatterMatch) {
@@ -2378,6 +2380,8 @@ Create \`sections/{section-name}/{slug}.code.py\`:
         // Parse Python file with frontmatter comment to code object
         function fileToCode(content, filename, outputContent = null) {
             const code = { type: 'code', language: 'python' };
+            // Store original filename (without extension) for reliable deletion when title changes
+            code._filename = filename.replace(/\.code\.py$/, '');
             const frontmatterMatch = content.match(/^# ---\n((?:# .*\n)*?)# ---\n?([\s\S]*)$/);
 
             if (frontmatterMatch) {
@@ -2422,7 +2426,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
         }
 
         // Parse JSON to bookmark object
-        function jsonToBookmark(json, thumbnailDataUrl = null) {
+        function jsonToBookmark(json, thumbnailDataUrl = null, filename = null) {
             const bookmark = {
                 type: 'bookmark',
                 id: json.id || Date.now().toString(),
@@ -2432,6 +2436,10 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 created: json.created || new Date().toISOString(),
                 modified: json.modified || new Date().toISOString()
             };
+            // Store original filename (without extension) for reliable deletion when title changes
+            if (filename) {
+                bookmark._filename = filename.replace(/\.bookmark\.json$/, '');
+            }
             // Use data URL if provided (loaded from separate file), else use stored value
             bookmark.thumbnail = thumbnailDataUrl || json.thumbnail || null;
             return bookmark;
@@ -2630,7 +2638,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                                     }
                                 }
 
-                                const bookmark = jsonToBookmark(bookmarkData, thumbnailDataUrl);
+                                const bookmark = jsonToBookmark(bookmarkData, thumbnailDataUrl, filename);
                                 section.items.push(bookmark);
                             }
                         } catch (e) {
@@ -3000,23 +3008,25 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 const sectionSlug = slugify(section.name);
                 const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug);
 
-                const titleSlug = slugify(item.title);
-
+                // Use stored _filename if available (from filesystem load), otherwise derive from title
+                // This handles cases where filename doesn't match slugify(title)
                 if (item.type === 'note') {
-                    const filename = `${titleSlug}.md`;
+                    const filename = item._filename || `${slugify(item.title)}.md`;
                     await sectionDir.removeEntry(filename);
                     recordSave(`sections/${sectionSlug}/${filename}`);
                 } else if (item.type === 'code') {
-                    const filename = `${titleSlug}.code.py`;
+                    const baseFilename = item._filename || slugify(item.title);
+                    const filename = `${baseFilename}.code.py`;
                     await sectionDir.removeEntry(filename);
                     recordSave(`sections/${sectionSlug}/${filename}`);
                     try {
-                        const outputFilename = `${titleSlug}.output.html`;
+                        const outputFilename = `${baseFilename}.output.html`;
                         await sectionDir.removeEntry(outputFilename);
                         recordSave(`sections/${sectionSlug}/${outputFilename}`);
                     } catch (e) { /* output might not exist */ }
                 } else if (item.type === 'bookmark') {
-                    const filename = `${titleSlug}.bookmark.json`;
+                    const baseFilename = item._filename || slugify(item.title);
+                    const filename = `${baseFilename}.bookmark.json`;
                     await sectionDir.removeEntry(filename);
                     recordSave(`sections/${sectionSlug}/${filename}`);
                 }
@@ -3672,6 +3682,10 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                     }
                     section.items.push(bookmarkData);
                 } else {
+                    // Same section - check if title changed (need to delete old file)
+                    if (editingBookmark.title !== title) {
+                        await deleteItemFile(sectionId, editingBookmark);
+                    }
                     const index = section.items.findIndex(b => b.id === editingBookmark.id);
                     if (index !== -1) {
                         section.items[index] = bookmarkData;
@@ -3818,6 +3832,10 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                         }
                         section.items.push(noteData);
                     } else {
+                        // Same section - check if title changed (need to delete old file)
+                        if (editingNote.title !== title) {
+                            await deleteItemFile(sectionId, editingNote);
+                        }
                         const index = section.items.findIndex(n => n.id === editingNote.id);
                         if (index !== -1) {
                             section.items[index] = noteData;
@@ -4335,6 +4353,10 @@ sys.stderr = sys.__stderr__
                     }
                     section.items.push(codeData);
                 } else {
+                    // Same section - check if title changed (need to delete old file)
+                    if (editingCode.title !== title) {
+                        await deleteItemFile(sectionId, editingCode);
+                    }
                     const index = section.items.findIndex(c => c.id === editingCode.id);
                     if (index !== -1) {
                         section.items[index] = codeData;
