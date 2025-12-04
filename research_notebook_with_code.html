@@ -1919,14 +1919,12 @@ print('Hello, World!')" spellcheck="false"></textarea>
         // Track collapsed sections (not persisted)
         let collapsedSections = new Set();
 
-        // Track code display mode: 'code' or 'output'
-        let codeDisplayMode = 'code';
-
         let editingBookmark = null;
         let editingNote = null;
         let editingCode = null;
         let currentViewingNote = null;
         let currentViewingCode = null;
+        let currentViewingBookmark = null;
         let manualThumbnail = null; // Track manually uploaded thumbnail
 
         // Pyodide state
@@ -2209,7 +2207,6 @@ print('Hello, World!')" spellcheck="false"></textarea>
         // ========== SECTION: BOOKMARK_MODAL ==========
         // Bookmark creation/editing modal: open, close, save
 
-        // Bookmark Modal
         function openBookmarkModal(sectionId = null, bookmark = null) {
             editingBookmark = bookmark ? { ...bookmark, sectionId } : null;
             
@@ -2327,7 +2324,6 @@ print('Hello, World!')" spellcheck="false"></textarea>
         // ========== SECTION: NOTE_MODAL ==========
         // Note creation/editing modal: open, close, switchEditorTab, save
 
-        // Note Modal
         function openNoteModal(sectionId = null, note = null) {
             editingNote = note ? { ...note, sectionId } : null;
             
@@ -2430,7 +2426,6 @@ print('Hello, World!')" spellcheck="false"></textarea>
         // ========== SECTION: NOTE_VIEWER ==========
         // Note viewing modal: open, close, edit, delete
 
-        // Note Viewer
         function openNoteViewer(sectionId, noteId) {
             const section = data.sections.find(s => s.id === sectionId);
             if (!section) return;
@@ -2491,9 +2486,6 @@ print('Hello, World!')" spellcheck="false"></textarea>
             closeNoteViewer();
             await confirmDeleteItem(sectionId, noteId, 'note');
         }
-
-        // Bookmark Viewer
-        let currentViewingBookmark = null;
 
         // ========== SECTION: BOOKMARK_VIEWER ==========
         // Bookmark viewing modal: open, close, edit, delete
@@ -2805,7 +2797,6 @@ sys.stderr = sys.__stderr__
         // ========== SECTION: CODE_MODAL ==========
         // Code note creation/editing modal: open, close, save (auto-executes on save)
 
-        // Code Modal
         function openCodeModal(sectionId = null, codeNote = null) {
             editingCode = codeNote ? { ...codeNote, sectionId } : null;
             
@@ -2914,7 +2905,6 @@ sys.stderr = sys.__stderr__
         // ========== SECTION: CODE_VIEWER ==========
         // Code viewing modal: open, close, edit, delete, runCurrentCode
 
-        // Code Viewer
         function openCodeViewer(sectionId, codeId) {
             const section = data.sections.find(s => s.id === sectionId);
             if (!section) return;

@@ -1,46 +1,46 @@
 # research_notebook_with_code.html - Section Index
 
-This file provides a navigable index for the large single-file application (3800+ lines).
-Use grep to search for section markers: `grep -n "SECTION:" research_notebook_with_code.html`
+This file provides a navigable index for the large single-file application (~3800 lines).
+
+**To find actual line numbers:** `grep -n "SECTION:" research_notebook_with_code.html`
 
 ## Quick Reference
 
-| Section | Line | Purpose |
-|---------|------|---------|
-| [HTML_HEAD](#html_head) | 1 | DOCTYPE, CDN dependencies, all CSS |
-| [HTML_BODY_AND_MODALS](#html_body_and_modals) | 1631 | Header, toolbar, modals |
-| [STATE_AND_CONFIG](#state_and_config) | 1907 | Global state, marked config |
-| [DATA_PERSISTENCE](#data_persistence) | 1943 | IndexedDB operations |
-| [UI_UTILITIES](#ui_utilities) | 2021 | Toast notifications |
-| [SECTION_MODAL](#section_modal) | 2032 | Section CRUD |
-| [SETTINGS_MODAL](#settings_modal) | 2065 | Title/subtitle settings |
-| [THUMBNAIL_DRAG_DROP](#thumbnail_drag_drop) | 2093 | Manual thumbnail upload |
-| [BOOKMARK_MODAL](#bookmark_modal) | 2209 | Bookmark CRUD |
-| [NOTE_MODAL](#note_modal) | 2327 | Note CRUD |
-| [NOTE_VIEWER](#note_viewer) | 2430 | Note viewing |
-| [BOOKMARK_VIEWER](#bookmark_viewer) | 2498 | Bookmark viewing |
-| [PYODIDE_RUNTIME](#pyodide_runtime) | 2579 | Python execution |
-| [CODE_MODAL](#code_modal) | 2805 | Code note CRUD |
-| [CODE_VIEWER](#code_viewer) | 2914 | Code viewing |
-| [INTERNAL_LINKING](#internal_linking) | 3039 | [[wiki-links]] |
-| [THUMBNAIL_GENERATION](#thumbnail_generation) | 3225 | Auto thumbnails |
-| [DATA_OPERATIONS](#data_operations) | 3409 | Toggle, delete, edit |
-| [EXPORT_IMPORT](#export_import) | 3477 | JSON export/import |
-| [RENDER_FUNCTIONS](#render_functions) | 3566 | UI rendering |
-| [EVENT_HANDLERS_AND_INIT](#event_handlers_and_init) | 3741 | Keyboard, init |
+| Section | ~Lines | Purpose |
+|---------|--------|---------|
+| [HTML_HEAD](#html_head) | 1630 | DOCTYPE, CDN dependencies, all CSS |
+| [HTML_BODY_AND_MODALS](#html_body_and_modals) | 275 | Header, toolbar, modals |
+| [STATE_AND_CONFIG](#state_and_config) | 35 | Global state, marked config |
+| [DATA_PERSISTENCE](#data_persistence) | 80 | IndexedDB operations |
+| [UI_UTILITIES](#ui_utilities) | 10 | Toast notifications |
+| [SECTION_MODAL](#section_modal) | 35 | Section CRUD |
+| [SETTINGS_MODAL](#settings_modal) | 30 | Title/subtitle settings |
+| [THUMBNAIL_DRAG_DROP](#thumbnail_drag_drop) | 115 | Manual thumbnail upload |
+| [BOOKMARK_MODAL](#bookmark_modal) | 115 | Bookmark CRUD |
+| [NOTE_MODAL](#note_modal) | 100 | Note CRUD |
+| [NOTE_VIEWER](#note_viewer) | 65 | Note viewing |
+| [BOOKMARK_VIEWER](#bookmark_viewer) | 80 | Bookmark viewing |
+| [PYODIDE_RUNTIME](#pyodide_runtime) | 225 | Python execution |
+| [CODE_MODAL](#code_modal) | 110 | Code note CRUD |
+| [CODE_VIEWER](#code_viewer) | 125 | Code viewing |
+| [INTERNAL_LINKING](#internal_linking) | 185 | [[wiki-links]] |
+| [THUMBNAIL_GENERATION](#thumbnail_generation) | 185 | Auto thumbnails |
+| [DATA_OPERATIONS](#data_operations) | 70 | Toggle, delete, edit |
+| [EXPORT_IMPORT](#export_import) | 90 | JSON export/import |
+| [RENDER_FUNCTIONS](#render_functions) | 175 | UI rendering |
+| [EVENT_HANDLERS_AND_INIT](#event_handlers_and_init) | 75 | Keyboard, init |
 
 ---
 
 ## Section Details
 
 ### HTML_HEAD
-**Lines:** 1-1630
-**Type:** HTML/CSS
+**~1630 lines** | HTML/CSS
 
 Contains:
 - DOCTYPE declaration
 - External CDN dependencies (PDF.js, Marked.js, KaTeX, Pyodide v0.28.2, Highlight.js)
-- All CSS styles (~1600 lines)
+- All CSS styles
   - CSS variables and base styles
   - Header and toolbar styles
   - Card styles (bookmark, note, code)
@@ -48,8 +48,7 @@ Contains:
   - Responsive breakpoints
 
 ### HTML_BODY_AND_MODALS
-**Lines:** 1631-1905
-**Type:** HTML
+**~275 lines** | HTML
 
 Contains:
 - Header with title/subtitle
@@ -67,21 +66,19 @@ Contains:
 - Toast notification element
 
 ### STATE_AND_CONFIG
-**Lines:** 1907-1942
-**Type:** JavaScript
+**~35 lines** | JavaScript
 
 Key variables:
 - `data` - Main data structure (title, subtitle, sections[])
 - `collapsedSections` - UI state (not persisted)
 - `editingBookmark`, `editingNote`, `editingCode` - Edit mode trackers
-- `currentViewingNote`, `currentViewingCode` - Viewer state
+- `currentViewingNote`, `currentViewingCode`, `currentViewingBookmark` - Viewer state
 - `manualThumbnail` - Manual upload tracker
 - `pyodide`, `pyodideLoading`, `pyodideReady` - Python runtime state
 - `marked.setOptions()` - Markdown parser config
 
 ### DATA_PERSISTENCE
-**Lines:** 1943-2020
-**Type:** JavaScript
+**~80 lines** | JavaScript
 
 Functions:
 - `loadData()` - Load from IndexedDB on startup
@@ -94,15 +91,13 @@ Constants:
 - `IDB_KEY = 'data'`
 
 ### UI_UTILITIES
-**Lines:** 2021-2031
-**Type:** JavaScript
+**~10 lines** | JavaScript
 
 Functions:
 - `showToast(message)` - Display temporary notification
 
 ### SECTION_MODAL
-**Lines:** 2032-2064
-**Type:** JavaScript
+**~35 lines** | JavaScript
 
 Functions:
 - `openSectionModal()` - Show section creation modal
@@ -110,8 +105,7 @@ Functions:
 - `createSection()` - Create new section and save
 
 ### SETTINGS_MODAL
-**Lines:** 2065-2092
-**Type:** JavaScript
+**~30 lines** | JavaScript
 
 Functions:
 - `openSettingsModal()` - Show settings modal
@@ -119,8 +113,7 @@ Functions:
 - `saveSettings()` - Save title/subtitle, update header
 
 ### THUMBNAIL_DRAG_DROP
-**Lines:** 2093-2208
-**Type:** JavaScript
+**~115 lines** | JavaScript
 
 Functions:
 - `initThumbnailDragDrop()` - Set up drag-drop handlers (called on init)
@@ -136,8 +129,7 @@ Features:
 - Image type validation
 
 ### BOOKMARK_MODAL
-**Lines:** 2209-2326
-**Type:** JavaScript
+**~115 lines** | JavaScript
 
 Functions:
 - `openBookmarkModal(sectionId, bookmark)` - Open for create/edit
@@ -151,8 +143,7 @@ Features:
 - Auto-thumbnail generation on save
 
 ### NOTE_MODAL
-**Lines:** 2327-2429
-**Type:** JavaScript
+**~100 lines** | JavaScript
 
 Functions:
 - `openNoteModal(sectionId, note)` - Open for create/edit
@@ -166,8 +157,7 @@ Features:
 - LaTeX support
 
 ### NOTE_VIEWER
-**Lines:** 2430-2497
-**Type:** JavaScript
+**~65 lines** | JavaScript
 
 Functions:
 - `openNoteViewer(sectionId, noteId)` - Display note
@@ -181,8 +171,7 @@ Features:
 - Edit/Delete actions
 
 ### BOOKMARK_VIEWER
-**Lines:** 2498-2578
-**Type:** JavaScript
+**~80 lines** | JavaScript
 
 Functions:
 - `openBookmarkViewer(sectionId, bookmarkId)` - Display bookmark
@@ -197,8 +186,7 @@ Features:
 - Open, Edit, Delete actions
 
 ### PYODIDE_RUNTIME
-**Lines:** 2579-2804
-**Type:** JavaScript
+**~225 lines** | JavaScript
 
 Functions:
 - `initPyodide()` - Lazy-load Python runtime (IMPORTANT: not named loadPyodide!)
@@ -214,8 +202,7 @@ Features:
 - 120s timeout with error handling
 
 ### CODE_MODAL
-**Lines:** 2805-2913
-**Type:** JavaScript
+**~110 lines** | JavaScript
 
 Functions:
 - `openCodeModal(sectionId, codeNote)` - Open for create/edit
@@ -229,8 +216,7 @@ Features:
 - Auto-executes on save
 
 ### CODE_VIEWER
-**Lines:** 2914-3038
-**Type:** JavaScript
+**~125 lines** | JavaScript
 
 Functions:
 - `openCodeViewer(sectionId, codeId)` - Display code note
@@ -246,8 +232,7 @@ Features:
 - Run, Edit, Delete actions
 
 ### INTERNAL_LINKING
-**Lines:** 3039-3224
-**Type:** JavaScript
+**~185 lines** | JavaScript
 
 Functions:
 - `renderMarkdownWithLinks(text, containerId)` - Parse markdown with [[links]]
@@ -263,8 +248,7 @@ Features:
 - Click navigation between items
 
 ### THUMBNAIL_GENERATION
-**Lines:** 3225-3408
-**Type:** JavaScript
+**~185 lines** | JavaScript
 
 Functions:
 - `resizeAndCompressThumbnail(source, maxWidth, quality)` - Resize to 1000px, JPEG 90%
@@ -280,8 +264,7 @@ Features:
 - Fallback handling for CORS issues
 
 ### DATA_OPERATIONS
-**Lines:** 3409-3476
-**Type:** JavaScript
+**~70 lines** | JavaScript
 
 Functions:
 - `toggleSection(sectionId)` - Collapse/expand section
@@ -293,8 +276,7 @@ Functions:
 - `updateSectionName(sectionId, newName)` - Rename section
 
 ### EXPORT_IMPORT
-**Lines:** 3477-3565
-**Type:** JavaScript
+**~90 lines** | JavaScript
 
 Functions:
 - `exportData()` - Download JSON file
@@ -307,8 +289,7 @@ Features:
 - Progress feedback for large files
 
 ### RENDER_FUNCTIONS
-**Lines:** 3566-3740
-**Type:** JavaScript
+**~175 lines** | JavaScript
 
 Functions:
 - `render()` - Main UI render (regenerates from data)
@@ -322,8 +303,7 @@ Functions:
 - `getPlainTextPreview(markdown, maxLength)` - Strip markdown for preview
 
 ### EVENT_HANDLERS_AND_INIT
-**Lines:** 3741-end
-**Type:** JavaScript
+**~75 lines** | JavaScript
 
 Contains:
 - Enter key handlers for modals

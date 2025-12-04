@@ -8,14 +8,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### How to Navigate
 
-1. **Read INDEX.md first** - Contains a complete section index with line numbers and function lists
+1. **Read INDEX.md first** - Contains section sizes (~lines) and function lists
 2. **Use grep to find sections** - Search for section markers:
    ```bash
    grep -n "SECTION:" research_notebook_with_code.html
    ```
 3. **Read targeted line ranges** - Use the Read tool with offset/limit parameters:
    ```
-   Read file_path with offset=2579 limit=200  # Read PYODIDE_RUNTIME section
+   # First: grep -n "SECTION: PYODIDE" to get line number, then:
+   Read file_path with offset=<line_number> limit=200
    ```
 4. **Search for specific functions**:
    ```bash
@@ -30,27 +31,19 @@ The file uses consistent section markers:
 
 ### Quick Section Reference
 
-| Section | Line | Purpose |
-|---------|------|---------|
-| HTML_HEAD | 1 | Dependencies, all CSS |
-| HTML_BODY_AND_MODALS | 1631 | All HTML and modals |
-| STATE_AND_CONFIG | 1907 | Global state |
-| DATA_PERSISTENCE | 1943 | IndexedDB |
-| BOOKMARK_MODAL | 2209 | Bookmark CRUD |
-| NOTE_MODAL | 2327 | Note CRUD |
-| PYODIDE_RUNTIME | 2579 | Python execution |
-| CODE_MODAL | 2805 | Code CRUD |
-| RENDER_FUNCTIONS | 3566 | UI rendering |
-| EVENT_HANDLERS_AND_INIT | 3741 | Init |
+Use `grep -n "SECTION:" research_notebook_with_code.html` for current line numbers.
 
-See INDEX.md for the complete list with all 21 sections.
+Key sections: HTML_HEAD (CSS), HTML_BODY_AND_MODALS, STATE_AND_CONFIG, DATA_PERSISTENCE,
+BOOKMARK_MODAL, NOTE_MODAL, PYODIDE_RUNTIME, CODE_MODAL, RENDER_FUNCTIONS, EVENT_HANDLERS_AND_INIT
+
+See INDEX.md for the complete list with all 21 sections and their sizes.
 
 ### When Making Changes
 
 1. First, use grep to locate the relevant section
 2. Read only the lines you need to understand
 3. Make targeted edits
-4. **Update INDEX.md** if you add/remove sections or significantly change line numbers
+4. **Update INDEX.md** if you add/remove sections or significantly change section sizes
 
 ---
 
@@ -91,7 +84,7 @@ data = {
 
 ### Key Components
 
-**State Management** (STATE_AND_CONFIG section, line ~1907):
+**State Management** (STATE_AND_CONFIG section):
 - Global `data` object holds all sections and items
 - `collapsedSections` Set tracks UI state (not persisted)
 - Modal editing states: `editingBookmark`, `editingNote`, `editingCode`
@@ -99,18 +92,18 @@ data = {
 - `manualThumbnail`: Tracks manually uploaded thumbnail (data URL) during bookmark creation/editing
 - Pyodide runtime state: `pyodide`, `pyodideLoading`, `pyodideReady`
 
-**Data Persistence** (DATA_PERSISTENCE section, line ~1943):
+**Data Persistence** (DATA_PERSISTENCE section):
 - `loadData()`: Async function that reads from IndexedDB
 - `saveData()`: Async function that writes to IndexedDB (no size limits like localStorage)
 - **IMPORTANT**: All `saveData()` calls must use `await` since it's async
 
-**Core Rendering** (RENDER_FUNCTIONS section, line ~3566):
+**Core Rendering** (RENDER_FUNCTIONS section):
 - `render()`: Main function that regenerates entire UI from data model
 - Called after any data modification
 - Uses template literals to generate HTML dynamically
 
 **Item Types**:
-1. **Bookmarks** (BOOKMARK_MODAL section, line ~2209): URL, title, description, auto-fetches metadata
+1. **Bookmarks** (BOOKMARK_MODAL section): URL, title, description, auto-fetches metadata
    - **Thumbnail Generation**: Automatically generates thumbnails via microlink API or PDF.js
    - **Manual Thumbnail Upload**: Drag-and-drop or click-to-upload screenshot fallback
      - Preview area in bookmark modal (180px height, matches card thumbnails)
@@ -121,14 +114,14 @@ data = {
      - Preserved in edit mode, can replace failed auto-generation
    - State tracking via `manualThumbnail` variable
    - `initThumbnailDragDrop()`: Initializes drag-and-drop handlers on page load
-2. **Notes** (NOTE_MODAL section, line ~2327): Markdown content with LaTeX support, preview/edit modes
-3. **Code** (CODE_MODAL section, line ~2805): Python code snippets with in-browser execution via Pyodide
+2. **Notes** (NOTE_MODAL section): Markdown content with LaTeX support, preview/edit modes
+3. **Code** (CODE_MODAL section): Python code snippets with in-browser execution via Pyodide
    - Each code item has `showOutput` boolean field (defaults to `true` when output exists)
    - Output includes HTML (text, images for plots) stored in `output` field
    - **Auto-execute**: Code automatically runs on save to generate output
    - Split pane view shows output (60% left) and code context (40% right)
 
-**Python Execution** (PYODIDE_RUNTIME section, line ~2579):
+**Python Execution** (PYODIDE_RUNTIME section):
 - **CRITICAL**: Function is named `initPyodide()` NOT `loadPyodide()` to avoid collision with global `window.loadPyodide()`
 - Uses Pyodide v0.28.2 (same stable version as stlite project)
 - Lazy-loads on first Python code execution (~10MB initial download)
@@ -138,14 +131,14 @@ data = {
 - Matplotlib integration: plots rendered as base64 PNG images in output
 - Console logging enabled for debugging: `[Pyodide] ...` messages track initialization progress
 
-**Settings** (SETTINGS_MODAL section, line ~2065):
+**Settings** (SETTINGS_MODAL section):
 - **Settings Modal**: Accessible via ⚙ icon in toolbar (far right, grey/muted color)
 - Allows customization of notebook title and subtitle
 - `openSettingsModal()`: Opens modal with current title/subtitle values
 - `saveSettings()`: Saves changes to data model, updates header and browser tab title
 - Backwards compatible: loads default values if title/subtitle missing from saved data
 
-**Export/Import** (EXPORT_IMPORT section, line ~3477):
+**Export/Import** (EXPORT_IMPORT section):
 - **Export**: Downloads entire notebook as JSON file (data structure only, no IndexedDB metadata)
 - **Import**: Reads JSON file, validates format, handles large files
   - File size validation: 50MB maximum for safety
@@ -153,7 +146,7 @@ data = {
   - Expects current format with `title`, `subtitle`, and `sections` fields
   - Console logging of import statistics (sections count, items count)
 
-**Internal Linking** (INTERNAL_LINKING section, line ~3039):
+**Internal Linking** (INTERNAL_LINKING section):
 - Supports `[[Section Name > Item Title]]` syntax in markdown
 - Event delegation for click handling
 - `navigateToItem()`: Opens viewer for linked items
@@ -177,11 +170,11 @@ Since this is a single HTML file:
 4. Use Edit tool to make precise changes
 5. Test by opening in browser
 
-**Section Locations** (see INDEX.md for complete list):
-- CSS styles: HTML_HEAD section (lines 1-1630)
-- HTML modals: HTML_BODY_AND_MODALS section (lines 1631-1905)
-- State/config: STATE_AND_CONFIG section (line 1907)
-- Render functions: RENDER_FUNCTIONS section (line 3566)
+**Section Locations** (use `grep -n "SECTION:"` for line numbers, see INDEX.md for sizes):
+- CSS styles: HTML_HEAD section (~1630 lines)
+- HTML modals: HTML_BODY_AND_MODALS section (~275 lines)
+- State/config: STATE_AND_CONFIG section (~35 lines)
+- Render functions: RENDER_FUNCTIONS section (~175 lines)
 
 **Important Patterns**:
 - After any data modification, always call `await saveData()` then `render()` (saveData is async!)
