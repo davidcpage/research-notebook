@@ -2809,229 +2809,265 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 
         // ========== Targeted filesystem save functions ==========
         // These functions save only specific files, avoiding full rewrites
-        // All wrapped with withFilesystemSave() to manage observer flag
+        // Each records its save path so the observer can ignore our own writes
 
         // Track recent saves to ignore observer events for files we just wrote
-        let recentSaveTimestamp = 0;
+        // Maps relative path -> timestamp
+        let recentSaves = new Map();
 
-        // Wrapper that records save timestamp for observer suppression
-        async function withFilesystemSave(operation) {
-            if (!filesystemLinked || !notebookDirHandle) return;
-            await operation();
-            recentSaveTimestamp = Date.now();
+        // Record that we just saved a file (path relative to notebook root)
+        function recordSave(relativePath) {
+            recentSaves.set(relativePath, Date.now());
+            // Clean up old entries (older than 2s)
+            const cutoff = Date.now() - 2000;
+            for (const [path, time] of recentSaves) {
+                if (time < cutoff) recentSaves.delete(path);
+            }
+        }
+
+        // Check if we recently saved this file (within 1s)
+        function wasRecentlySaved(relativePath) {
+            const saveTime = recentSaves.get(relativePath);
+            return saveTime && (Date.now() - saveTime < 1000);
         }
 
         // Save only notebook.json (for settings, section order changes)
         async function saveNotebookMeta() {
-            await withFilesystemSave(async () => {
-                const metaFile = await notebookDirHandle.getFileHandle('notebook.json', { create: true });
-                const metaWritable = await metaFile.createWritable();
-                await metaWritable.write(JSON.stringify({
-                    title: data.title,
-                    subtitle: data.subtitle,
-                    sections: data.sections.map(s => slugify(s.name))
-                }, null, 2));
-                await metaWritable.close();
-            });
+            if (!filesystemLinked || !notebookDirHandle) return;
+
+            const metaFile = await notebookDirHandle.getFileHandle('notebook.json', { create: true });
+            const metaWritable = await metaFile.createWritable();
+            await metaWritable.write(JSON.stringify({
+                title: data.title,
+                subtitle: data.subtitle,
+                sections: data.sections.map(s => slugify(s.name))
+            }, null, 2));
+            await metaWritable.close();
+            recordSave('notebook.json');
         }
 
         // Save a single note file
         async function saveNoteFile(sectionId, note) {
-            await withFilesystemSave(async () => {
-                if (sectionId === '_system') {
-                    // System note - save at root
-                    const filename = note.title + '.md';
-                    const fileHandle = await notebookDirHandle.getFileHandle(filename, { create: true });
-                    const writable = await fileHandle.createWritable();
-                    await writable.write(note.content);
-                    await writable.close();
-                    note.filename = filename;
-                    note.id = 'system-' + filename;
-                } else {
-                    // Regular note - save in section folder
-                    const section = data.sections.find(s => s.id === sectionId);
-                    if (!section) return;
+            if (!filesystemLinked || !notebookDirHandle) return;
 
-                    const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
-                    const sectionDir = await sectionsDir.getDirectoryHandle(slugify(section.name), { create: true });
+            if (sectionId === '_system') {
+                // System note - save at root
+                const filename = note.title + '.md';
+                const fileHandle = await notebookDirHandle.getFileHandle(filename, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(note.content);
+                await writable.close();
+                note.filename = filename;
+                note.id = 'system-' + filename;
+                recordSave(filename);
+            } else {
+                // Regular note - save in section folder
+                const section = data.sections.find(s => s.id === sectionId);
+                if (!section) return;
 
-                    const filename = `${slugify(note.title)}.md`;
-                    const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
-                    const writable = await fileHandle.createWritable();
-                    await writable.write(noteToMarkdown(note));
-                    await writable.close();
-                }
-            });
+                const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
+                const sectionSlug = slugify(section.name);
+                const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug, { create: true });
+
+                const filename = `${slugify(note.title)}.md`;
+                const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(noteToMarkdown(note));
+                await writable.close();
+                recordSave(`sections/${sectionSlug}/${filename}`);
+            }
         }
 
         // Save a single code file (and its output)
         async function saveCodeFile(sectionId, codeItem) {
-            await withFilesystemSave(async () => {
-                const section = data.sections.find(s => s.id === sectionId);
-                if (!section) return;
+            if (!filesystemLinked || !notebookDirHandle) return;
 
-                const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
-                const sectionDir = await sectionsDir.getDirectoryHandle(slugify(section.name), { create: true });
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return;
 
-                const titleSlug = slugify(codeItem.title);
+            const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
+            const sectionSlug = slugify(section.name);
+            const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug, { create: true });
 
-                // Write code file
-                const filename = `${titleSlug}.code.py`;
-                const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(codeToFile(codeItem));
-                await writable.close();
+            const titleSlug = slugify(codeItem.title);
 
-                // Write output file if exists
-                if (codeItem.output) {
-                    const outputFilename = `${titleSlug}.output.html`;
-                    const outputHandle = await sectionDir.getFileHandle(outputFilename, { create: true });
-                    const outputWritable = await outputHandle.createWritable();
-                    await outputWritable.write(codeItem.output);
-                    await outputWritable.close();
-                }
-            });
+            // Write code file
+            const filename = `${titleSlug}.code.py`;
+            const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(codeToFile(codeItem));
+            await writable.close();
+            recordSave(`sections/${sectionSlug}/${filename}`);
+
+            // Write output file if exists
+            if (codeItem.output) {
+                const outputFilename = `${titleSlug}.output.html`;
+                const outputHandle = await sectionDir.getFileHandle(outputFilename, { create: true });
+                const outputWritable = await outputHandle.createWritable();
+                await outputWritable.write(codeItem.output);
+                await outputWritable.close();
+                recordSave(`sections/${sectionSlug}/${outputFilename}`);
+            }
         }
 
         // Save a single bookmark file (and its thumbnail)
         async function saveBookmarkFile(sectionId, bookmark) {
-            await withFilesystemSave(async () => {
-                const section = data.sections.find(s => s.id === sectionId);
-                if (!section) return;
+            if (!filesystemLinked || !notebookDirHandle) return;
 
-                const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
-                const sectionDir = await sectionsDir.getDirectoryHandle(slugify(section.name), { create: true });
+            const section = data.sections.find(s => s.id === sectionId);
+            if (!section) return;
 
-                const titleSlug = slugify(bookmark.title);
+            const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
+            const sectionSlug = slugify(section.name);
+            const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug, { create: true });
 
-                // Handle thumbnail - save to assets if data URL
-                let thumbnailPath = null;
-                if (bookmark.thumbnail && bookmark.thumbnail.startsWith('data:')) {
-                    const assetsDir = await notebookDirHandle.getDirectoryHandle('assets', { create: true });
-                    const thumbsDir = await assetsDir.getDirectoryHandle('thumbnails', { create: true });
+            const titleSlug = slugify(bookmark.title);
 
-                    const thumbFilename = `${bookmark.id || titleSlug}.png`;
-                    thumbnailPath = `../../assets/thumbnails/${thumbFilename}`;
+            // Handle thumbnail - save to assets if data URL
+            let thumbnailPath = null;
+            if (bookmark.thumbnail && bookmark.thumbnail.startsWith('data:')) {
+                const assetsDir = await notebookDirHandle.getDirectoryHandle('assets', { create: true });
+                const thumbsDir = await assetsDir.getDirectoryHandle('thumbnails', { create: true });
 
-                    try {
-                        const response = await fetch(bookmark.thumbnail);
-                        const blob = await response.blob();
-                        const thumbHandle = await thumbsDir.getFileHandle(thumbFilename, { create: true });
-                        const thumbWritable = await thumbHandle.createWritable();
-                        await thumbWritable.write(blob);
-                        await thumbWritable.close();
-                    } catch (e) {
-                        console.error('[Filesystem] Error saving thumbnail:', e);
-                        thumbnailPath = null;
-                    }
+                const thumbFilename = `${bookmark.id || titleSlug}.png`;
+                thumbnailPath = `../../assets/thumbnails/${thumbFilename}`;
+
+                try {
+                    const response = await fetch(bookmark.thumbnail);
+                    const blob = await response.blob();
+                    const thumbHandle = await thumbsDir.getFileHandle(thumbFilename, { create: true });
+                    const thumbWritable = await thumbHandle.createWritable();
+                    await thumbWritable.write(blob);
+                    await thumbWritable.close();
+                    recordSave(`assets/thumbnails/${thumbFilename}`);
+                } catch (e) {
+                    console.error('[Filesystem] Error saving thumbnail:', e);
+                    thumbnailPath = null;
                 }
+            }
 
-                // Write bookmark JSON
-                const filename = `${titleSlug}.bookmark.json`;
-                const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(JSON.stringify(bookmarkToJson(bookmark, thumbnailPath), null, 2));
-                await writable.close();
-            });
+            // Write bookmark JSON
+            const filename = `${titleSlug}.bookmark.json`;
+            const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(JSON.stringify(bookmarkToJson(bookmark, thumbnailPath), null, 2));
+            await writable.close();
+            recordSave(`sections/${sectionSlug}/${filename}`);
         }
 
         // Create a new section directory with _section.json
         async function createSectionDir(section) {
-            await withFilesystemSave(async () => {
-                const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
-                const sectionDir = await sectionsDir.getDirectoryHandle(slugify(section.name), { create: true });
+            if (!filesystemLinked || !notebookDirHandle) return;
 
-                const sectionMetaFile = await sectionDir.getFileHandle('_section.json', { create: true });
+            const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
+            const sectionSlug = slugify(section.name);
+            const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug, { create: true });
+
+            const sectionMetaFile = await sectionDir.getFileHandle('_section.json', { create: true });
+            const sectionMetaWritable = await sectionMetaFile.createWritable();
+            await sectionMetaWritable.write(JSON.stringify({
+                name: section.name,
+                id: section.id
+            }, null, 2));
+            await sectionMetaWritable.close();
+            recordSave(`sections/${sectionSlug}/_section.json`);
+        }
+
+        // Delete a section directory
+        async function deleteSectionDir(sectionName) {
+            if (!filesystemLinked || !notebookDirHandle) return;
+
+            try {
+                const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections');
+                const sectionSlug = slugify(sectionName);
+                await sectionsDir.removeEntry(sectionSlug, { recursive: true });
+                // Record that we deleted files in this section (observer will see directory change)
+                recordSave(`sections/${sectionSlug}`);
+            } catch (e) {
+                console.error('[Filesystem] Error deleting section dir:', e);
+            }
+        }
+
+        // Delete a single item file
+        async function deleteItemFile(sectionId, item) {
+            if (!filesystemLinked || !notebookDirHandle) return;
+
+            try {
+                const section = data.sections.find(s => s.id === sectionId);
+                if (!section) return;
+
+                const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections');
+                const sectionSlug = slugify(section.name);
+                const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug);
+
+                const titleSlug = slugify(item.title);
+
+                if (item.type === 'note') {
+                    const filename = `${titleSlug}.md`;
+                    await sectionDir.removeEntry(filename);
+                    recordSave(`sections/${sectionSlug}/${filename}`);
+                } else if (item.type === 'code') {
+                    const filename = `${titleSlug}.code.py`;
+                    await sectionDir.removeEntry(filename);
+                    recordSave(`sections/${sectionSlug}/${filename}`);
+                    try {
+                        const outputFilename = `${titleSlug}.output.html`;
+                        await sectionDir.removeEntry(outputFilename);
+                        recordSave(`sections/${sectionSlug}/${outputFilename}`);
+                    } catch (e) { /* output might not exist */ }
+                } else if (item.type === 'bookmark') {
+                    const filename = `${titleSlug}.bookmark.json`;
+                    await sectionDir.removeEntry(filename);
+                    recordSave(`sections/${sectionSlug}/${filename}`);
+                }
+            } catch (e) {
+                console.error('[Filesystem] Error deleting item file:', e);
+            }
+        }
+
+        // Rename a section directory
+        async function renameSectionDir(oldName, newName, section) {
+            if (!filesystemLinked || !notebookDirHandle) return;
+
+            const oldSlug = slugify(oldName);
+            const newSlug = slugify(newName);
+            if (oldSlug === newSlug) return; // No actual rename needed
+
+            try {
+                const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections');
+
+                // Create new directory and copy files
+                const oldDir = await sectionsDir.getDirectoryHandle(oldSlug);
+                const newDir = await sectionsDir.getDirectoryHandle(newSlug, { create: true });
+
+                // Copy all files from old to new
+                for await (const [name, handle] of oldDir.entries()) {
+                    if (handle.kind === 'file') {
+                        const file = await handle.getFile();
+                        const newFile = await newDir.getFileHandle(name, { create: true });
+                        const writable = await newFile.createWritable();
+                        await writable.write(await file.arrayBuffer());
+                        await writable.close();
+                        recordSave(`sections/${newSlug}/${name}`);
+                    }
+                }
+
+                // Update _section.json with new name
+                const sectionMetaFile = await newDir.getFileHandle('_section.json', { create: true });
                 const sectionMetaWritable = await sectionMetaFile.createWritable();
                 await sectionMetaWritable.write(JSON.stringify({
                     name: section.name,
                     id: section.id
                 }, null, 2));
                 await sectionMetaWritable.close();
-            });
-        }
+                recordSave(`sections/${newSlug}/_section.json`);
 
-        // Delete a section directory
-        async function deleteSectionDir(sectionName) {
-            await withFilesystemSave(async () => {
-                try {
-                    const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections');
-                    await sectionsDir.removeEntry(slugify(sectionName), { recursive: true });
-                } catch (e) {
-                    console.error('[Filesystem] Error deleting section dir:', e);
-                }
-            });
-        }
-
-        // Delete a single item file
-        async function deleteItemFile(sectionId, item) {
-            await withFilesystemSave(async () => {
-                try {
-                    const section = data.sections.find(s => s.id === sectionId);
-                    if (!section) return;
-
-                    const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections');
-                    const sectionDir = await sectionsDir.getDirectoryHandle(slugify(section.name));
-
-                    const titleSlug = slugify(item.title);
-
-                    if (item.type === 'note') {
-                        await sectionDir.removeEntry(`${titleSlug}.md`);
-                    } else if (item.type === 'code') {
-                        await sectionDir.removeEntry(`${titleSlug}.code.py`);
-                        try {
-                            await sectionDir.removeEntry(`${titleSlug}.output.html`);
-                        } catch (e) { /* output might not exist */ }
-                    } else if (item.type === 'bookmark') {
-                        await sectionDir.removeEntry(`${titleSlug}.bookmark.json`);
-                        // Note: we don't delete thumbnails as they might be reused
-                    }
-                } catch (e) {
-                    console.error('[Filesystem] Error deleting item file:', e);
-                }
-            });
-        }
-
-        // Rename a section directory
-        async function renameSectionDir(oldName, newName, section) {
-            const oldSlug = slugify(oldName);
-            const newSlug = slugify(newName);
-            if (oldSlug === newSlug) return; // No actual rename needed
-
-            await withFilesystemSave(async () => {
-                try {
-                    const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections');
-
-                    // Create new directory and copy files
-                    const oldDir = await sectionsDir.getDirectoryHandle(oldSlug);
-                    const newDir = await sectionsDir.getDirectoryHandle(newSlug, { create: true });
-
-                    // Copy all files from old to new
-                    for await (const [name, handle] of oldDir.entries()) {
-                        if (handle.kind === 'file') {
-                            const file = await handle.getFile();
-                            const newFile = await newDir.getFileHandle(name, { create: true });
-                            const writable = await newFile.createWritable();
-                            await writable.write(await file.arrayBuffer());
-                            await writable.close();
-                        }
-                    }
-
-                    // Update _section.json with new name
-                    const sectionMetaFile = await newDir.getFileHandle('_section.json', { create: true });
-                    const sectionMetaWritable = await sectionMetaFile.createWritable();
-                    await sectionMetaWritable.write(JSON.stringify({
-                        name: section.name,
-                        id: section.id
-                    }, null, 2));
-                    await sectionMetaWritable.close();
-
-                    // Delete old directory
-                    await sectionsDir.removeEntry(oldSlug, { recursive: true });
-                } catch (e) {
-                    console.error('[Filesystem] Error renaming section dir:', e);
-                }
-            });
+                // Delete old directory
+                await sectionsDir.removeEntry(oldSlug, { recursive: true });
+                recordSave(`sections/${oldSlug}`);
+            } catch (e) {
+                console.error('[Filesystem] Error renaming section dir:', e);
+            }
         }
 
         // Link a notebook folder - show picker and save handle
@@ -3200,16 +3236,17 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 return;
             }
 
-            // Ignore changes that arrive shortly after we saved (our own writes echoing back)
-            if (Date.now() - recentSaveTimestamp < 1000) {
-                console.log('[Observer] Ignoring changes shortly after save');
-                return;
-            }
-
-            // Filter to relevant changes (ignore non-notebook files)
+            // Filter to relevant changes (ignore non-notebook files and files we recently saved)
             const relevantChanges = records.filter(record => {
-                const path = record.relativePathComponents || [];
-                const filename = path[path.length - 1] || '';
+                const pathComponents = record.relativePathComponents || [];
+                const relativePath = pathComponents.join('/');
+                const filename = pathComponents[pathComponents.length - 1] || '';
+
+                // Skip files we recently saved (our own writes echoing back)
+                if (wasRecentlySaved(relativePath)) {
+                    console.log(`[Observer] Ignoring recently saved: ${relativePath}`);
+                    return false;
+                }
 
                 // Relevant: .md, .code.py, .bookmark.json, notebook.json, _section.json, .output.html
                 // Also include directory changes (for new sections)
