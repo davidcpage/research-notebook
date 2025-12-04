@@ -38,6 +38,10 @@
             --note-border: #e8e4d9;
             --link-color: #2563eb;
             --link-hover: #1d4ed8;
+
+            /* Code theme colors */
+            --code-bg: #1a3a52;
+            --code-text: #e0e6ed;
         }
 
         * {
@@ -613,7 +617,7 @@
         .code-preview-frame {
             width: 100%;
             height: 180px;
-            background: #f8faf8;
+            background: var(--code-bg);
             display: flex;
             align-items: flex-start;
             justify-content: center;
@@ -625,7 +629,7 @@
         .code-preview-content {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.8rem;
-            color: var(--text-secondary);
+            color: var(--code-text);
             line-height: 1.5;
             width: 100%;
             height: 100%;
@@ -643,6 +647,7 @@
             line-height: inherit;
             background: transparent !important;
             padding: 0;
+            color: var(--code-text);
         }
 
         .code-preview-content::after {
@@ -652,7 +657,7 @@
             left: 0;
             right: 0;
             height: 60px;
-            background: linear-gradient(transparent, #f8faf8);
+            background: linear-gradient(transparent, var(--code-bg));
             pointer-events: none;
         }
 
@@ -686,7 +691,7 @@
 
         .code-output-code-pane {
             flex: 1;
-            background: #f8faf8;
+            background: var(--code-bg);
             padding: 0.75rem;
             overflow: hidden;
             position: relative;
@@ -695,7 +700,7 @@
         .code-output-code-pane .code-preview-content {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.4rem;
-            color: var(--text-secondary);
+            color: var(--code-text);
             line-height: 1.2;
             width: 100%;
             height: 100%;
@@ -711,7 +716,7 @@
             left: 0;
             right: 0;
             height: 40px;
-            background: linear-gradient(transparent, #f8faf8);
+            background: linear-gradient(transparent, var(--code-bg));
             pointer-events: none;
         }
 
@@ -982,7 +987,7 @@
 
         .code-viewer-code-pane {
             flex: 1;
-            background: #f8faf8;
+            background: var(--code-bg);
             padding: 1.5rem;
             overflow: auto;
         }
@@ -994,14 +999,12 @@
             line-height: 1.4;
             white-space: pre-wrap;
             word-break: break-word;
-            color: #2d5016;
+            color: var(--code-text);
         }
 
         .code-viewer-code-pane code {
             background: transparent !important;
-        }
-
-        .code-viewer-code-pane code {
+            color: var(--code-text);
             font-family: inherit;
             font-size: inherit;
             line-height: inherit;
@@ -1054,7 +1057,7 @@
         .code-viewer-code-pane .hljs,
         .code-viewer-code-only .hljs {
             background: transparent !important;
-            color: #2d5016 !important;
+            color: var(--code-text) !important;
         }
 
         /* Internal Links */
