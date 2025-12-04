@@ -157,41 +157,29 @@ function parseYamlFrontmatter(content)   // Extract frontmatter from file
 - Small icon in toolbar showing storage status (cloud for IndexedDB, folder for filesystem)
 - Tooltip shows path when linked
 
-### Phase 2: Change Detection
+### Phase 2: Change Detection ✅ IMPLEMENTED
 
 **Goal**: App detects when Claude Code (or any external editor) modifies files.
 
-**Options** (in order of preference):
-1. **FileSystemObserver API** (Chrome 129+) - native, efficient
-2. **Polling with hash** - check every 3-5 seconds, compare mtimes
-3. **Manual refresh** - F5 or refresh button (always available as fallback)
+**Implementation** (FileSystemObserver API):
+- Uses native `FileSystemObserver` API (Chrome 129+) for efficient change detection
+- Watches notebook directory recursively for file changes
+- Filters to relevant file types (.md, .code.py, .bookmark.json, etc.)
+- Automatically reloads and re-renders when external changes detected
+- Shows toast notification on sync ("🔄 Synced external changes")
+- Manual refresh button in Settings as fallback (always available)
 
-**Implementation**:
-```javascript
-// Try native observer first, fall back to polling
-async function startWatchingFilesystem(dirHandle) {
-  if ('FileSystemObserver' in window) {
-    const observer = new FileSystemObserver(handleFilesystemChange);
-    await observer.observe(dirHandle, { recursive: true });
-  } else {
-    // Polling fallback
-    setInterval(() => checkForChanges(dirHandle), 3000);
-  }
-}
-
-async function handleFilesystemChange(records) {
-  // Reload affected sections/items
-  // Merge with any unsaved local changes (conflict resolution)
-  // Re-render
-}
-```
+**Key Functions**:
+- `isFileSystemObserverSupported()` - Feature detection
+- `startWatchingFilesystem(dirHandle)` - Start watching with recursive option
+- `stopWatchingFilesystem()` - Clean disconnect
+- `handleFilesystemChanges(records)` - Process change records
+- `reloadFromFilesystem()` - Reload and render
 
 **Conflict Handling**:
-- If local unsaved changes exist when external change detected:
-  - Option A: Auto-save local first, then reload (local wins)
-  - Option B: Prompt user to choose
-  - Option C: External always wins (simpler, Claude Code is intentional)
-- Start with Option C, add UI later if needed
+- External changes always win (Option C from original plan)
+- Flag prevents observer triggering during app's own saves
+- Clean separation: `isSavingToFilesystem` and `isReloadingFromFilesystem` flags
 
 ### Phase 3: Git Integration Awareness
 
@@ -252,173 +240,15 @@ This notebook stores data as files that Claude Code can read and edit directly.
 
 ## Migration
 
-### Conversion Script (Python)
+Migration from IndexedDB to filesystem format has been completed. The app now:
+1. Shows onboarding on first launch to select a notebook folder
+2. Creates new notebooks in selected folders (or loads existing ones)
+3. All data stored as files that Claude Code can read/write directly
 
-Run once to convert existing IndexedDB export to new format:
-
-```python
-#!/usr/bin/env python3
-"""
-Convert Research Notebook JSON export to filesystem format.
-
-Usage:
-    python convert_notebook.py input.json output_folder/
-"""
-
-import json
-import os
-import re
-from datetime import datetime
-from pathlib import Path
-
-def slugify(title, max_length=50):
-    """Convert title to filename-safe slug."""
-    slug = title.lower()
-    slug = re.sub(r'[^\w\s-]', '', slug)
-    slug = re.sub(r'[\s_]+', '-', slug)
-    slug = slug.strip('-')
-    return slug[:max_length]
-
-def convert_note(item):
-    """Convert note item to markdown with frontmatter."""
-    frontmatter = f"""---
-id: {item.get('id', '')}
-title: {item['title']}
-created: {item.get('created', datetime.now().isoformat())}
-modified: {item.get('modified', datetime.now().isoformat())}
----
-
-"""
-    return frontmatter + item.get('content', '')
-
-def convert_code(item):
-    """Convert code item to Python with frontmatter comment."""
-    output_file = None
-    if item.get('output'):
-        output_file = f"{slugify(item['title'])}.output.html"
-
-    frontmatter_lines = [
-        '# ---',
-        f"# id: {item.get('id', '')}",
-        f"# title: {item['title']}",
-        f"# created: {item.get('created', datetime.now().isoformat())}",
-        f"# modified: {item.get('modified', datetime.now().isoformat())}",
-    ]
-    if output_file:
-        frontmatter_lines.append(f"# output: {output_file}")
-        frontmatter_lines.append(f"# showOutput: {str(item.get('showOutput', True)).lower()}")
-    frontmatter_lines.append('# ---')
-    frontmatter_lines.append('')
-
-    return '\n'.join(frontmatter_lines) + item.get('code', '')
-
-def convert_bookmark(item):
-    """Convert bookmark item to JSON."""
-    return {
-        'id': item.get('id', ''),
-        'type': 'bookmark',
-        'title': item['title'],
-        'url': item.get('url', ''),
-        'description': item.get('description', ''),
-        'thumbnail': item.get('thumbnail'),  # Will need path adjustment
-        'created': item.get('created', datetime.now().isoformat()),
-        'modified': item.get('modified', datetime.now().isoformat()),
-    }
-
-def convert_notebook(input_path, output_path):
-    """Convert full notebook to directory structure."""
-    with open(input_path, 'r') as f:
-        data = json.load(f)
-
-    output_dir = Path(output_path)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Create notebook.json (structure only)
-    notebook_meta = {
-        'title': data.get('title', 'Research Notebook'),
-        'subtitle': data.get('subtitle', ''),
-        'sections': [slugify(s['name']) for s in data.get('sections', [])]
-    }
-    with open(output_dir / 'notebook.json', 'w') as f:
-        json.dump(notebook_meta, f, indent=2)
-
-    # Create sections directory
-    sections_dir = output_dir / 'sections'
-    sections_dir.mkdir(exist_ok=True)
-
-    # Create assets directory
-    assets_dir = output_dir / 'assets' / 'thumbnails'
-    assets_dir.mkdir(parents=True, exist_ok=True)
-
-    # Process each section
-    for section in data.get('sections', []):
-        section_slug = slugify(section['name'])
-        section_dir = sections_dir / section_slug
-        section_dir.mkdir(exist_ok=True)
-
-        # Create section metadata (preserves original name)
-        section_meta = {
-            'name': section['name'],
-            'id': section.get('id', '')
-        }
-        with open(section_dir / '_section.json', 'w') as f:
-            json.dump(section_meta, f, indent=2)
-
-        # Process items
-        for item in section.get('items', []):
-            item_type = item.get('type')
-            title_slug = slugify(item.get('title', 'untitled'))
-
-            if item_type == 'note':
-                filename = f"{title_slug}.md"
-                content = convert_note(item)
-                with open(section_dir / filename, 'w') as f:
-                    f.write(content)
-
-            elif item_type == 'code':
-                filename = f"{title_slug}.code.py"
-                content = convert_code(item)
-                with open(section_dir / filename, 'w') as f:
-                    f.write(content)
-                # Save output separately if exists
-                if item.get('output'):
-                    output_filename = f"{title_slug}.output.html"
-                    with open(section_dir / output_filename, 'w') as f:
-                        f.write(item['output'])
-
-            elif item_type == 'bookmark':
-                filename = f"{title_slug}.bookmark.json"
-                bookmark_data = convert_bookmark(item)
-                # Handle thumbnail
-                if bookmark_data.get('thumbnail') and bookmark_data['thumbnail'].startswith('data:'):
-                    # Save data URL as file
-                    thumb_filename = f"{item.get('id', title_slug)}.png"
-                    bookmark_data['thumbnail'] = f"../../assets/thumbnails/{thumb_filename}"
-                    # TODO: decode and save base64 image
-                with open(section_dir / filename, 'w') as f:
-                    json.dump(bookmark_data, f, indent=2)
-
-    print(f"Converted notebook to {output_dir}")
-    print(f"  Sections: {len(data.get('sections', []))}")
-    total_items = sum(len(s.get('items', [])) for s in data.get('sections', []))
-    print(f"  Total items: {total_items}")
-
-if __name__ == '__main__':
-    import sys
-    if len(sys.argv) != 3:
-        print("Usage: python convert_notebook.py input.json output_folder/")
-        sys.exit(1)
-    convert_notebook(sys.argv[1], sys.argv[2])
+To initialize git versioning for an existing notebook:
+```bash
+cd my-notebook && git init && git add . && git commit -m "Initial import"
 ```
-
-### Migration Steps
-
-1. Export current notebook to JSON (existing export feature)
-2. Run conversion script: `python convert_notebook.py export.json ./my-notebook/`
-3. Open notebook app, go to Settings → Link Notebook Folder
-4. Select the converted `my-notebook/` folder
-5. Verify all content loaded correctly
-6. Initialize git: `cd my-notebook && git init && git add . && git commit -m "Initial import"`
 
 ---
 

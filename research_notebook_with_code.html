@@ -1980,6 +1980,11 @@ print('Hello, World!')" spellcheck="false"></textarea>
         let filesystemLinked = false;   // Whether filesystem mode is active
         const IDB_DIR_HANDLE_KEY = 'notebookDirHandle';  // IndexedDB key for persisting handle
 
+        // FileSystemObserver state (Phase 2: Change Detection)
+        let filesystemObserver = null;  // FileSystemObserver instance for watching changes
+        let isReloadingFromFilesystem = false;  // Flag to prevent observer triggering during our own saves
+        let isSavingToFilesystem = false;  // Flag to prevent observer triggering during saves
+
         // Configure marked for safe rendering
         marked.setOptions({
             breaks: true,
@@ -2061,10 +2066,13 @@ print('Hello, World!')" spellcheck="false"></textarea>
                 // Also save to filesystem if linked
                 if (filesystemLinked && notebookDirHandle) {
                     try {
+                        isSavingToFilesystem = true;
                         await saveToFilesystem(notebookDirHandle);
                     } catch (fsError) {
                         console.error('Error saving to filesystem:', fsError);
                         // Don't throw - IndexedDB save succeeded
+                    } finally {
+                        isSavingToFilesystem = false;
                     }
                 }
             } catch (error) {
@@ -2553,6 +2561,9 @@ print('Hello, World!')" spellcheck="false"></textarea>
                     showToast('📁 Linked to folder (exported current notebook)');
                 }
 
+                // Start watching for external changes
+                await startWatchingFilesystem(handle);
+
                 return true;
 
             } catch (error) {
@@ -2569,6 +2580,9 @@ print('Hello, World!')" spellcheck="false"></textarea>
         // Unlink notebook folder
         async function unlinkNotebookFolder() {
             try {
+                // Stop watching for changes
+                stopWatchingFilesystem();
+
                 const db = await openDB();
                 const tx = db.transaction(IDB_STORE, 'readwrite');
                 const store = tx.objectStore(IDB_STORE);
@@ -2606,6 +2620,9 @@ print('Hello, World!')" spellcheck="false"></textarea>
                     try {
                         const fsData = await loadFromFilesystem(savedHandle);
                         data = fsData;
+
+                        // Start watching for external changes
+                        await startWatchingFilesystem(savedHandle);
                     } catch (error) {
                         console.error('[Filesystem] Error loading from saved folder:', error);
                         showToast('⚠️ Error loading from linked folder');
@@ -2613,6 +2630,118 @@ print('Hello, World!')" spellcheck="false"></textarea>
                 } else {
                     console.log('[Filesystem] Permission denied for saved folder');
                 }
+            }
+        }
+
+        // ========== SECTION: FILESYSTEM_OBSERVER ==========
+        // FileSystemObserver for detecting external changes (Phase 2)
+        // Functions: isFileSystemObserverSupported, startWatchingFilesystem, stopWatchingFilesystem,
+        //            handleFilesystemChanges, reloadFromFilesystem
+
+        // Check if FileSystemObserver API is available
+        function isFileSystemObserverSupported() {
+            return 'FileSystemObserver' in window;
+        }
+
+        // Start watching filesystem for external changes
+        async function startWatchingFilesystem(dirHandle) {
+            if (!isFileSystemObserverSupported()) {
+                console.log('[Observer] FileSystemObserver not supported - manual refresh only');
+                return false;
+            }
+
+            // Stop any existing observer
+            stopWatchingFilesystem();
+
+            try {
+                filesystemObserver = new FileSystemObserver(handleFilesystemChanges);
+                await filesystemObserver.observe(dirHandle, { recursive: true });
+                console.log('[Observer] Started watching filesystem for changes');
+                return true;
+            } catch (error) {
+                console.error('[Observer] Error starting filesystem observer:', error);
+                filesystemObserver = null;
+                return false;
+            }
+        }
+
+        // Stop watching filesystem
+        function stopWatchingFilesystem() {
+            if (filesystemObserver) {
+                filesystemObserver.disconnect();
+                filesystemObserver = null;
+                console.log('[Observer] Stopped watching filesystem');
+            }
+        }
+
+        // Handle filesystem change events
+        async function handleFilesystemChanges(records, observer) {
+            // Ignore changes while we're saving or reloading (prevents loops)
+            if (isReloadingFromFilesystem || isSavingToFilesystem) {
+                console.log('[Observer] Ignoring changes during save/reload');
+                return;
+            }
+
+            // Filter to relevant changes (ignore non-notebook files)
+            const relevantChanges = records.filter(record => {
+                const path = record.relativePathComponents || [];
+                const filename = path[path.length - 1] || '';
+
+                // Relevant: .md, .code.py, .bookmark.json, notebook.json, _section.json, .output.html
+                // Also include directory changes (for new sections)
+                if (record.changedHandle?.kind === 'directory') return true;
+                if (filename.endsWith('.md')) return true;
+                if (filename.endsWith('.code.py')) return true;
+                if (filename.endsWith('.output.html')) return true;
+                if (filename.endsWith('.bookmark.json')) return true;
+                if (filename === 'notebook.json') return true;
+                if (filename === '_section.json') return true;
+                return false;
+            });
+
+            if (relevantChanges.length === 0) {
+                console.log('[Observer] No relevant changes detected');
+                return;
+            }
+
+            // Log what changed for debugging
+            console.log(`[Observer] Detected ${relevantChanges.length} relevant changes:`);
+            relevantChanges.forEach(record => {
+                const path = (record.relativePathComponents || []).join('/');
+                console.log(`  - ${record.type}: ${path || record.changedHandle?.name || 'unknown'}`);
+            });
+
+            // Reload from filesystem
+            await reloadFromFilesystem();
+        }
+
+        // Reload notebook data from filesystem (called by observer or manual refresh)
+        // showNotification: if true, shows toast for external sync (used by observer)
+        async function reloadFromFilesystem(showNotification = true) {
+            if (!filesystemLinked || !notebookDirHandle) {
+                console.log('[Observer] Cannot reload - no folder linked');
+                return;
+            }
+
+            isReloadingFromFilesystem = true;
+
+            try {
+                console.log('[Observer] Reloading from filesystem...');
+                const fsData = await loadFromFilesystem(notebookDirHandle);
+                data = fsData;
+                render();
+                if (showNotification) {
+                    showToast('🔄 Synced external changes');
+                }
+                console.log('[Observer] Reload complete');
+            } catch (error) {
+                console.error('[Observer] Error reloading from filesystem:', error);
+                if (showNotification) {
+                    showToast('⚠️ Error syncing changes');
+                }
+                throw error;  // Re-throw so caller can handle
+            } finally {
+                isReloadingFromFilesystem = false;
             }
         }
 
@@ -2708,10 +2837,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
 
             try {
                 showToast('🔄 Refreshing from folder...');
-                const fsData = await loadFromFilesystem(notebookDirHandle);
-                data = fsData;
-                await saveData();  // Also update IndexedDB cache
-                render();
+                await reloadFromFilesystem(false);  // Don't show auto-sync toast
                 showToast(`✅ Refreshed (${data.sections.length} sections)`);
             } catch (error) {
                 console.error('[Filesystem] Refresh error:', error);

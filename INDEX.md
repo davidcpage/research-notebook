@@ -13,6 +13,7 @@ This file provides a navigable index for the large single-file application (~440
 | [STATE_AND_CONFIG](#state_and_config) | 40 | Global state, marked config |
 | [DATA_PERSISTENCE](#data_persistence) | 90 | IndexedDB operations |
 | [FILESYSTEM_STORAGE](#filesystem_storage) | 515 | File System Access API |
+| [FILESYSTEM_OBSERVER](#filesystem_observer) | 100 | Change detection |
 | [UI_UTILITIES](#ui_utilities) | 10 | Toast notifications |
 | [SECTION_MODAL](#section_modal) | 35 | Section CRUD |
 | [SETTINGS_MODAL](#settings_modal) | 60 | Title/subtitle + folder settings |
@@ -78,6 +79,7 @@ Key variables:
 - `manualThumbnail` - Manual upload tracker
 - `pyodide`, `pyodideLoading`, `pyodideReady` - Python runtime state
 - `notebookDirHandle`, `filesystemLinked` - Filesystem state
+- `filesystemObserver`, `isReloadingFromFilesystem`, `isSavingToFilesystem` - Observer state
 - `marked.setOptions()` - Markdown parser config
 
 ### DATA_PERSISTENCE
@@ -122,6 +124,23 @@ Features:
 - YAML frontmatter for metadata
 - Thumbnail extraction to separate files
 - Persistent directory handle across sessions
+
+### FILESYSTEM_OBSERVER
+**~100 lines** | JavaScript
+
+Functions:
+- `isFileSystemObserverSupported()` - Check browser support for FileSystemObserver
+- `startWatchingFilesystem(dirHandle)` - Start watching directory recursively
+- `stopWatchingFilesystem()` - Disconnect observer
+- `handleFilesystemChanges(records)` - Process change records, filter relevant files
+- `reloadFromFilesystem(showNotification)` - Reload data and render
+
+Features:
+- FileSystemObserver API (Chrome 129+) for native change detection
+- Recursive watching of notebook directory
+- Filters to relevant file types (.md, .code.py, .bookmark.json, etc.)
+- Toast notification on sync
+- Flags prevent observer triggering during saves/reloads
 
 ### UI_UTILITIES
 **~10 lines** | JavaScript
