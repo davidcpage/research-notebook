@@ -2359,8 +2359,35 @@ print('Hello, World!')" spellcheck="false"></textarea>
                             } else if (filename.endsWith('.bookmark.json')) {
                                 // Bookmark file
                                 const bookmarkData = JSON.parse(content);
-                                // TODO: Load thumbnail from assets if path reference
-                                const bookmark = jsonToBookmark(bookmarkData);
+
+                                // Load thumbnail from assets if path reference
+                                let thumbnailDataUrl = null;
+                                if (bookmarkData.thumbnail && !bookmarkData.thumbnail.startsWith('data:')) {
+                                    // It's a file path, need to load the actual image
+                                    try {
+                                        // Get assets/thumbnails directory
+                                        const assetsDir = await dirHandle.getDirectoryHandle('assets');
+                                        const thumbsDir = await assetsDir.getDirectoryHandle('thumbnails');
+
+                                        // Extract filename from path (e.g., "../../assets/thumbnails/foo.png" -> "foo.png")
+                                        const thumbFilename = bookmarkData.thumbnail.split('/').pop();
+
+                                        const thumbHandle = await thumbsDir.getFileHandle(thumbFilename);
+                                        const thumbFile = await thumbHandle.getFile();
+
+                                        // Convert to data URL
+                                        const reader = new FileReader();
+                                        thumbnailDataUrl = await new Promise((resolve, reject) => {
+                                            reader.onload = () => resolve(reader.result);
+                                            reader.onerror = reject;
+                                            reader.readAsDataURL(thumbFile);
+                                        });
+                                    } catch (e) {
+                                        console.warn(`[Filesystem] Could not load thumbnail ${bookmarkData.thumbnail}:`, e);
+                                    }
+                                }
+
+                                const bookmark = jsonToBookmark(bookmarkData, thumbnailDataUrl);
                                 section.items.push(bookmark);
                             }
                         } catch (e) {
