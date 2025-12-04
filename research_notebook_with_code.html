@@ -3496,7 +3496,6 @@ sys.stderr = sys.__stderr__
                         <h3 class="bookmark-title">
                             <a href="${escapeHtml(bookmark.url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${escapeHtml(bookmark.title)}</a>
                         </h3>
-                        <div class="bookmark-url">${escapeHtml(bookmark.url)}</div>
                         ${bookmark.description ?
                             `<div class="bookmark-description">${renderMarkdownWithLinks(bookmark.description)}</div>` :
                             ''
