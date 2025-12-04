@@ -1734,7 +1734,7 @@
                 <button class="modal-close" onclick="closeNoteModal()">×</button>
             </div>
             <div class="modal-body">
-                <div class="form-group">
+                <div class="form-group" id="noteSectionGroup">
                     <label for="noteSection">Section</label>
                     <select id="noteSection"></select>
                 </div>
@@ -1908,6 +1908,18 @@ print('Hello, World!')" spellcheck="false"></textarea>
                         </div>
                     </div>
                 </div>
+
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
+
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="showSystemNotesCheckbox" onchange="toggleSystemNotes(this.checked)" style="width: 18px; height: 18px;">
+                        <span>Show System notes</span>
+                    </label>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 6px; margin-left: 28px;">
+                        Display markdown files from the notebook root (README.md, CLAUDE.md, etc.)
+                    </p>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeSettingsModal()">Cancel</button>
@@ -1955,12 +1967,16 @@ print('Hello, World!')" spellcheck="false"></textarea>
             title: 'Research Notebook',
             subtitle: 'Bookmarks, notes, and connections',
             sections: [],
+            systemNotes: [],  // Markdown files at notebook root (README.md, CLAUDE.md, etc.)
             // Notes are stored in sections alongside bookmarks
             // Each item has a 'type' field: 'bookmark', 'note', or 'code'
         };
 
         // Track collapsed sections (not persisted)
         let collapsedSections = new Set();
+
+        // Show/hide system notes section (persisted in localStorage)
+        let showSystemNotes = localStorage.getItem('showSystemNotes') === 'true';
 
         let editingBookmark = null;
         let editingNote = null;
@@ -2091,6 +2107,213 @@ print('Hello, World!')" spellcheck="false"></textarea>
         // Check if File System Access API is available
         function isFileSystemAccessSupported() {
             return 'showDirectoryPicker' in window;
+        }
+
+        // Template for README.md in notebook folders
+        function getReadmeTemplate(notebookTitle) {
+            return `# ${notebookTitle || 'Research Notebook'}
+
+This folder contains a Research Notebook - a collection of notes, code snippets, and bookmarks stored as plain files.
+
+## Directory Structure
+
+\`\`\`
+notebook-folder/
+├── notebook.json           # Notebook metadata (title, subtitle, section order)
+├── README.md               # This file
+├── CLAUDE.md               # Instructions for Claude Code
+├── sections/
+│   └── section-name/
+│       ├── _section.json   # Section metadata
+│       ├── note-title.md   # Markdown note with YAML frontmatter
+│       ├── code-title.code.py     # Python code with comment frontmatter
+│       ├── code-title.output.html # Code execution output (auto-generated)
+│       └── bookmark.bookmark.json # Bookmark metadata
+└── assets/
+    └── thumbnails/         # Bookmark thumbnail images
+\`\`\`
+
+## File Formats
+
+### Notes (\`.md\`)
+Markdown files with YAML frontmatter:
+
+\`\`\`markdown
+---
+id: abc123
+title: My Note Title
+created: 2024-01-15T10:30:00Z
+modified: 2024-01-20T14:22:00Z
+---
+
+Note content in markdown...
+\`\`\`
+
+### Code (\`.code.py\`)
+Python files with comment-based frontmatter:
+
+\`\`\`python
+# ---
+# id: def456
+# title: Analysis Script
+# created: 2024-01-15T10:30:00Z
+# modified: 2024-01-20T14:22:00Z
+# output: analysis-script.output.html
+# showOutput: true
+# ---
+
+import numpy as np
+# Your code here...
+\`\`\`
+
+### Bookmarks (\`.bookmark.json\`)
+JSON files with URL and metadata:
+
+\`\`\`json
+{
+  "id": "ghi789",
+  "type": "bookmark",
+  "title": "Example Site",
+  "url": "https://example.com",
+  "description": "Description here",
+  "thumbnail": "../../assets/thumbnails/ghi789.png",
+  "created": "2024-01-15T10:30:00Z",
+  "modified": "2024-01-20T14:22:00Z"
+}
+\`\`\`
+
+## Git Workflow
+
+This folder is designed for git version control:
+
+\`\`\`bash
+# Initialize git (first time only)
+git init
+git add .
+git commit -m "Initial notebook"
+
+# After making changes in the browser
+git add .
+git commit -m "Add notes on transformers"
+
+# View history of a specific note
+git log --oneline sections/papers/attention-mechanisms.md
+\`\`\`
+
+## Internal Links
+
+Notes support wiki-style internal links:
+- \`[[Section Name > Item Title]]\` - Links to another item
+- Links work across notes, code, and bookmarks
+
+## Opening the Notebook
+
+Open \`research_notebook_with_code.html\` in Chrome/Edge and select this folder when prompted.
+`;
+        }
+
+        // Template for CLAUDE.md in notebook folders
+        function getClaudeMdTemplate() {
+            return `# CLAUDE.md
+
+This folder is a Research Notebook that stores notes, code, and bookmarks as plain files. You can read and edit these files directly.
+
+## Quick Reference
+
+| Type | Extension | Format |
+|------|-----------|--------|
+| Notes | \`.md\` | Markdown with YAML frontmatter |
+| Code | \`.code.py\` | Python with comment frontmatter |
+| Code Output | \`.output.html\` | HTML (auto-generated, don't edit) |
+| Bookmarks | \`.bookmark.json\` | JSON |
+| Thumbnails | \`assets/thumbnails/*.png\` | Images (auto-generated) |
+
+## Reading Items
+
+\`\`\`bash
+# List all sections
+ls sections/
+
+# Read a note
+cat sections/papers/attention-mechanisms.md
+
+# Read code
+cat sections/ideas/analysis.code.py
+
+# Search across all notes
+grep -r "transformer" sections/ --include="*.md"
+\`\`\`
+
+## Creating Items
+
+### New Note
+Create \`sections/{section-name}/{slug}.md\`:
+
+\`\`\`markdown
+---
+id: unique-id-here
+title: Your Note Title
+created: 2024-01-15T10:30:00Z
+modified: 2024-01-15T10:30:00Z
+---
+
+Your markdown content here...
+\`\`\`
+
+### New Code
+Create \`sections/{section-name}/{slug}.code.py\`:
+
+\`\`\`python
+# ---
+# id: unique-id-here
+# title: Your Code Title
+# created: 2024-01-15T10:30:00Z
+# modified: 2024-01-15T10:30:00Z
+# ---
+
+# Your Python code here
+\`\`\`
+
+### New Section
+1. Create directory: \`sections/{section-slug}/\`
+2. Create \`sections/{section-slug}/_section.json\`:
+
+\`\`\`json
+{
+  "name": "Section Display Name",
+  "id": "unique-section-id"
+}
+\`\`\`
+3. Add section slug to \`notebook.json\` sections array
+
+## Editing Items
+
+- Edit the file content directly
+- Update the \`modified\` timestamp
+- The browser app will auto-detect changes (Chrome 129+) or user can click Refresh
+
+## Important Notes
+
+- **Slugs**: Filenames should be lowercase, hyphenated versions of titles (max 50 chars)
+- **IDs**: Each item needs a unique ID (use any string, e.g., timestamp or UUID)
+- **Don't edit**: \`.output.html\` files (auto-generated when code runs)
+- **Internal links**: Use \`[[Section Name > Item Title]]\` syntax in markdown
+- **Thumbnails**: Bookmarks can reference \`../../assets/thumbnails/{id}.png\`
+
+## Common Tasks
+
+**Add a note summarizing a paper:**
+> Create a new .md file in sections/papers/ with frontmatter and markdown content
+
+**Search for all mentions of a topic:**
+> grep -r "attention" sections/ --include="*.md" --include="*.code.py"
+
+**List all items in a section:**
+> ls sections/papers/
+
+**Find items modified recently:**
+> find sections/ -name "*.md" -mtime -7
+`;
         }
 
         // Convert title to filename-safe slug
@@ -2289,7 +2512,8 @@ print('Hello, World!')" spellcheck="false"></textarea>
             const loadedData = {
                 title: 'Research Notebook',
                 subtitle: 'Bookmarks, notes, and connections',
-                sections: []
+                sections: [],
+                systemNotes: []
             };
 
             try {
@@ -2303,6 +2527,31 @@ print('Hello, World!')" spellcheck="false"></textarea>
                     loadedData.subtitle = meta.subtitle || loadedData.subtitle;
                 } catch (e) {
                     console.log('[Filesystem] No notebook.json found, using defaults');
+                }
+
+                // Read system notes (markdown files at root)
+                for await (const [filename, fileHandle] of dirHandle.entries()) {
+                    if (fileHandle.kind !== 'file') continue;
+                    if (!filename.endsWith('.md')) continue;
+
+                    try {
+                        const file = await fileHandle.getFile();
+                        const content = await file.text();
+                        const titleFromFilename = filename.replace(/\.md$/, '');
+
+                        loadedData.systemNotes.push({
+                            type: 'note',
+                            system: true,
+                            id: 'system-' + filename,
+                            filename: filename,
+                            title: titleFromFilename,
+                            content: content,
+                            modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
+                        });
+                        console.log(`[Filesystem] Loaded system note: ${filename}`);
+                    } catch (e) {
+                        console.error(`[Filesystem] Error reading system note ${filename}:`, e);
+                    }
                 }
 
                 // Read sections directory
@@ -2432,6 +2681,30 @@ print('Hello, World!')" spellcheck="false"></textarea>
                 }, null, 2));
                 await metaWritable.close();
 
+                // Write README.md (only if it doesn't exist)
+                try {
+                    await dirHandle.getFileHandle('README.md');
+                    // File exists, don't overwrite
+                } catch (e) {
+                    // File doesn't exist, create it
+                    const readmeFile = await dirHandle.getFileHandle('README.md', { create: true });
+                    const readmeWritable = await readmeFile.createWritable();
+                    await readmeWritable.write(getReadmeTemplate(data.title));
+                    await readmeWritable.close();
+                }
+
+                // Write CLAUDE.md (only if it doesn't exist)
+                try {
+                    await dirHandle.getFileHandle('CLAUDE.md');
+                    // File exists, don't overwrite
+                } catch (e) {
+                    // File doesn't exist, create it
+                    const claudeFile = await dirHandle.getFileHandle('CLAUDE.md', { create: true });
+                    const claudeWritable = await claudeFile.createWritable();
+                    await claudeWritable.write(getClaudeMdTemplate());
+                    await claudeWritable.close();
+                }
+
                 // Create/get sections directory
                 const sectionsDir = await dirHandle.getDirectoryHandle('sections', { create: true });
 
@@ -2513,6 +2786,34 @@ print('Hello, World!')" spellcheck="false"></textarea>
                     }
                 }
 
+                // Write system notes (markdown files at root)
+                if (data.systemNotes) {
+                    for (const note of data.systemNotes) {
+                        const newFilename = note.title + '.md';
+                        const oldFilename = note.filename;
+
+                        // If filename changed, delete old file
+                        if (oldFilename && oldFilename !== newFilename) {
+                            try {
+                                await dirHandle.removeEntry(oldFilename);
+                                console.log(`[Filesystem] Deleted old system note: ${oldFilename}`);
+                            } catch (e) {
+                                // Old file might not exist
+                            }
+                        }
+
+                        // Write with new filename
+                        const fileHandle = await dirHandle.getFileHandle(newFilename, { create: true });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(note.content);
+                        await writable.close();
+
+                        // Update filename in note object
+                        note.filename = newFilename;
+                        note.id = 'system-' + newFilename;
+                    }
+                }
+
                 console.log('[Filesystem] Save complete');
             } catch (error) {
                 console.error('[Filesystem] Error saving to filesystem:', error);
@@ -2556,9 +2857,13 @@ print('Hello, World!')" spellcheck="false"></textarea>
                     render();
                     showToast(`📁 Linked to folder (loaded ${data.sections.length} sections)`);
                 } else {
-                    // Save current data to filesystem
+                    // Save current data to filesystem (creates README.md, CLAUDE.md, etc.)
                     await saveToFilesystem(handle);
-                    showToast('📁 Linked to folder (exported current notebook)');
+                    // Reload to pick up the newly created system notes
+                    const fsData = await loadFromFilesystem(handle);
+                    data = fsData;
+                    render();
+                    showToast('📁 Linked to folder (new notebook created)');
                 }
 
                 // Start watching for external changes
@@ -2798,8 +3103,15 @@ print('Hello, World!')" spellcheck="false"></textarea>
             document.getElementById('settingsTitle').value = data.title || 'Research Notebook';
             document.getElementById('settingsSubtitle').value = data.subtitle || 'Bookmarks, notes, and connections';
             document.getElementById('linkedFolderName').textContent = notebookDirHandle ? notebookDirHandle.name : 'Not linked';
+            document.getElementById('showSystemNotesCheckbox').checked = showSystemNotes;
             document.getElementById('settingsModal').classList.add('active');
             document.getElementById('settingsTitle').focus();
+        }
+
+        function toggleSystemNotes(enabled) {
+            showSystemNotes = enabled;
+            localStorage.setItem('showSystemNotes', enabled);
+            render();
         }
 
         function closeSettingsModal() {
@@ -3108,24 +3420,34 @@ print('Hello, World!')" spellcheck="false"></textarea>
         // Note creation/editing modal: open, close, switchEditorTab, save
 
         function openNoteModal(sectionId = null, note = null) {
+            const isSystemNote = sectionId === '_system';
             editingNote = note ? { ...note, sectionId } : null;
-            
-            const select = document.getElementById('noteSection');
-            select.innerHTML = data.sections.map(s => 
-                `<option value="${s.id}" ${s.id === sectionId ? 'selected' : ''}>${s.name}</option>`
-            ).join('');
 
-            if (data.sections.length === 0) {
-                showToast('Create a section first');
-                return;
+            const select = document.getElementById('noteSection');
+            const sectionGroup = document.getElementById('noteSectionGroup');
+
+            if (isSystemNote) {
+                // Hide section selector for system notes
+                sectionGroup.style.display = 'none';
+                select.innerHTML = '<option value="_system">System</option>';
+            } else {
+                sectionGroup.style.display = '';
+                select.innerHTML = data.sections.map(s =>
+                    `<option value="${s.id}" ${s.id === sectionId ? 'selected' : ''}>${s.name}</option>`
+                ).join('');
+
+                if (data.sections.length === 0) {
+                    showToast('Create a section first');
+                    return;
+                }
             }
 
-            document.getElementById('noteModalTitle').textContent = note ? 'Edit Note' : 'New Note';
+            document.getElementById('noteModalTitle').textContent = note ? 'Edit Note' : (isSystemNote ? 'New System Note' : 'New Note');
             document.getElementById('noteSubmitBtn').textContent = note ? 'Save Changes' : 'Save Note';
-            
+
             document.getElementById('noteTitle').value = note?.title || '';
             document.getElementById('noteContent').value = note?.content || '';
-            
+
             // Reset to write tab
             switchEditorTab('write');
 
@@ -3170,34 +3492,62 @@ print('Hello, World!')" spellcheck="false"></textarea>
                 return;
             }
 
-            const section = data.sections.find(s => s.id === sectionId);
-            if (!section) return;
+            const isSystemNote = sectionId === '_system';
 
-            const noteData = {
-                id: editingNote?.id || Date.now().toString(),
-                type: 'note',
-                title,
-                content,
-                createdAt: editingNote?.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            };
+            if (isSystemNote) {
+                // Handle system note (markdown file at notebook root)
+                const noteData = {
+                    type: 'note',
+                    system: true,
+                    id: editingNote?.id || 'system-' + title + '.md',
+                    filename: editingNote?.filename || title + '.md',
+                    title,
+                    content,
+                    modified: new Date().toISOString()
+                };
 
-            if (editingNote) {
-                // If section changed, move note
-                if (editingNote.sectionId !== sectionId) {
-                    const oldSection = data.sections.find(s => s.id === editingNote.sectionId);
-                    if (oldSection) {
-                        oldSection.items = oldSection.items.filter(n => n.id !== editingNote.id);
-                    }
-                    section.items.push(noteData);
-                } else {
-                    const index = section.items.findIndex(n => n.id === editingNote.id);
+                if (editingNote) {
+                    // Update existing system note
+                    const index = data.systemNotes.findIndex(n => n.id === editingNote.id);
                     if (index !== -1) {
-                        section.items[index] = noteData;
+                        data.systemNotes[index] = noteData;
                     }
+                } else {
+                    // Add new system note
+                    if (!data.systemNotes) data.systemNotes = [];
+                    data.systemNotes.push(noteData);
                 }
             } else {
-                section.items.push(noteData);
+                // Handle regular note
+                const section = data.sections.find(s => s.id === sectionId);
+                if (!section) return;
+
+                const noteData = {
+                    id: editingNote?.id || Date.now().toString(),
+                    type: 'note',
+                    title,
+                    content,
+                    createdAt: editingNote?.createdAt || new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                if (editingNote) {
+                    // If section changed, move note
+                    if (editingNote.sectionId !== sectionId) {
+                        const oldSection = data.sections.find(s => s.id === editingNote.sectionId);
+                        if (oldSection) {
+                            oldSection.items = oldSection.items.filter(n => n.id !== editingNote.id);
+                        }
+                        section.items.push(noteData);
+                    } else {
+                        const index = section.items.findIndex(n => n.id === editingNote.id);
+                        if (index !== -1) {
+                            section.items[index] = noteData;
+                        }
+                    }
+                } else {
+                    section.items.push(noteData);
+                }
             }
 
             await saveData();
@@ -3210,18 +3560,27 @@ print('Hello, World!')" spellcheck="false"></textarea>
         // Note viewing modal: open, close, edit, delete
 
         function openNoteViewer(sectionId, noteId) {
-            const section = data.sections.find(s => s.id === sectionId);
-            if (!section) return;
-            
-            const note = section.items.find(n => n.id === noteId);
-            if (!note) return;
+            let note;
+            const isSystemNote = sectionId === '_system';
+
+            if (isSystemNote) {
+                // Find system note
+                note = data.systemNotes?.find(n => n.id === noteId);
+                if (!note) return;
+            } else {
+                // Find regular note
+                const section = data.sections.find(s => s.id === sectionId);
+                if (!section) return;
+                note = section.items.find(n => n.id === noteId);
+                if (!note) return;
+            }
 
             currentViewingNote = { ...note, sectionId };
 
             document.getElementById('noteViewerTitle').textContent = note.title;
-            
+
             let content = renderMarkdownWithLinks(note.content);
-            
+
             // Add backlinks
             const backlinks = findBacklinks(noteId);
             if (backlinks.length > 0) {
@@ -3236,16 +3595,21 @@ print('Hello, World!')" spellcheck="false"></textarea>
                     </div>
                 `;
             }
-            
+
             document.getElementById('noteViewerContent').innerHTML = content;
-            
+
             // Set meta info
-            let metaText = formatDate(note.createdAt);
-            if (note.updatedAt && note.updatedAt !== note.createdAt) {
-                metaText += ` · Updated ${formatDate(note.updatedAt)}`;
+            let metaText;
+            if (isSystemNote) {
+                metaText = note.modified ? `Modified ${formatDate(note.modified)}` : '';
+            } else {
+                metaText = formatDate(note.createdAt);
+                if (note.updatedAt && note.updatedAt !== note.createdAt) {
+                    metaText += ` · Updated ${formatDate(note.updatedAt)}`;
+                }
             }
             document.getElementById('noteViewerMeta').textContent = metaText;
-            
+
             document.getElementById('noteViewerModal').classList.add('active');
         }
 
@@ -3266,8 +3630,30 @@ print('Hello, World!')" spellcheck="false"></textarea>
             if (!currentViewingNote) return;
             const sectionId = currentViewingNote.sectionId;
             const noteId = currentViewingNote.id;
+            const isSystemNote = sectionId === '_system';
             closeNoteViewer();
-            await confirmDeleteItem(sectionId, noteId, 'note');
+
+            if (isSystemNote) {
+                // Delete system note
+                if (!confirm('Delete this system note? The file will be removed from your notebook folder.')) return;
+
+                const note = data.systemNotes?.find(n => n.id === noteId);
+                if (note && notebookDirHandle) {
+                    // Delete the file from filesystem
+                    try {
+                        await notebookDirHandle.removeEntry(note.filename);
+                    } catch (e) {
+                        console.warn('[Filesystem] Could not delete system note file:', e);
+                    }
+                }
+
+                data.systemNotes = data.systemNotes?.filter(n => n.id !== noteId) || [];
+                await saveData();
+                render();
+                showToast('System note deleted');
+            } else {
+                await confirmDeleteItem(sectionId, noteId, 'note');
+            }
         }
 
         // ========== SECTION: BOOKMARK_VIEWER ==========
@@ -3892,11 +4278,16 @@ sys.stderr = sys.__stderr__
         // Render preview for note cards (truncated, with clickable links)
         function renderNotePreview(text, maxLength = 300) {
             if (!text) return '';
-            
-            // Truncate text first for performance
-            let truncated = text;
-            if (text.length > maxLength) {
-                truncated = text.substring(0, maxLength);
+
+            // Strip fenced code blocks - they don't preview well in cards
+            let cleaned = text.replace(/```[\s\S]*?```/g, '');
+            // Collapse multiple newlines left behind
+            cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+
+            // Truncate text for performance
+            let truncated = cleaned;
+            if (cleaned.length > maxLength) {
+                truncated = cleaned.substring(0, maxLength);
                 // Try to break at a word boundary
                 const lastSpace = truncated.lastIndexOf(' ');
                 if (lastSpace > maxLength * 0.7) {
@@ -3904,7 +4295,7 @@ sys.stderr = sys.__stderr__
                 }
                 truncated += '...';
             }
-            
+
             return renderMarkdownWithLinks(truncated);
         }
 
@@ -4289,7 +4680,9 @@ sys.stderr = sys.__stderr__
 
             const content = document.getElementById('content');
 
-            if (data.sections.length === 0) {
+            const hasSystemNotes = showSystemNotes && data.systemNotes && data.systemNotes.length > 0;
+
+            if (data.sections.length === 0 && !hasSystemNotes) {
                 content.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-state-icon">📚</div>
@@ -4300,7 +4693,7 @@ sys.stderr = sys.__stderr__
                 return;
             }
 
-            content.innerHTML = data.sections.map(section => {
+            let sectionsHtml = data.sections.map(section => {
                 const isCollapsed = collapsedSections.has(section.id);
                 const itemCount = section.items.length;
 
@@ -4343,6 +4736,34 @@ sys.stderr = sys.__stderr__
                     </div>
                 </div>
             `}).join('');
+
+            // Add System section if enabled and has notes
+            if (hasSystemNotes) {
+                const isCollapsed = collapsedSections.has('_system');
+                const itemCount = data.systemNotes.length;
+
+                sectionsHtml += `
+                <div class="section section-system" data-section-id="_system">
+                    <div class="section-header">
+                        <button class="section-toggle ${isCollapsed ? 'collapsed' : ''}" onclick="toggleSection('_system')" title="${isCollapsed ? 'Expand' : 'Collapse'}">▼</button>
+                        <h2 class="section-title">
+                            <span style="color: var(--text-muted);">System</span>
+                            ${isCollapsed && itemCount > 0 ? `<span class="section-count">(${itemCount})</span>` : ''}
+                        </h2>
+                        <div class="section-actions">
+                            <button class="btn btn-note btn-small" onclick="openNoteModal('_system')">
+                                + Note
+                            </button>
+                        </div>
+                    </div>
+                    <div class="items-grid ${isCollapsed ? 'collapsed' : ''}">
+                        ${data.systemNotes.map(note => renderNoteCard('_system', note)).join('')}
+                    </div>
+                </div>
+                `;
+            }
+
+            content.innerHTML = sectionsHtml;
 
             // Apply syntax highlighting to all code blocks
             hljs.highlightAll();

@@ -72,8 +72,9 @@ Contains:
 **~40 lines** | JavaScript
 
 Key variables:
-- `data` - Main data structure (title, subtitle, sections[])
+- `data` - Main data structure (title, subtitle, sections[], systemNotes[])
 - `collapsedSections` - UI state (not persisted)
+- `showSystemNotes` - Toggle for System section visibility (persisted in localStorage)
 - `editingBookmark`, `editingNote`, `editingCode` - Edit mode trackers
 - `currentViewingNote`, `currentViewingCode`, `currentViewingBookmark` - Viewer state
 - `manualThumbnail` - Manual upload tracker
@@ -100,6 +101,8 @@ Constants:
 
 Functions:
 - `isFileSystemAccessSupported()` - Check browser support
+- `getReadmeTemplate(notebookTitle)` - Generate README.md content for notebook folder
+- `getClaudeMdTemplate()` - Generate CLAUDE.md content for notebook folder
 - `slugify(title, maxLength)` - Convert title to filename-safe slug
 - `noteToMarkdown(note)` - Convert note to markdown with YAML frontmatter
 - `markdownToNote(content, filename)` - Parse markdown back to note object
@@ -124,6 +127,7 @@ Features:
 - YAML frontmatter for metadata
 - Thumbnail extraction to separate files
 - Persistent directory handle across sessions
+- Auto-generates README.md and CLAUDE.md in new notebook folders
 
 ### FILESYSTEM_OBSERVER
 **~100 lines** | JavaScript
@@ -165,10 +169,12 @@ Functions:
 - `saveSettings()` - Save title/subtitle, update header
 - `changeNotebookFolder()` - Switch to different folder
 - `refreshFromFilesystem()` - Reload data from linked folder
+- `toggleSystemNotes(enabled)` - Show/hide System section
 
 Features:
 - Title and subtitle editing
 - Storage settings (change folder, refresh)
+- System notes visibility toggle
 
 ### ONBOARDING
 **~25 lines** | JavaScript

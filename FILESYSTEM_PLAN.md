@@ -181,60 +181,44 @@ function parseYamlFrontmatter(content)   // Extract frontmatter from file
 - Flag prevents observer triggering during app's own saves
 - Clean separation: `isSavingToFilesystem` and `isReloadingFromFilesystem` flags
 
-### Phase 3: Git Integration Awareness
+### Phase 3: Git Integration Awareness ✅ IMPLEMENTED
 
-**Goal**: Show git status in UI, make versioning visible.
+**Goal**: Document git workflow for notebook folders.
 
-**Features**:
-- Show modified indicator on cards that have uncommitted changes
-- "Last committed" timestamp on items
-- Optional: commit message input in UI
+**Implementation** (Simple approach):
+- README.md auto-created in new notebook folders
+- Documents directory structure, file formats, and git workflow
+- Clean file formats produce readable diffs
+- Git operations handled via terminal or Claude Code
 
-**Implementation Approach**:
-- Don't embed git operations in browser (complex, security issues)
-- Instead: read `.git` status files or run simple checks
-- Or: just document git workflow, let user run git in terminal
-
-**Simpler Alternative**:
-- Just ensure file format produces clean diffs
-- Document recommended git workflow in README
-- Let Claude Code handle git operations when asked
-
-### Phase 4: Claude Code Workflow Documentation
+### Phase 4: Claude Code Workflow Documentation ✅ IMPLEMENTED
 
 **Goal**: Document how to use Claude Code with the notebook effectively.
 
-**CLAUDE.md Updates**:
-```markdown
-## Working with Claude Code
+**Implementation**:
+- CLAUDE.md auto-created in new notebook folders
+- Quick reference table for file types and extensions
+- Examples for reading, creating, and editing items
+- Common task prompts for Claude Code interaction
 
-This notebook stores data as files that Claude Code can read and edit directly.
+**Both README.md and CLAUDE.md**:
+- Created automatically when new notebook folder is initialized
+- Only created if files don't already exist (preserves user edits)
+- Templates in `getReadmeTemplate()` and `getClaudeMdTemplate()` functions
+- Editable as "System notes" in the UI (Settings → Show System notes)
+- Users can also edit them in any text editor or via Claude Code
 
-### Directory Structure
-[document the structure]
+### System Notes Feature
 
-### Common Operations
+**Goal**: Allow viewing/editing of root markdown files (README.md, CLAUDE.md, etc.) within the app.
 
-**Read a note:**
-> Read sections/papers/attention-mechanisms.md
-
-**Create a new note:**
-> Create a note in sections/ideas/ titled "Experiment Design" about...
-
-**Search across notes:**
-> Search for "transformer" across all markdown files in sections/
-
-**Add a bookmark:**
-> Create a bookmark in sections/references/ for https://arxiv.org/...
-
-### File Format Reference
-[document frontmatter format for each type]
-```
-
-**Example Prompts File** (optional `PROMPTS.md`):
-- Common research workflows
-- How to reference items using wiki syntax
-- How to ask Claude to synthesize across multiple items
+**Implementation**:
+- Markdown files at notebook root are loaded as "system notes"
+- Displayed in a collapsible "System" section (hidden by default)
+- Toggle visibility via Settings → "Show System notes"
+- No frontmatter required - plain markdown files
+- Title derived from filename, editable (renames file)
+- Can create new system notes via "+ Note" button in System section
 
 ---
 
