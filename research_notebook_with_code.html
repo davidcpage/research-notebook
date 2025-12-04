@@ -1,3 +1,6 @@
+<!-- ========== SECTION: HTML_HEAD ========== -->
+<!-- External dependencies: PDF.js, Marked.js, KaTeX, Pyodide, Highlight.js -->
+<!-- All CSS styles included below -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1625,6 +1628,8 @@
         }
     </style>
 </head>
+<!-- ========== SECTION: HTML_BODY_AND_MODALS ========== -->
+<!-- Header, toolbar, main content area, and all modal templates -->
 <body>
     <header>
         <div class="header-content">
@@ -1899,6 +1904,9 @@ print('Hello, World!')" spellcheck="false"></textarea>
     <div class="toast" id="toast"></div>
 
     <script>
+        // ========== SECTION: STATE_AND_CONFIG ==========
+        // Global data structure, state variables, editing trackers, Pyodide state, marked config
+
         // Data structure
         let data = {
             title: 'Research Notebook',
@@ -1931,6 +1939,10 @@ print('Hello, World!')" spellcheck="false"></textarea>
             breaks: true,
             gfm: true
         });
+
+        // ========== SECTION: DATA_PERSISTENCE ==========
+        // IndexedDB operations: loadData, openDB, saveData
+        // Storage config: IDB_NAME, IDB_STORE, IDB_KEY
 
         // Load data from IndexedDB
         async function loadData() {
@@ -2006,6 +2018,9 @@ print('Hello, World!')" spellcheck="false"></textarea>
             }
         }
 
+        // ========== SECTION: UI_UTILITIES ==========
+        // Toast notifications and misc UI helpers
+
         // Show toast notification
         function showToast(message) {
             const toast = document.getElementById('toast');
@@ -2013,6 +2028,9 @@ print('Hello, World!')" spellcheck="false"></textarea>
             toast.classList.add('active');
             setTimeout(() => toast.classList.remove('active'), 3000);
         }
+
+        // ========== SECTION: SECTION_MODAL ==========
+        // Section creation modal: open, close, create
 
         // Section Modal
         function openSectionModal() {
@@ -2044,6 +2062,9 @@ print('Hello, World!')" spellcheck="false"></textarea>
             showToast('Section created');
         }
 
+        // ========== SECTION: SETTINGS_MODAL ==========
+        // Notebook settings (title/subtitle): open, close, save
+
         // Settings Modal
         function openSettingsModal() {
             document.getElementById('settingsTitle').value = data.title || 'Research Notebook';
@@ -2068,6 +2089,10 @@ print('Hello, World!')" spellcheck="false"></textarea>
             closeSettingsModal();
             showToast('Settings saved');
         }
+
+        // ========== SECTION: THUMBNAIL_DRAG_DROP ==========
+        // Manual thumbnail upload via drag-drop or file picker
+        // Functions: initThumbnailDragDrop, handleDrop, handleFiles, displayThumbnailPreview, clearThumbnailPreview
 
         // Initialize thumbnail drag-and-drop handlers
         function initThumbnailDragDrop() {
@@ -2180,6 +2205,9 @@ print('Hello, World!')" spellcheck="false"></textarea>
 
             manualThumbnail = null;
         }
+
+        // ========== SECTION: BOOKMARK_MODAL ==========
+        // Bookmark creation/editing modal: open, close, save
 
         // Bookmark Modal
         function openBookmarkModal(sectionId = null, bookmark = null) {
@@ -2296,6 +2324,9 @@ print('Hello, World!')" spellcheck="false"></textarea>
             showToast(editingBookmark ? 'Bookmark updated' : 'Bookmark added');
         }
 
+        // ========== SECTION: NOTE_MODAL ==========
+        // Note creation/editing modal: open, close, switchEditorTab, save
+
         // Note Modal
         function openNoteModal(sectionId = null, note = null) {
             editingNote = note ? { ...note, sectionId } : null;
@@ -2396,6 +2427,9 @@ print('Hello, World!')" spellcheck="false"></textarea>
             showToast(editingNote ? 'Note updated' : 'Note created');
         }
 
+        // ========== SECTION: NOTE_VIEWER ==========
+        // Note viewing modal: open, close, edit, delete
+
         // Note Viewer
         function openNoteViewer(sectionId, noteId) {
             const section = data.sections.find(s => s.id === sectionId);
@@ -2460,6 +2494,9 @@ print('Hello, World!')" spellcheck="false"></textarea>
 
         // Bookmark Viewer
         let currentViewingBookmark = null;
+
+        // ========== SECTION: BOOKMARK_VIEWER ==========
+        // Bookmark viewing modal: open, close, edit, delete
 
         function openBookmarkViewer(sectionId, bookmarkId) {
             const section = data.sections.find(s => s.id === sectionId);
@@ -2539,7 +2576,8 @@ print('Hello, World!')" spellcheck="false"></textarea>
             await confirmDeleteItem(sectionId, bookmarkId, 'bookmark');
         }
 
-        // ============ Pyodide / Code Notes ============
+        // ========== SECTION: PYODIDE_RUNTIME ==========
+        // Python execution via Pyodide: initPyodide, updatePyodideStatus, runCode, executePythonCode
 
         // Load Pyodide lazily
         async function initPyodide() {
@@ -2764,6 +2802,9 @@ sys.stderr = sys.__stderr__
             return output;
         }
 
+        // ========== SECTION: CODE_MODAL ==========
+        // Code note creation/editing modal: open, close, save (auto-executes on save)
+
         // Code Modal
         function openCodeModal(sectionId = null, codeNote = null) {
             editingCode = codeNote ? { ...codeNote, sectionId } : null;
@@ -2869,6 +2910,9 @@ sys.stderr = sys.__stderr__
             submitBtn.textContent = 'Save Code Note';
             showToast(editingCode ? 'Code note updated' : 'Code note created');
         }
+
+        // ========== SECTION: CODE_VIEWER ==========
+        // Code viewing modal: open, close, edit, delete, runCurrentCode
 
         // Code Viewer
         function openCodeViewer(sectionId, codeId) {
@@ -2991,6 +3035,9 @@ sys.stderr = sys.__stderr__
                 mainEl.innerHTML = `<div style="padding: 2rem;"><pre class="error">${escapeHtml(error.toString())}</pre></div>`;
             }
         }
+
+        // ========== SECTION: INTERNAL_LINKING ==========
+        // Wiki-style [[links]]: renderMarkdownWithLinks, renderNotePreview, resolveLink, findBacklinks, navigateToItem
 
         // Internal linking
         function renderMarkdownWithLinks(text, containerId = null) {
@@ -3175,6 +3222,9 @@ sys.stderr = sys.__stderr__
             }
         }
 
+        // ========== SECTION: THUMBNAIL_GENERATION ==========
+        // Auto-thumbnail via microlink API and PDF.js: resizeAndCompressThumbnail, urlToDataUrl, generateThumbnail, generatePdfThumbnail, extractDomain
+
         // Helper function to resize and compress a canvas or image to reduce storage size
         // Target: 1000px width for high quality display, JPEG 90% quality
         async function resizeAndCompressThumbnail(source, maxWidth = 1000, quality = 0.90) {
@@ -3356,6 +3406,9 @@ sys.stderr = sys.__stderr__
             }
         }
 
+        // ========== SECTION: DATA_OPERATIONS ==========
+        // Section/item actions: toggleSection, toggleCodeOutput, editBookmark, confirmDeleteItem, deleteSection, deleteItem, updateSectionName
+
         // Toggle section collapsed state
         function toggleSection(sectionId) {
             if (collapsedSections.has(sectionId)) {
@@ -3420,6 +3473,9 @@ sys.stderr = sys.__stderr__
                 await saveData();
             }
         }
+
+        // ========== SECTION: EXPORT_IMPORT ==========
+        // Data export/import: exportData, importData
 
         // Export data
         function exportData() {
@@ -3506,6 +3562,9 @@ sys.stderr = sys.__stderr__
             }
             return text;
         }
+
+        // ========== SECTION: RENDER_FUNCTIONS ==========
+        // Main render and card templates: render, renderBookmarkCard, renderNoteCard, renderCodeCard, findNote, findCode, escapeHtml
 
         // Render the UI
         function render() {
@@ -3678,6 +3737,9 @@ sys.stderr = sys.__stderr__
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // ========== SECTION: EVENT_HANDLERS_AND_INIT ==========
+        // Keyboard shortcuts, modal close handlers, internal link delegation, initialization
 
         // Handle Enter key in modals
         document.getElementById('sectionName').addEventListener('keypress', (e) => {
