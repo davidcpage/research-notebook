@@ -3670,8 +3670,8 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 title: title || extractDomain(url),
                 description,
                 thumbnail,
-                createdAt: editingBookmark?.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                created: editingBookmark?.created || new Date().toISOString(),
+                modified: new Date().toISOString()
             };
 
             if (editingBookmark) {
@@ -3820,8 +3820,8 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                     type: 'note',
                     title,
                     content,
-                    createdAt: editingNote?.createdAt || new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
+                    created: editingNote?.created || new Date().toISOString(),
+                    modified: new Date().toISOString()
                 };
 
                 if (editingNote) {
@@ -3903,9 +3903,9 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             if (isSystemNote) {
                 metaText = note.modified ? `Modified ${formatDate(note.modified)}` : '';
             } else {
-                metaText = formatDate(note.createdAt);
-                if (note.updatedAt && note.updatedAt !== note.createdAt) {
-                    metaText += ` · Updated ${formatDate(note.updatedAt)}`;
+                metaText = formatDate(note.created || note.modified);
+                if (note.modified && note.created && note.modified !== note.created) {
+                    metaText += ` · Updated ${formatDate(note.modified)}`;
                 }
             }
             document.getElementById('noteViewerMeta').textContent = metaText;
@@ -4007,9 +4007,9 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             }
             
             // Set meta info
-            let metaText = formatDate(bookmark.createdAt);
-            if (bookmark.updatedAt && bookmark.updatedAt !== bookmark.createdAt) {
-                metaText += ` · Updated ${formatDate(bookmark.updatedAt)}`;
+            let metaText = formatDate(bookmark.created || bookmark.modified);
+            if (bookmark.modified && bookmark.created && bookmark.modified !== bookmark.created) {
+                metaText += ` · Updated ${formatDate(bookmark.modified)}`;
             }
             document.getElementById('bookmarkViewerMeta').textContent = metaText;
             
@@ -4342,8 +4342,8 @@ sys.stderr = sys.__stderr__
                 code,
                 output,
                 showOutput: editingCode?.showOutput !== undefined ? editingCode.showOutput : (output.trim() ? true : false),
-                createdAt: editingCode?.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                created: editingCode?.created || new Date().toISOString(),
+                modified: new Date().toISOString()
             };
 
             if (editingCode) {
@@ -4441,9 +4441,9 @@ sys.stderr = sys.__stderr__
             }
 
             // Set meta info
-            let metaText = formatDate(codeNote.createdAt);
-            if (codeNote.updatedAt && codeNote.updatedAt !== codeNote.createdAt) {
-                metaText += ` · Updated ${formatDate(codeNote.updatedAt)}`;
+            let metaText = formatDate(codeNote.created || codeNote.modified);
+            if (codeNote.modified && codeNote.created && codeNote.modified !== codeNote.created) {
+                metaText += ` · Updated ${formatDate(codeNote.modified)}`;
             }
             document.getElementById('codeViewerMeta').textContent = metaText;
 
@@ -4488,7 +4488,7 @@ sys.stderr = sys.__stderr__
                     const codeNote = section.items.find(c => c.id === currentViewingCode.id);
                     if (codeNote) {
                         codeNote.output = result;
-                        codeNote.updatedAt = new Date().toISOString();
+                        codeNote.modified = new Date().toISOString();
                         currentViewingCode.output = result;
                         await saveData();
                         await saveCodeFile(currentViewingCode.sectionId, codeNote);  // Save code file with new output
@@ -5125,9 +5125,9 @@ sys.stderr = sys.__stderr__
                         <h3 class="note-title">${escapeHtml(note.title)}</h3>
                     </div>
                     <div class="note-meta">
-                        <span>${formatDate(note.createdAt)}</span>
-                        ${note.updatedAt && note.updatedAt !== note.createdAt ?
-                            `<span>Updated ${formatDate(note.updatedAt)}</span>` : ''
+                        <span>${formatDate(note.created || note.modified)}</span>
+                        ${note.modified && note.created && note.modified !== note.created ?
+                            `<span>Updated ${formatDate(note.modified)}</span>` : ''
                         }
                     </div>
                 </div>
@@ -5163,9 +5163,9 @@ sys.stderr = sys.__stderr__
                         <h3 class="code-title">${escapeHtml(codeNote.title)}</h3>
                     </div>
                     <div class="code-meta">
-                        <span>${formatDate(codeNote.createdAt)}</span>
-                        ${codeNote.updatedAt && codeNote.updatedAt !== codeNote.createdAt ?
-                            `<span>Updated ${formatDate(codeNote.updatedAt)}</span>` : ''
+                        <span>${formatDate(codeNote.created || codeNote.modified)}</span>
+                        ${codeNote.modified && codeNote.created && codeNote.modified !== codeNote.created ?
+                            `<span>Updated ${formatDate(codeNote.modified)}</span>` : ''
                         }
                     </div>
                 </div>
