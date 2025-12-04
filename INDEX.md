@@ -1,6 +1,6 @@
 # research_notebook_with_code.html - Section Index
 
-This file provides a navigable index for the large single-file application (~3800 lines).
+This file provides a navigable index for the large single-file application (~4400 lines).
 
 **To find actual line numbers:** `grep -n "SECTION:" research_notebook_with_code.html`
 
@@ -9,12 +9,14 @@ This file provides a navigable index for the large single-file application (~380
 | Section | ~Lines | Purpose |
 |---------|--------|---------|
 | [HTML_HEAD](#html_head) | 1630 | DOCTYPE, CDN dependencies, all CSS |
-| [HTML_BODY_AND_MODALS](#html_body_and_modals) | 275 | Header, toolbar, modals |
-| [STATE_AND_CONFIG](#state_and_config) | 35 | Global state, marked config |
-| [DATA_PERSISTENCE](#data_persistence) | 80 | IndexedDB operations |
+| [HTML_BODY_AND_MODALS](#html_body_and_modals) | 315 | Header, toolbar, modals (incl. onboarding) |
+| [STATE_AND_CONFIG](#state_and_config) | 40 | Global state, marked config |
+| [DATA_PERSISTENCE](#data_persistence) | 90 | IndexedDB operations |
+| [FILESYSTEM_STORAGE](#filesystem_storage) | 515 | File System Access API |
 | [UI_UTILITIES](#ui_utilities) | 10 | Toast notifications |
 | [SECTION_MODAL](#section_modal) | 35 | Section CRUD |
-| [SETTINGS_MODAL](#settings_modal) | 30 | Title/subtitle settings |
+| [SETTINGS_MODAL](#settings_modal) | 60 | Title/subtitle + folder settings |
+| [ONBOARDING](#onboarding) | 25 | First-time folder setup |
 | [THUMBNAIL_DRAG_DROP](#thumbnail_drag_drop) | 115 | Manual thumbnail upload |
 | [BOOKMARK_MODAL](#bookmark_modal) | 115 | Bookmark CRUD |
 | [NOTE_MODAL](#note_modal) | 100 | Note CRUD |
@@ -26,9 +28,9 @@ This file provides a navigable index for the large single-file application (~380
 | [INTERNAL_LINKING](#internal_linking) | 185 | [[wiki-links]] |
 | [THUMBNAIL_GENERATION](#thumbnail_generation) | 185 | Auto thumbnails |
 | [DATA_OPERATIONS](#data_operations) | 70 | Toggle, delete, edit |
-| [EXPORT_IMPORT](#export_import) | 90 | JSON export/import |
+| [UTILITY_FUNCTIONS](#utility_functions) | 30 | formatDate, getPlainTextPreview |
 | [RENDER_FUNCTIONS](#render_functions) | 175 | UI rendering |
-| [EVENT_HANDLERS_AND_INIT](#event_handlers_and_init) | 75 | Keyboard, init |
+| [EVENT_HANDLERS_AND_INIT](#event_handlers_and_init) | 85 | Keyboard, init, onboarding
 
 ---
 
@@ -66,7 +68,7 @@ Contains:
 - Toast notification element
 
 ### STATE_AND_CONFIG
-**~35 lines** | JavaScript
+**~40 lines** | JavaScript
 
 Key variables:
 - `data` - Main data structure (title, subtitle, sections[])
@@ -75,6 +77,7 @@ Key variables:
 - `currentViewingNote`, `currentViewingCode`, `currentViewingBookmark` - Viewer state
 - `manualThumbnail` - Manual upload tracker
 - `pyodide`, `pyodideLoading`, `pyodideReady` - Python runtime state
+- `notebookDirHandle`, `filesystemLinked` - Filesystem state
 - `marked.setOptions()` - Markdown parser config
 
 ### DATA_PERSISTENCE
@@ -89,6 +92,36 @@ Constants:
 - `IDB_NAME = 'ResearchNotebookDB'`
 - `IDB_STORE = 'notebook'`
 - `IDB_KEY = 'data'`
+
+### FILESYSTEM_STORAGE
+**~500 lines** | JavaScript
+
+Functions:
+- `isFileSystemAccessSupported()` - Check browser support
+- `slugify(title, maxLength)` - Convert title to filename-safe slug
+- `noteToMarkdown(note)` - Convert note to markdown with YAML frontmatter
+- `markdownToNote(content, filename)` - Parse markdown back to note object
+- `codeToFile(code)` - Convert code to Python with frontmatter comment
+- `fileToCode(content, filename, output)` - Parse Python back to code object
+- `bookmarkToJson(bookmark, thumbnailPath)` - Convert bookmark to JSON
+- `jsonToBookmark(json, thumbnailDataUrl)` - Parse JSON to bookmark object
+- `saveDirHandle(handle)` - Persist directory handle to IndexedDB
+- `loadDirHandle()` - Retrieve directory handle from IndexedDB
+- `verifyDirPermission(handle)` - Request permission for directory access
+- `loadFromFilesystem(dirHandle)` - Load all data from directory
+- `saveToFilesystem(dirHandle)` - Write all data to directory
+- `linkNotebookFolder()` - Show picker and link folder
+- `unlinkNotebookFolder()` - Unlink folder, switch to browser storage
+- `updateStorageIndicator()` - Update toolbar indicator
+- `initFilesystem()` - Initialize on page load
+
+Features:
+- File System Access API integration
+- Markdown files for notes, Python files for code, JSON for bookmarks
+- Directory structure: `notebook.json`, `sections/`, `assets/thumbnails/`
+- YAML frontmatter for metadata
+- Thumbnail extraction to separate files
+- Persistent directory handle across sessions
 
 ### UI_UTILITIES
 **~10 lines** | JavaScript
@@ -105,12 +138,31 @@ Functions:
 - `createSection()` - Create new section and save
 
 ### SETTINGS_MODAL
-**~30 lines** | JavaScript
+**~60 lines** | JavaScript
 
 Functions:
 - `openSettingsModal()` - Show settings modal
 - `closeSettingsModal()` - Hide modal
 - `saveSettings()` - Save title/subtitle, update header
+- `changeNotebookFolder()` - Switch to different folder
+- `refreshFromFilesystem()` - Reload data from linked folder
+
+Features:
+- Title and subtitle editing
+- Storage settings (change folder, refresh)
+
+### ONBOARDING
+**~25 lines** | JavaScript
+
+Functions:
+- `showOnboarding()` - Display first-time setup modal
+- `closeOnboarding()` - Close modal
+- `setupNotebookFolder()` - Link folder from onboarding
+
+Features:
+- First-time user experience
+- Browser compatibility check
+- Folder selection flow
 
 ### THUMBNAIL_DRAG_DROP
 **~115 lines** | JavaScript
@@ -275,18 +327,12 @@ Functions:
 - `deleteItem(sectionId, itemId)` - Delete item from section
 - `updateSectionName(sectionId, newName)` - Rename section
 
-### EXPORT_IMPORT
-**~90 lines** | JavaScript
+### UTILITY_FUNCTIONS
+**~30 lines** | JavaScript
 
 Functions:
-- `exportData()` - Download JSON file
-- `importData(event)` - Load JSON file
-
-Features:
-- Full notebook export as JSON
-- 50MB import limit
-- Validation and error handling
-- Progress feedback for large files
+- `formatDate(dateString)` - Format date for display
+- `getPlainTextPreview(markdown, maxLength)` - Strip markdown for card previews
 
 ### RENDER_FUNCTIONS
 **~175 lines** | JavaScript
@@ -303,7 +349,7 @@ Functions:
 - `getPlainTextPreview(markdown, maxLength)` - Strip markdown for preview
 
 ### EVENT_HANDLERS_AND_INIT
-**~75 lines** | JavaScript
+**~85 lines** | JavaScript
 
 Contains:
 - Enter key handlers for modals
@@ -311,7 +357,10 @@ Contains:
 - Modal close on overlay click
 - Escape key modal close
 - Internal link click delegation
-- Initialization: `loadData()`, `initThumbnailDragDrop()`
+- `init()` function:
+  - `initFilesystem()` - Restore filesystem link
+  - `showOnboarding()` - Show setup if no folder linked
+  - `initThumbnailDragDrop()` - Setup drag-drop handlers
 
 ---
 
@@ -327,7 +376,7 @@ Contains:
 1. Update `data` structure in STATE_AND_CONFIG
 2. Update `loadData()` for backwards compatibility
 3. Update `render()` and card render functions
-4. Update export/import if needed
+4. Update filesystem read/write functions if format changes
 
 ### Adding a new item type
 1. Add modal HTML (HTML_BODY_AND_MODALS)

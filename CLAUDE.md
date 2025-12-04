@@ -138,13 +138,11 @@ data = {
 - `saveSettings()`: Saves changes to data model, updates header and browser tab title
 - Backwards compatible: loads default values if title/subtitle missing from saved data
 
-**Export/Import** (EXPORT_IMPORT section):
-- **Export**: Downloads entire notebook as JSON file (data structure only, no IndexedDB metadata)
-- **Import**: Reads JSON file, validates format, handles large files
-  - File size validation: 50MB maximum for safety
-  - Progress feedback for files > 1MB
-  - Expects current format with `title`, `subtitle`, and `sections` fields
-  - Console logging of import statistics (sections count, items count)
+**Onboarding** (ONBOARDING section):
+- First-time setup flow shown when no folder is linked
+- Prompts user to select a notebook folder
+- Browser compatibility check for File System Access API
+- `showOnboarding()`, `closeOnboarding()`, `setupNotebookFolder()`
 
 **Internal Linking** (INTERNAL_LINKING section):
 - Supports `[[Section Name > Item Title]]` syntax in markdown
@@ -185,25 +183,49 @@ Since this is a single HTML file:
 
 ### Storage Architecture
 
-**IndexedDB Storage**:
-- Database name: `ResearchNotebookDB`
-- Object store: `notebook`
-- Key: `data`
-- Stores entire data structure as JSON string
-- **No size limits**: Can handle gigabytes of data (vs localStorage's 5-10MB quota)
-- **Asynchronous**: Non-blocking operations for better performance
-- **Persistent**: Survives browser restarts and crashes
+The app uses **filesystem-based storage** via the File System Access API (Chrome/Edge required).
 
-**Why IndexedDB?**
-- Research notebooks can grow very large with many bookmarks, notes, and code outputs
-- Python code execution outputs (especially matplotlib plots) can be data-heavy
-- IndexedDB is purpose-built for web applications storing structured data
-- No compression needed - browser handles storage optimization
+**First-Time Setup**:
+- On first launch, onboarding modal prompts user to select a notebook folder
+- Can select empty folder (creates new notebook) or existing notebook folder (loads it)
+- Folder selection persists across browser sessions
 
-**Data Format**:
-- Sections contain `items` arrays where each item has a `type` field ('bookmark', 'note', or 'code')
-- All data must be in current format - legacy format support has been removed for simplicity
-- Export and import use the same clean JSON structure
+**Directory Structure**:
+```
+notebook-folder/
+├── notebook.json           # Title, subtitle, section order
+├── sections/
+│   ├── section-name/
+│   │   ├── _section.json   # Section metadata
+│   │   ├── note-title.md   # Note as markdown with YAML frontmatter
+│   │   ├── code-title.code.py    # Code as Python with comment frontmatter
+│   │   ├── code-title.output.html # Code execution output
+│   │   └── bookmark-title.bookmark.json # Bookmark metadata
+│   └── ...
+└── assets/
+    └── thumbnails/         # Bookmark thumbnails as image files
+```
+
+**File Formats**:
+- **Notes**: Markdown with YAML frontmatter (id, title, created, modified)
+- **Code**: Python with comment-based frontmatter, output in separate `.output.html`
+- **Bookmarks**: JSON with url, title, description, thumbnail path
+
+**Why Filesystem?**
+- **Claude Code integration**: Claude can read/write files directly
+- **Git versioning**: Meaningful diffs, history per item
+- **Portable**: Markdown/Python files editable in any editor
+- **No size limits**: Folder can grow to any size
+
+**IndexedDB** (Cache Only):
+- Used to persist directory handle across sessions
+- Also caches notebook data for faster loads
+- Database: `ResearchNotebookDB`, Store: `notebook`
+
+**Settings**:
+- Settings modal shows current folder and provides Refresh/Change Folder buttons
+- Refresh reloads from filesystem (picks up external edits)
+- Change Folder switches to different notebook
 
 ### Pyodide Configuration
 **Version**: v0.28.2 (following stlite's proven approach)

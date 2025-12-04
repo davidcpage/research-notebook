@@ -1647,15 +1647,6 @@
                 <span class="btn-icon">+</span> New Section
             </button>
         </div>
-        <div class="toolbar-group">
-            <button class="btn btn-secondary" onclick="exportData()">
-                <span class="btn-icon">↓</span> Export
-            </button>
-            <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">
-                <span class="btn-icon">↑</span> Import
-            </button>
-            <input type="file" id="importFile" accept=".json" style="display: none" onchange="importData(event)">
-        </div>
         <div class="toolbar-group" style="margin-left: auto;">
             <button class="btn btn-secondary" onclick="openSettingsModal()" title="Settings" style="color: var(--text-muted);">
                 <span class="btn-icon">⚙</span>
@@ -1895,10 +1886,59 @@ print('Hello, World!')" spellcheck="false"></textarea>
                     <label for="settingsSubtitle">Subtitle</label>
                     <input type="text" id="settingsSubtitle" placeholder="Bookmarks, notes, and connections">
                 </div>
+
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
+
+                <div class="form-group">
+                    <label>Storage</label>
+                    <div id="storageSettings" style="margin-top: 8px;">
+                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 8px;">
+                            Notebook folder:
+                        </p>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            <code id="linkedFolderName" style="flex: 1; padding: 8px 12px; background: var(--bg-secondary); border-radius: 4px; font-size: 0.85rem;"></code>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary" onclick="refreshFromFilesystem()" style="flex: 1;">
+                                🔄 Refresh
+                            </button>
+                            <button class="btn btn-secondary" onclick="changeNotebookFolder()" style="flex: 1;">
+                                📁 Change Folder
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeSettingsModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onboarding Modal -->
+    <div class="modal-overlay" id="onboardingModal">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Welcome to Research Notebook</h2>
+            </div>
+            <div class="modal-body" style="text-align: center; padding: 30px 20px;">
+                <div style="font-size: 4rem; margin-bottom: 20px;">📚</div>
+                <p style="color: var(--text-secondary); font-size: 1.1rem; margin-bottom: 20px; line-height: 1.6;">
+                    Your notebook is stored as files on your computer, making it easy to use with Claude Code and track changes with git.
+                </p>
+                <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 30px;">
+                    Choose a folder to store your notebook. You can select an empty folder to start fresh, or pick a folder with an existing notebook.
+                </p>
+                <button class="btn btn-primary" onclick="setupNotebookFolder()" style="padding: 12px 32px; font-size: 1.1rem;">
+                    📁 Choose Notebook Folder
+                </button>
+                <div id="onboardingUnsupported" style="display: none; margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 8px;">
+                    <p style="color: #856404; margin: 0; font-size: 0.9rem;">
+                        ⚠️ File System Access is not supported in this browser.<br>
+                        Please use <strong>Chrome</strong> or <strong>Edge</strong> for the full experience.
+                    </p>
+                </div>
             </div>
         </div>
     </div>
@@ -1934,6 +1974,11 @@ print('Hello, World!')" spellcheck="false"></textarea>
         let pyodide = null;
         let pyodideLoading = false;
         let pyodideReady = false;
+
+        // Filesystem state
+        let notebookDirHandle = null;  // FileSystemDirectoryHandle for linked folder
+        let filesystemLinked = false;   // Whether filesystem mode is active
+        const IDB_DIR_HANDLE_KEY = 'notebookDirHandle';  // IndexedDB key for persisting handle
 
         // Configure marked for safe rendering
         marked.setOptions({
@@ -1996,7 +2041,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
             });
         }
 
-        // Save data to IndexedDB
+        // Save data to IndexedDB (and filesystem if linked)
         async function saveData() {
             try {
                 const jsonStr = JSON.stringify(data);
@@ -2012,10 +2057,535 @@ print('Hello, World!')" spellcheck="false"></textarea>
 
                 db.close();
                 console.log(`Data saved to IndexedDB (${(jsonStr.length / 1024).toFixed(1)}KB)`);
+
+                // Also save to filesystem if linked
+                if (filesystemLinked && notebookDirHandle) {
+                    try {
+                        await saveToFilesystem(notebookDirHandle);
+                    } catch (fsError) {
+                        console.error('Error saving to filesystem:', fsError);
+                        // Don't throw - IndexedDB save succeeded
+                    }
+                }
             } catch (error) {
                 console.error('Error saving data:', error);
                 showToast('⚠️ Error saving data: ' + error.message);
                 throw error;
+            }
+        }
+
+        // ========== SECTION: FILESYSTEM_STORAGE ==========
+        // File System Access API integration for direct folder read/write
+        // Functions: slugify, noteToMarkdown, markdownToNote, codeToFile, fileToCode,
+        //            bookmarkToJson, jsonToBookmark, loadFromFilesystem, saveToFilesystem,
+        //            saveDirHandle, loadDirHandle, linkNotebookFolder, unlinkNotebookFolder
+
+        // Check if File System Access API is available
+        function isFileSystemAccessSupported() {
+            return 'showDirectoryPicker' in window;
+        }
+
+        // Convert title to filename-safe slug
+        function slugify(title, maxLength = 50) {
+            if (!title) return 'untitled';
+            let slug = title.toLowerCase();
+            slug = slug.replace(/[^\w\s-]/g, '');  // Remove special chars
+            slug = slug.replace(/[\s_]+/g, '-');   // Spaces to hyphens
+            slug = slug.trim().replace(/^-+|-+$/g, '');  // Trim hyphens
+            return slug.substring(0, maxLength) || 'untitled';
+        }
+
+        // Convert note object to markdown with YAML frontmatter
+        function noteToMarkdown(note) {
+            const frontmatter = [
+                '---',
+                `id: ${note.id || ''}`,
+                `title: ${note.title || 'Untitled'}`,
+                `created: ${note.created || new Date().toISOString()}`,
+                `modified: ${note.modified || new Date().toISOString()}`,
+                '---',
+                ''
+            ].join('\n');
+            return frontmatter + (note.content || '');
+        }
+
+        // Parse markdown with YAML frontmatter to note object
+        function markdownToNote(content, filename) {
+            const note = { type: 'note' };
+            const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+
+            if (frontmatterMatch) {
+                const frontmatter = frontmatterMatch[1];
+                note.content = frontmatterMatch[2];
+
+                // Parse YAML-like frontmatter
+                frontmatter.split('\n').forEach(line => {
+                    const match = line.match(/^(\w+):\s*(.*)$/);
+                    if (match) {
+                        const [, key, value] = match;
+                        if (key === 'id') note.id = value;
+                        else if (key === 'title') note.title = value;
+                        else if (key === 'created') note.created = value;
+                        else if (key === 'modified') note.modified = value;
+                    }
+                });
+            } else {
+                // No frontmatter - use file content as-is
+                note.content = content;
+                note.title = filename.replace(/\.md$/, '');
+            }
+
+            if (!note.id) note.id = Date.now().toString();
+            if (!note.title) note.title = filename.replace(/\.md$/, '');
+
+            return note;
+        }
+
+        // Convert code object to Python file with frontmatter comment
+        function codeToFile(code) {
+            const lines = [
+                '# ---',
+                `# id: ${code.id || ''}`,
+                `# title: ${code.title || 'Untitled'}`,
+                `# created: ${code.created || new Date().toISOString()}`,
+                `# modified: ${code.modified || new Date().toISOString()}`,
+            ];
+            if (code.output) {
+                lines.push(`# output: ${slugify(code.title)}.output.html`);
+                lines.push(`# showOutput: ${code.showOutput !== false}`);
+            }
+            lines.push('# ---', '');
+            return lines.join('\n') + (code.code || '');
+        }
+
+        // Parse Python file with frontmatter comment to code object
+        function fileToCode(content, filename, outputContent = null) {
+            const code = { type: 'code', language: 'python' };
+            const frontmatterMatch = content.match(/^# ---\n((?:# .*\n)*?)# ---\n?([\s\S]*)$/);
+
+            if (frontmatterMatch) {
+                const frontmatter = frontmatterMatch[1];
+                code.code = frontmatterMatch[2];
+
+                frontmatter.split('\n').forEach(line => {
+                    const match = line.match(/^# (\w+):\s*(.*)$/);
+                    if (match) {
+                        const [, key, value] = match;
+                        if (key === 'id') code.id = value;
+                        else if (key === 'title') code.title = value;
+                        else if (key === 'created') code.created = value;
+                        else if (key === 'modified') code.modified = value;
+                        else if (key === 'showOutput') code.showOutput = value === 'true';
+                    }
+                });
+            } else {
+                code.code = content;
+                code.title = filename.replace(/\.code\.py$/, '');
+            }
+
+            if (!code.id) code.id = Date.now().toString();
+            if (!code.title) code.title = filename.replace(/\.code\.py$/, '');
+            if (outputContent) code.output = outputContent;
+
+            return code;
+        }
+
+        // Convert bookmark object to JSON
+        function bookmarkToJson(bookmark, thumbnailPath = null) {
+            return {
+                id: bookmark.id || '',
+                type: 'bookmark',
+                title: bookmark.title || 'Untitled',
+                url: bookmark.url || '',
+                description: bookmark.description || '',
+                thumbnail: thumbnailPath || bookmark.thumbnail || null,
+                created: bookmark.created || new Date().toISOString(),
+                modified: bookmark.modified || new Date().toISOString()
+            };
+        }
+
+        // Parse JSON to bookmark object
+        function jsonToBookmark(json, thumbnailDataUrl = null) {
+            const bookmark = {
+                type: 'bookmark',
+                id: json.id || Date.now().toString(),
+                title: json.title || 'Untitled',
+                url: json.url || '',
+                description: json.description || '',
+                created: json.created || new Date().toISOString(),
+                modified: json.modified || new Date().toISOString()
+            };
+            // Use data URL if provided (loaded from separate file), else use stored value
+            bookmark.thumbnail = thumbnailDataUrl || json.thumbnail || null;
+            return bookmark;
+        }
+
+        // Save directory handle to IndexedDB for persistence
+        async function saveDirHandle(handle) {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(IDB_STORE, 'readwrite');
+                const store = tx.objectStore(IDB_STORE);
+                store.put(handle, IDB_DIR_HANDLE_KEY);
+                await new Promise((resolve, reject) => {
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+                db.close();
+                console.log('[Filesystem] Directory handle saved to IndexedDB');
+            } catch (error) {
+                console.error('[Filesystem] Error saving directory handle:', error);
+            }
+        }
+
+        // Load directory handle from IndexedDB
+        async function loadDirHandle() {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(IDB_STORE, 'readonly');
+                const store = tx.objectStore(IDB_STORE);
+                const handle = await new Promise((resolve, reject) => {
+                    const request = store.get(IDB_DIR_HANDLE_KEY);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+                db.close();
+                return handle || null;
+            } catch (error) {
+                console.error('[Filesystem] Error loading directory handle:', error);
+                return null;
+            }
+        }
+
+        // Request permission for directory handle (needed after page reload)
+        async function verifyDirPermission(handle) {
+            if (!handle) return false;
+            try {
+                const options = { mode: 'readwrite' };
+                if (await handle.queryPermission(options) === 'granted') {
+                    return true;
+                }
+                if (await handle.requestPermission(options) === 'granted') {
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error('[Filesystem] Permission error:', error);
+                return false;
+            }
+        }
+
+        // Load notebook data from filesystem
+        async function loadFromFilesystem(dirHandle) {
+            console.log('[Filesystem] Loading from directory...');
+            const loadedData = {
+                title: 'Research Notebook',
+                subtitle: 'Bookmarks, notes, and connections',
+                sections: []
+            };
+
+            try {
+                // Try to read notebook.json for metadata
+                try {
+                    const metaFile = await dirHandle.getFileHandle('notebook.json');
+                    const file = await metaFile.getFile();
+                    const metaContent = await file.text();
+                    const meta = JSON.parse(metaContent);
+                    loadedData.title = meta.title || loadedData.title;
+                    loadedData.subtitle = meta.subtitle || loadedData.subtitle;
+                } catch (e) {
+                    console.log('[Filesystem] No notebook.json found, using defaults');
+                }
+
+                // Read sections directory
+                let sectionsDir;
+                try {
+                    sectionsDir = await dirHandle.getDirectoryHandle('sections');
+                } catch (e) {
+                    console.log('[Filesystem] No sections directory found');
+                    return loadedData;
+                }
+
+                // Iterate through section directories
+                for await (const [sectionName, sectionHandle] of sectionsDir.entries()) {
+                    if (sectionHandle.kind !== 'directory') continue;
+
+                    const section = {
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                        name: sectionName,
+                        items: []
+                    };
+
+                    // Try to read section metadata for display name
+                    try {
+                        const sectionMetaFile = await sectionHandle.getFileHandle('_section.json');
+                        const file = await sectionMetaFile.getFile();
+                        const sectionMeta = JSON.parse(await file.text());
+                        section.name = sectionMeta.name || sectionName;
+                        section.id = sectionMeta.id || section.id;
+                    } catch (e) {
+                        // No metadata file, use directory name
+                    }
+
+                    // Read all files in section
+                    for await (const [filename, fileHandle] of sectionHandle.entries()) {
+                        if (fileHandle.kind !== 'file') continue;
+                        if (filename.startsWith('_')) continue;  // Skip metadata files
+                        if (filename.endsWith('.output.html')) continue;  // Skip output files (loaded with code)
+
+                        try {
+                            const file = await fileHandle.getFile();
+                            const content = await file.text();
+
+                            if (filename.endsWith('.md')) {
+                                // Note file
+                                const note = markdownToNote(content, filename);
+                                section.items.push(note);
+
+                            } else if (filename.endsWith('.code.py')) {
+                                // Code file - also try to load output
+                                const outputFilename = filename.replace('.code.py', '.output.html');
+                                let outputContent = null;
+                                try {
+                                    const outputFile = await sectionHandle.getFileHandle(outputFilename);
+                                    const outFile = await outputFile.getFile();
+                                    outputContent = await outFile.text();
+                                } catch (e) {
+                                    // No output file
+                                }
+                                const code = fileToCode(content, filename, outputContent);
+                                section.items.push(code);
+
+                            } else if (filename.endsWith('.bookmark.json')) {
+                                // Bookmark file
+                                const bookmarkData = JSON.parse(content);
+                                // TODO: Load thumbnail from assets if path reference
+                                const bookmark = jsonToBookmark(bookmarkData);
+                                section.items.push(bookmark);
+                            }
+                        } catch (e) {
+                            console.error(`[Filesystem] Error reading ${filename}:`, e);
+                        }
+                    }
+
+                    if (section.items.length > 0 || true) {  // Include empty sections too
+                        loadedData.sections.push(section);
+                    }
+                }
+
+                console.log(`[Filesystem] Loaded ${loadedData.sections.length} sections`);
+                return loadedData;
+
+            } catch (error) {
+                console.error('[Filesystem] Error loading from filesystem:', error);
+                throw error;
+            }
+        }
+
+        // Save notebook data to filesystem
+        async function saveToFilesystem(dirHandle) {
+            console.log('[Filesystem] Saving to directory...');
+
+            try {
+                // Write notebook.json
+                const metaFile = await dirHandle.getFileHandle('notebook.json', { create: true });
+                const metaWritable = await metaFile.createWritable();
+                await metaWritable.write(JSON.stringify({
+                    title: data.title,
+                    subtitle: data.subtitle,
+                    sections: data.sections.map(s => slugify(s.name))
+                }, null, 2));
+                await metaWritable.close();
+
+                // Create/get sections directory
+                const sectionsDir = await dirHandle.getDirectoryHandle('sections', { create: true });
+
+                // Create assets/thumbnails directory
+                const assetsDir = await dirHandle.getDirectoryHandle('assets', { create: true });
+                const thumbsDir = await assetsDir.getDirectoryHandle('thumbnails', { create: true });
+
+                // Write each section
+                for (const section of data.sections) {
+                    const sectionSlug = slugify(section.name);
+                    const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug, { create: true });
+
+                    // Write section metadata
+                    const sectionMetaFile = await sectionDir.getFileHandle('_section.json', { create: true });
+                    const sectionMetaWritable = await sectionMetaFile.createWritable();
+                    await sectionMetaWritable.write(JSON.stringify({
+                        name: section.name,
+                        id: section.id
+                    }, null, 2));
+                    await sectionMetaWritable.close();
+
+                    // Write each item
+                    for (const item of section.items) {
+                        const titleSlug = slugify(item.title);
+
+                        if (item.type === 'note') {
+                            const filename = `${titleSlug}.md`;
+                            const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
+                            const writable = await fileHandle.createWritable();
+                            await writable.write(noteToMarkdown(item));
+                            await writable.close();
+
+                        } else if (item.type === 'code') {
+                            const filename = `${titleSlug}.code.py`;
+                            const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
+                            const writable = await fileHandle.createWritable();
+                            await writable.write(codeToFile(item));
+                            await writable.close();
+
+                            // Write output file if exists
+                            if (item.output) {
+                                const outputFilename = `${titleSlug}.output.html`;
+                                const outputHandle = await sectionDir.getFileHandle(outputFilename, { create: true });
+                                const outputWritable = await outputHandle.createWritable();
+                                await outputWritable.write(item.output);
+                                await outputWritable.close();
+                            }
+
+                        } else if (item.type === 'bookmark') {
+                            const filename = `${titleSlug}.bookmark.json`;
+
+                            // Handle thumbnail - save to assets if data URL
+                            let thumbnailPath = null;
+                            if (item.thumbnail && item.thumbnail.startsWith('data:')) {
+                                // Save thumbnail as separate file
+                                const thumbFilename = `${item.id || titleSlug}.png`;
+                                thumbnailPath = `../../assets/thumbnails/${thumbFilename}`;
+
+                                try {
+                                    // Convert data URL to blob
+                                    const response = await fetch(item.thumbnail);
+                                    const blob = await response.blob();
+
+                                    const thumbHandle = await thumbsDir.getFileHandle(thumbFilename, { create: true });
+                                    const thumbWritable = await thumbHandle.createWritable();
+                                    await thumbWritable.write(blob);
+                                    await thumbWritable.close();
+                                } catch (e) {
+                                    console.error('[Filesystem] Error saving thumbnail:', e);
+                                    thumbnailPath = null;
+                                }
+                            }
+
+                            const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
+                            const writable = await fileHandle.createWritable();
+                            await writable.write(JSON.stringify(bookmarkToJson(item, thumbnailPath), null, 2));
+                            await writable.close();
+                        }
+                    }
+                }
+
+                console.log('[Filesystem] Save complete');
+            } catch (error) {
+                console.error('[Filesystem] Error saving to filesystem:', error);
+                throw error;
+            }
+        }
+
+        // Link a notebook folder - show picker and save handle
+        async function linkNotebookFolder() {
+            if (!isFileSystemAccessSupported()) {
+                showToast('❌ File System Access not supported in this browser');
+                return false;
+            }
+
+            try {
+                // Show directory picker
+                const handle = await window.showDirectoryPicker({
+                    id: 'research-notebook',
+                    mode: 'readwrite',
+                    startIn: 'documents'
+                });
+
+                // Save handle for persistence
+                await saveDirHandle(handle);
+                notebookDirHandle = handle;
+                filesystemLinked = true;
+
+                // Check if directory has existing content
+                let hasContent = false;
+                try {
+                    await handle.getDirectoryHandle('sections');
+                    hasContent = true;
+                } catch (e) {
+                    // No sections directory
+                }
+
+                if (hasContent) {
+                    // Load from filesystem
+                    const fsData = await loadFromFilesystem(handle);
+                    data = fsData;
+                    render();
+                    showToast(`📁 Linked to folder (loaded ${data.sections.length} sections)`);
+                } else {
+                    // Save current data to filesystem
+                    await saveToFilesystem(handle);
+                    showToast('📁 Linked to folder (exported current notebook)');
+                }
+
+                return true;
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    // User cancelled picker
+                    return false;
+                }
+                console.error('[Filesystem] Error linking folder:', error);
+                showToast('❌ Error linking folder: ' + error.message);
+                return false;
+            }
+        }
+
+        // Unlink notebook folder
+        async function unlinkNotebookFolder() {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(IDB_STORE, 'readwrite');
+                const store = tx.objectStore(IDB_STORE);
+                store.delete(IDB_DIR_HANDLE_KEY);
+                await new Promise((resolve, reject) => {
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+                db.close();
+
+                notebookDirHandle = null;
+                filesystemLinked = false;
+                showToast('📦 Switched to browser storage');
+            } catch (error) {
+                console.error('[Filesystem] Error unlinking folder:', error);
+            }
+        }
+
+        // Initialize filesystem on page load (restore saved handle)
+        async function initFilesystem() {
+            if (!isFileSystemAccessSupported()) {
+                console.log('[Filesystem] File System Access API not supported');
+                return;
+            }
+
+            const savedHandle = await loadDirHandle();
+            if (savedHandle) {
+                const hasPermission = await verifyDirPermission(savedHandle);
+                if (hasPermission) {
+                    notebookDirHandle = savedHandle;
+                    filesystemLinked = true;
+                    console.log(`[Filesystem] Restored link to folder: ${savedHandle.name}`);
+
+                    // Load data from filesystem
+                    try {
+                        const fsData = await loadFromFilesystem(savedHandle);
+                        data = fsData;
+                    } catch (error) {
+                        console.error('[Filesystem] Error loading from saved folder:', error);
+                        showToast('⚠️ Error loading from linked folder');
+                    }
+                } else {
+                    console.log('[Filesystem] Permission denied for saved folder');
+                }
             }
         }
 
@@ -2065,11 +2635,13 @@ print('Hello, World!')" spellcheck="false"></textarea>
 
         // ========== SECTION: SETTINGS_MODAL ==========
         // Notebook settings (title/subtitle): open, close, save
+        // Storage settings: refreshFromFilesystem, changeNotebookFolder
 
         // Settings Modal
         function openSettingsModal() {
             document.getElementById('settingsTitle').value = data.title || 'Research Notebook';
             document.getElementById('settingsSubtitle').value = data.subtitle || 'Bookmarks, notes, and connections';
+            document.getElementById('linkedFolderName').textContent = notebookDirHandle ? notebookDirHandle.name : 'Not linked';
             document.getElementById('settingsModal').classList.add('active');
             document.getElementById('settingsTitle').focus();
         }
@@ -2089,6 +2661,61 @@ print('Hello, World!')" spellcheck="false"></textarea>
             render();
             closeSettingsModal();
             showToast('Settings saved');
+        }
+
+        // Change to a different notebook folder
+        async function changeNotebookFolder() {
+            const success = await linkNotebookFolder();
+            if (success) {
+                document.getElementById('linkedFolderName').textContent = notebookDirHandle.name;
+                render();
+            }
+        }
+
+        // Refresh data from filesystem
+        async function refreshFromFilesystem() {
+            if (!filesystemLinked || !notebookDirHandle) {
+                showToast('❌ No folder linked');
+                return;
+            }
+
+            try {
+                showToast('🔄 Refreshing from folder...');
+                const fsData = await loadFromFilesystem(notebookDirHandle);
+                data = fsData;
+                await saveData();  // Also update IndexedDB cache
+                render();
+                showToast(`✅ Refreshed (${data.sections.length} sections)`);
+            } catch (error) {
+                console.error('[Filesystem] Refresh error:', error);
+                showToast('❌ Error refreshing: ' + error.message);
+            }
+        }
+
+        // ========== SECTION: ONBOARDING ==========
+        // First-time setup flow for new notebooks
+
+        // Show onboarding modal
+        function showOnboarding() {
+            // Check browser support
+            if (!isFileSystemAccessSupported()) {
+                document.getElementById('onboardingUnsupported').style.display = 'block';
+            }
+            document.getElementById('onboardingModal').classList.add('active');
+        }
+
+        // Close onboarding modal
+        function closeOnboarding() {
+            document.getElementById('onboardingModal').classList.remove('active');
+        }
+
+        // Setup notebook folder from onboarding
+        async function setupNotebookFolder() {
+            const success = await linkNotebookFolder();
+            if (success) {
+                closeOnboarding();
+                render();
+            }
         }
 
         // ========== SECTION: THUMBNAIL_DRAG_DROP ==========
@@ -3467,68 +4094,8 @@ sys.stderr = sys.__stderr__
             }
         }
 
-        // ========== SECTION: EXPORT_IMPORT ==========
-        // Data export/import: exportData, importData
-
-        // Export data
-        function exportData() {
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'research_notebook.json';
-            a.click();
-            URL.revokeObjectURL(url);
-            showToast('Notebook exported');
-        }
-
-        // Import data
-        function importData(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            // Check file size before processing
-            const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-            console.log(`Importing file: ${file.name} (${fileSizeMB}MB)`);
-
-            if (file.size > 50 * 1024 * 1024) { // 50MB limit
-                showToast(`❌ File too large (${fileSizeMB}MB). Maximum 50MB.`);
-                event.target.value = '';
-                return;
-            }
-
-            // Show loading indicator for large files
-            if (file.size > 1024 * 1024) {
-                showToast(`⏳ Importing ${fileSizeMB}MB file...`);
-            }
-
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const imported = JSON.parse(e.target.result);
-                    if (imported.sections && Array.isArray(imported.sections)) {
-                        data.sections = imported.sections;
-
-                        // Count items for user feedback
-                        const totalItems = data.sections.reduce((sum, s) => sum + s.items.length, 0);
-                        console.log(`Imported ${data.sections.length} sections with ${totalItems} items`);
-
-                        // Save to IndexedDB
-                        await saveData();
-                        render();
-
-                        showToast(`✅ Imported ${data.sections.length} sections (${totalItems} items)`);
-                    } else {
-                        showToast('❌ Invalid file format');
-                    }
-                } catch (error) {
-                    console.error('Import error:', error);
-                    showToast('❌ Error reading file: ' + error.message);
-                }
-            };
-            reader.readAsText(file);
-            event.target.value = '';
-        }
+        // ========== SECTION: UTILITY_FUNCTIONS ==========
+        // Misc utility functions
 
         // Format date
         function formatDate(dateString) {
@@ -3801,8 +4368,21 @@ sys.stderr = sys.__stderr__
         });
 
         // Initialize
-        loadData();
-        initThumbnailDragDrop();
+        async function init() {
+            // Try to restore filesystem link first
+            await initFilesystem();
+
+            if (filesystemLinked) {
+                // Filesystem data already loaded in initFilesystem, just render
+                render();
+            } else {
+                // No folder linked - show onboarding
+                showOnboarding();
+            }
+
+            initThumbnailDragDrop();
+        }
+        init();
     </script>
 </body>
 </html>
