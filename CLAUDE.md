@@ -4,11 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Navigating the Large Single-File Application
 
-**IMPORTANT**: `research_notebook_with_code.html` is a 3800+ line single-file application that cannot be read in full in one context window.
+**IMPORTANT**: `research_notebook_with_code.html` is a 5000+ line single-file application that cannot be read in full in one context window.
 
 ### How to Navigate
 
-1. **Read INDEX.md first** - Contains section sizes (~lines) and function lists
+1. **Use generate_index.py** - Auto-generates accurate section/function index:
+   ```bash
+   python3 generate_index.py              # Full index with all sections and functions
+   python3 generate_index.py --sections   # Just section names and line counts
+   python3 generate_index.py --section FILESYSTEM_STORAGE  # Details for one section
+   python3 generate_index.py --json       # Machine-readable output
+   ```
 2. **Use grep to find sections** - Search for section markers:
    ```bash
    grep -n "SECTION:" research_notebook_with_code.html
@@ -29,21 +35,50 @@ The file uses consistent section markers:
 - HTML sections: `<!-- ========== SECTION: NAME ========== -->`
 - JavaScript sections: `// ========== SECTION: NAME ==========`
 
+Each function should have a comment on the line immediately above describing its purpose.
+These comments are parsed by generate_index.py.
+
 ### Quick Section Reference
 
 Use `grep -n "SECTION:" research_notebook_with_code.html` for current line numbers.
 
 Key sections: HTML_HEAD (CSS), HTML_BODY_AND_MODALS, STATE_AND_CONFIG, DATA_PERSISTENCE,
-BOOKMARK_MODAL, NOTE_MODAL, PYODIDE_RUNTIME, CODE_MODAL, RENDER_FUNCTIONS, EVENT_HANDLERS_AND_INIT
-
-See INDEX.md for the complete list with all 21 sections and their sizes.
+FILESYSTEM_STORAGE, NOTE_MODAL, PYODIDE_RUNTIME, CODE_MODAL, RENDER_FUNCTIONS, EVENT_HANDLERS_AND_INIT
 
 ### When Making Changes
 
-1. First, use grep to locate the relevant section
+1. Use grep or generate_index.py to locate the relevant section
 2. Read only the lines you need to understand
 3. Make targeted edits
-4. **Update INDEX.md** if you add/remove sections or significantly change section sizes
+4. Add a comment above any new functions describing their purpose
+
+### Common Tasks
+
+**Adding a new modal:**
+1. Add HTML in HTML_BODY_AND_MODALS section
+2. Add CSS in HTML_HEAD section
+3. Add open/close/save functions in new or appropriate section
+4. Add Enter key handler in EVENT_HANDLERS_AND_INIT
+
+**Modifying data structure:**
+1. Update `data` structure in STATE_AND_CONFIG
+2. Update `loadData()` for backwards compatibility
+3. Update `render()` and card render functions
+4. Update filesystem read/write functions if format changes
+
+**Adding a new item type:**
+1. Add modal HTML (HTML_BODY_AND_MODALS)
+2. Add viewer modal HTML
+3. Add modal functions (new section)
+4. Add viewer functions (new section)
+5. Update `render()` switch statement
+6. Add `renderXxxCard()` function
+
+**Debugging Pyodide:**
+1. Check browser console for `[Pyodide]` logs
+2. Verify function is named `initPyodide()` not `loadPyodide()` (name collision!)
+3. Check network tab for CDN requests
+4. Pyodide v0.28.2 URL: `https://cdn.jsdelivr.net/pyodide/v0.28.2/full/`
 
 ---
 

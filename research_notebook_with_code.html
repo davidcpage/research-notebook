@@ -4074,6 +4074,8 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 
         // ========== SECTION: PYODIDE_RUNTIME ==========
         // Python execution via Pyodide: initPyodide, updatePyodideStatus, runCode, executePythonCode
+        // Config: Pyodide v0.28.2 from jsDelivr CDN, pre-loads numpy/pandas/matplotlib, 120s timeout
+        // IMPORTANT: initPyodide() not loadPyodide() to avoid collision with window.loadPyodide
 
         // Load Pyodide lazily
         async function initPyodide() {
