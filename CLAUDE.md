@@ -212,17 +212,17 @@ Since this is a single HTML file:
 ### Making Changes
 
 **Editing Flow**:
-1. Read INDEX.md to understand file structure
+1. Run `python3 generate_index.py --sections` to see current section layout
 2. Use grep to locate the specific section (see "Navigating the Large Single-File Application" above)
 3. Read targeted line ranges using offset/limit
 4. Use Edit tool to make precise changes
 5. Test by opening in browser
 
-**Section Locations** (use `grep -n "SECTION:"` for line numbers, see INDEX.md for sizes):
-- CSS styles: HTML_HEAD section (~1630 lines)
-- HTML modals: HTML_BODY_AND_MODALS section (~275 lines)
-- State/config: STATE_AND_CONFIG section (~35 lines)
-- Render functions: RENDER_FUNCTIONS section (~175 lines)
+**Section Locations** (use `python3 generate_index.py --sections` for current line numbers):
+- CSS styles: HTML_HEAD section
+- HTML modals: HTML_BODY_AND_MODALS section
+- State/config: STATE_AND_CONFIG section
+- Render functions: RENDER_FUNCTIONS section
 
 **Important Patterns**:
 - After any data modification, always call `await saveData()` then `render()` (saveData is async!)
