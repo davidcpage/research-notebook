@@ -1395,6 +1395,21 @@
             color: var(--text-primary);
         }
 
+        .note-viewer-content h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 1rem 0 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .note-viewer-content h5,
+        .note-viewer-content h6 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin: 0.875rem 0 0.375rem;
+            color: var(--text-secondary);
+        }
+
         .note-viewer-content p {
             margin-bottom: 0.875rem;
         }
@@ -1435,6 +1450,66 @@
             margin: 0.875rem 0;
             color: var(--text-secondary);
             font-style: italic;
+        }
+
+        .note-viewer-content a,
+        .note-preview-content a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .note-viewer-content a:hover,
+        .note-preview-content a:hover {
+            text-decoration: underline;
+        }
+
+        .note-viewer-content img,
+        .note-preview-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin: 0.5rem 0;
+        }
+
+        .note-viewer-content hr,
+        .note-preview-content hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 1.5rem 0;
+        }
+
+        .note-viewer-content input[type="checkbox"],
+        .note-preview-content input[type="checkbox"] {
+            margin-right: 0.5rem;
+            accent-color: var(--accent);
+        }
+
+        .note-viewer-content table,
+        .note-preview-content table {
+            border-collapse: collapse;
+            margin: 1rem 0;
+            width: 100%;
+            font-size: 0.9rem;
+        }
+
+        .note-viewer-content table th,
+        .note-viewer-content table td,
+        .note-preview-content table th,
+        .note-preview-content table td {
+            border: 1px solid var(--border);
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+        }
+
+        .note-viewer-content table th,
+        .note-preview-content table th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+        }
+
+        .note-viewer-content table tr:nth-child(even),
+        .note-preview-content table tr:nth-child(even) {
+            background: rgba(0, 0, 0, 0.02);
         }
 
         .note-viewer-content .katex-display {
