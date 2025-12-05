@@ -8,7 +8,9 @@ Usage:
     python generate_index.py --sections         # Just section headers + line counts
     python generate_index.py --json             # Output as JSON (for tooling)
 
-The script parses section markers (// ========== SECTION: NAME ==========)
+The script parses section markers in both formats:
+    // ========== SECTION: NAME ==========       (JavaScript)
+    <!-- ========== SECTION: NAME ========== --> (HTML)
 and extracts functions with their preceding comments.
 """
 
@@ -48,7 +50,8 @@ def parse_html_file(filepath: Path) -> tuple[list[Section], list[str]]:
     current_section = None
 
     # Regex patterns
-    section_pattern = re.compile(r'//\s*=+\s*SECTION:\s*(\w+)\s*=+')
+    js_section_pattern = re.compile(r'//\s*=+\s*SECTION:\s*(\w+)\s*=+')
+    html_section_pattern = re.compile(r'<!--\s*=+\s*SECTION:\s*(\w+)\s*=+')
     func_pattern = re.compile(r'^        (async\s+)?function\s+(\w+)\s*\(')
     comment_pattern = re.compile(r'^        //\s*(.*)$')
 
@@ -56,8 +59,8 @@ def parse_html_file(filepath: Path) -> tuple[list[Section], list[str]]:
     last_was_comment = False
 
     for i, line in enumerate(lines, 1):  # 1-indexed line numbers
-        # Check for section marker
-        section_match = section_pattern.search(line)
+        # Check for section marker (JS or HTML comment style)
+        section_match = js_section_pattern.search(line) or html_section_pattern.search(line)
         if section_match:
             # Close previous section
             if current_section:
@@ -73,7 +76,7 @@ def parse_html_file(filepath: Path) -> tuple[list[Section], list[str]]:
             if i < len(lines):
                 next_line = lines[i]  # 0-indexed, so lines[i] is line i+1
                 desc_match = comment_pattern.match(next_line)
-                if desc_match and not section_pattern.search(next_line):
+                if desc_match and not js_section_pattern.search(next_line):
                     current_section.description = desc_match.group(1)
 
             pending_comment = ""
@@ -105,7 +108,7 @@ def parse_html_file(filepath: Path) -> tuple[list[Section], list[str]]:
         if comment_match:
             comment_text = comment_match.group(1)
             # Skip section markers and dividers
-            if not section_pattern.search(line) and not line.strip().startswith('// ==='):
+            if not js_section_pattern.search(line) and not line.strip().startswith('// ==='):
                 pending_comment = comment_text
                 last_was_comment = True
             else:
