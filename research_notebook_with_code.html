@@ -5041,7 +5041,12 @@ sys.stderr = sys.__stderr__
                     <div class="items-grid ${isCollapsed ? 'collapsed' : ''}">
                         ${itemCount === 0 ?
                             '<p style="color: var(--text-muted); grid-column: 1/-1;">No items yet. Add a bookmark, note, or code!</p>' :
-                            section.items.map(item => {
+                            [...section.items].sort((a, b) => {
+                                // Sort by modified time descending (most recent first)
+                                const aTime = a.modified ? new Date(a.modified).getTime() : 0;
+                                const bTime = b.modified ? new Date(b.modified).getTime() : 0;
+                                return bTime - aTime;
+                            }).map(item => {
                                 if (item.type === 'note') {
                                     return renderNoteCard(section.id, item);
                                 } else if (item.type === 'code') {
@@ -5075,7 +5080,11 @@ sys.stderr = sys.__stderr__
                         </div>
                     </div>
                     <div class="items-grid ${isCollapsed ? 'collapsed' : ''}">
-                        ${data.systemNotes.map(note => renderNoteCard('_system', note)).join('')}
+                        ${[...data.systemNotes].sort((a, b) => {
+                            const aTime = a.modified ? new Date(a.modified).getTime() : 0;
+                            const bTime = b.modified ? new Date(b.modified).getTime() : 0;
+                            return bTime - aTime;
+                        }).map(note => renderNoteCard('_system', note)).join('')}
                     </div>
                 </div>
                 `;
