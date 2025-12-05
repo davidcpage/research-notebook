@@ -85,12 +85,27 @@ data = {
 ### Key Components
 
 **State Management** (STATE_AND_CONFIG section):
-- Global `data` object holds all sections and items
+- Global `data` object holds all sections and items (including `data.systemNotes[]`)
 - `collapsedSections` Set tracks UI state (not persisted)
+- `showSystemNotes` - Toggle for System section visibility (persisted in localStorage)
 - Modal editing states: `editingBookmark`, `editingNote`, `editingCode`
 - Current viewing states: `currentViewingNote`, `currentViewingCode`
 - `manualThumbnail`: Tracks manually uploaded thumbnail (data URL) during bookmark creation/editing
 - Pyodide runtime state: `pyodide`, `pyodideLoading`, `pyodideReady`
+
+**System Notes** (loaded from notebook root):
+- Text files at notebook root are loaded as "system notes" in a special System section
+- Toggle visibility in Settings modal via checkbox
+- **File types loaded**: `.md`, `.txt`, and specific dotfiles (`.gitignore`, `.env.example`, `.editorconfig`, `.prettierrc`, `.eslintrc`)
+- **Excluded**: `.json`, `.html`, `.js`, `.css`, images, and most hidden files
+- **Format field**: `format: 'markdown' | 'text'` based on file extension
+  - `.md` files → `format: 'markdown'` (rendered with markdown/LaTeX)
+  - Other files → `format: 'text'` (rendered as `<pre>` monospace)
+- Raw text notes preserve their original filename when saved
+- System note data structure:
+  ```javascript
+  { type: 'note', system: true, id, filename, title, content, format, modified }
+  ```
 
 **Data Persistence** (DATA_PERSISTENCE section):
 - `loadData()`: Async function that reads from IndexedDB

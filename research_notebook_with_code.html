@@ -2526,15 +2526,31 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                     console.log('[Filesystem] No notebook.json found, using defaults');
                 }
 
-                // Read system notes (markdown files at root)
+                // Read system notes (text files at root)
+                // Include: .md, .txt, dotfiles like .gitignore
+                // Exclude: .json, .html, .js, binary files
+                const excludedExtensions = ['.json', '.html', '.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico'];
+                const includedDotfiles = ['.gitignore', '.env.example', '.editorconfig', '.prettierrc', '.eslintrc'];
+
                 for await (const [filename, fileHandle] of dirHandle.entries()) {
                     if (fileHandle.kind !== 'file') continue;
-                    if (!filename.endsWith('.md')) continue;
+
+                    // Skip files with excluded extensions
+                    if (excludedExtensions.some(ext => filename.endsWith(ext))) continue;
+
+                    // Skip hidden files unless they're in the allowed list
+                    if (filename.startsWith('.') && !includedDotfiles.includes(filename)) continue;
+
+                    // Skip notebook.json (our metadata file)
+                    if (filename === 'notebook.json') continue;
 
                     try {
                         const file = await fileHandle.getFile();
                         const content = await file.text();
-                        const titleFromFilename = filename.replace(/\.md$/, '');
+
+                        // Determine format based on extension
+                        const isMarkdown = filename.endsWith('.md');
+                        const titleFromFilename = isMarkdown ? filename.replace(/\.md$/, '') : filename;
 
                         loadedData.systemNotes.push({
                             type: 'note',
@@ -2543,9 +2559,10 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                             filename: filename,
                             title: titleFromFilename,
                             content: content,
+                            format: isMarkdown ? 'markdown' : 'text',
                             modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
                         });
-                        console.log(`[Filesystem] Loaded system note: ${filename}`);
+                        console.log(`[Filesystem] Loaded system note: ${filename} (${isMarkdown ? 'markdown' : 'text'})`);
                     } catch (e) {
                         console.error(`[Filesystem] Error reading system note ${filename}:`, e);
                     }
@@ -2783,13 +2800,15 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                     }
                 }
 
-                // Write system notes (markdown files at root)
+                // Write system notes (text files at root)
                 if (data.systemNotes) {
                     for (const note of data.systemNotes) {
-                        const newFilename = note.title + '.md';
+                        // For raw text notes, preserve original filename
+                        // For markdown notes, use title + .md
+                        const newFilename = note.format === 'text' ? note.filename : (note.title + '.md');
                         const oldFilename = note.filename;
 
-                        // If filename changed, delete old file
+                        // If filename changed (markdown notes only), delete old file
                         if (oldFilename && oldFilename !== newFilename) {
                             try {
                                 await dirHandle.removeEntry(oldFilename);
@@ -2799,7 +2818,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                             }
                         }
 
-                        // Write with new filename
+                        // Write with filename
                         const fileHandle = await dirHandle.getFileHandle(newFilename, { create: true });
                         const writable = await fileHandle.createWritable();
                         await writable.write(note.content);
@@ -2863,7 +2882,8 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 
             if (sectionId === '_system') {
                 // System note - save at root
-                const filename = note.title + '.md';
+                // Use existing filename for raw text files, or title + .md for new markdown notes
+                const filename = note.filename || (note.title + '.md');
                 const fileHandle = await notebookDirHandle.getFileHandle(filename, { create: true });
                 const writable = await fileHandle.createWritable();
                 await writable.write(note.content);
@@ -3770,7 +3790,12 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 previewTab.classList.add('active');
                 textarea.style.display = 'none';
                 preview.classList.add('active');
-                preview.innerHTML = renderMarkdownWithLinks(textarea.value);
+                // Use format from editingNote if available (raw text for non-.md system notes)
+                if (editingNote?.format === 'text') {
+                    preview.innerHTML = `<pre style="margin: 0; white-space: pre-wrap; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; font-size: 0.9rem; line-height: 1.5;">${escapeHtml(textarea.value)}</pre>`;
+                } else {
+                    preview.innerHTML = renderMarkdownWithLinks(textarea.value);
+                }
             }
         }
 
@@ -3788,14 +3813,18 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 
             let noteData;
             if (isSystemNote) {
-                // Handle system note (markdown file at notebook root)
+                // Handle system note (text file at notebook root)
+                // Preserve format and filename for existing notes, default to .md for new
+                const format = editingNote?.format || 'markdown';
+                const filename = editingNote?.filename || title + '.md';
                 noteData = {
                     type: 'note',
                     system: true,
-                    id: editingNote?.id || 'system-' + title + '.md',
-                    filename: editingNote?.filename || title + '.md',
+                    id: editingNote?.id || 'system-' + filename,
+                    filename: filename,
                     title,
                     content,
+                    format: format,
                     modified: new Date().toISOString()
                 };
 
@@ -3879,7 +3908,13 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 
             document.getElementById('noteViewerTitle').textContent = note.title;
 
-            let content = renderMarkdownWithLinks(note.content);
+            // Render content based on format
+            let content;
+            if (note.format === 'text') {
+                content = `<pre style="margin: 0; white-space: pre-wrap; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; font-size: 0.9rem; line-height: 1.5;">${escapeHtml(note.content)}</pre>`;
+            } else {
+                content = renderMarkdownWithLinks(note.content);
+            }
 
             // Add backlinks
             const backlinks = findBacklinks(noteId);
@@ -4584,10 +4619,24 @@ sys.stderr = sys.__stderr__
         }
 
         // Render preview for note cards (truncated, with clickable links)
-        function renderNotePreview(text, maxLength = 300) {
+        function renderNotePreview(text, format = 'markdown', maxLength = 300) {
             if (!text) return '';
 
-            // Strip fenced code blocks - they don't preview well in cards
+            // For raw text format, just escape and truncate
+            if (format === 'text') {
+                let truncated = text;
+                if (text.length > maxLength) {
+                    truncated = text.substring(0, maxLength);
+                    const lastNewline = truncated.lastIndexOf('\n');
+                    if (lastNewline > maxLength * 0.5) {
+                        truncated = truncated.substring(0, lastNewline);
+                    }
+                    truncated += '...';
+                }
+                return `<pre style="margin: 0; white-space: pre-wrap; font-size: 0.75rem; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;">${escapeHtml(truncated)}</pre>`;
+            }
+
+            // Markdown format - strip fenced code blocks, they don't preview well in cards
             let cleaned = text.replace(/```[\s\S]*?```/g, '');
             // Collapse multiple newlines left behind
             cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
@@ -5121,7 +5170,7 @@ sys.stderr = sys.__stderr__
         }
 
         function renderNoteCard(sectionId, note) {
-            const previewHtml = renderNotePreview(note.content);
+            const previewHtml = renderNotePreview(note.content, note.format || 'markdown');
             return `
                 <div class="note-card" data-item-id="${note.id}" data-section-id="${sectionId}" onclick="openNoteViewer('${sectionId}', '${note.id}')">
                     <div class="note-preview-frame">
