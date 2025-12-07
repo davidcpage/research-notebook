@@ -17,6 +17,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
     <!-- Pyodide for Python execution -->
     <script src="https://cdn.jsdelivr.net/pyodide/v0.28.2/full/pyodide.js"></script>
+    <!-- js-yaml for YAML parsing (template system) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
     <!-- Highlight.js for syntax highlighting -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -2124,6 +2126,583 @@ print('Hello, World!')" spellcheck="false"></textarea>
             gfm: true
         });
 
+        // ========== SECTION: TEMPLATE_SYSTEM ==========
+        // Template and extension registry infrastructure for unified card handling
+        // Functions: loadExtensionRegistry, loadTemplates, getDefaultExtensionRegistry,
+        //            getDefaultTemplates, getTemplateFileContent, getExtensionRegistryContent,
+        //            ensureTemplateFiles, parsers, serializers, loadCard, saveCard
+
+        // Extension registry - maps file extensions to parsing behavior
+        // Loaded from extensions.yaml or uses defaults
+        let extensionRegistry = null;
+
+        // Template registry - maps template names to their definitions
+        // Loaded from *.template.yaml files or uses defaults
+        let templateRegistry = {};
+
+        // Get the default extension registry (hardcoded fallback)
+        function getDefaultExtensionRegistry() {
+            return {
+                '.md': {
+                    parser: 'yaml-frontmatter',
+                    defaultTemplate: 'note',
+                    bodyField: 'content'
+                },
+                '.code.py': {
+                    parser: 'comment-frontmatter',
+                    defaultTemplate: 'code',
+                    bodyField: 'code',
+                    companionFiles: [
+                        { suffix: '.output.html', field: 'output' }
+                    ]
+                },
+                '.bookmark.json': {
+                    parser: 'json',
+                    defaultTemplate: 'bookmark'
+                },
+                '.card.yaml': {
+                    parser: 'yaml',
+                    defaultTemplate: null  // Must specify template: in file
+                }
+            };
+        }
+
+        // Get the default templates (hardcoded fallback)
+        function getDefaultTemplates() {
+            return {
+                note: {
+                    name: 'note',
+                    description: 'Markdown note with full formatting support',
+                    schema: {
+                        title: { type: 'text', required: true },
+                        content: { type: 'markdown', required: true },
+                        created: { type: 'datetime' },
+                        modified: { type: 'datetime' }
+                    },
+                    card: {
+                        layout: 'document',
+                        preview_field: 'content',
+                        placeholder: '📝'
+                    },
+                    viewer: {
+                        layout: 'document',
+                        content_field: 'content'
+                    },
+                    editor: {
+                        fields: [
+                            { field: 'title', label: 'Title' },
+                            { field: 'content', label: 'Content', multiline: true, rows: 20, preview: true }
+                        ]
+                    },
+                    style: {
+                        variables: {
+                            '--preview-bg': '#f0ebe0'
+                        }
+                    },
+                    ui: {
+                        button_label: 'Note',
+                        icon: '📝',
+                        sort_order: 1
+                    }
+                },
+                code: {
+                    name: 'code',
+                    description: 'Executable Python code with output',
+                    schema: {
+                        title: { type: 'text', required: true },
+                        code: { type: 'code', language: 'python', required: true },
+                        output: { type: 'html' },
+                        showOutput: { type: 'boolean', default: true }
+                    },
+                    card: {
+                        layout: 'split-pane',
+                        slots: {
+                            left: { field: 'output', width: '60%' },
+                            right: { field: 'code', width: '40%' }
+                        },
+                        fallback_layout: 'document',
+                        fallback_field: 'code',
+                        placeholder: '🐍'
+                    },
+                    viewer: {
+                        layout: 'split-pane',
+                        slots: {
+                            left: { field: 'output', width: '60%' },
+                            right: { field: 'code', width: '40%' }
+                        }
+                    },
+                    editor: {
+                        fields: [
+                            { field: 'title', label: 'Title' },
+                            { field: 'code', label: 'Code', multiline: true, rows: 20, monospace: true }
+                        ],
+                        actions: [
+                            { label: 'Run', action: 'execute', icon: '▶' }
+                        ]
+                    },
+                    style: {
+                        variables: {
+                            '--preview-bg': '#f8faf8',
+                            '--code-bg': '#f5f5f5'
+                        }
+                    },
+                    ui: {
+                        button_label: 'Code',
+                        icon: '🐍',
+                        sort_order: 2
+                    }
+                },
+                bookmark: {
+                    name: 'bookmark',
+                    description: 'Web bookmark with thumbnail and description',
+                    schema: {
+                        title: { type: 'text', required: true },
+                        url: { type: 'url', required: true },
+                        description: { type: 'markdown' },
+                        thumbnail: { type: 'thumbnail', auto_generate: true },
+                        favicon: { type: 'url' },
+                        created: { type: 'datetime' },
+                        modified: { type: 'datetime' }
+                    },
+                    card: {
+                        layout: 'image',
+                        preview_field: 'thumbnail',
+                        placeholder: '🔗'
+                    },
+                    viewer: {
+                        layout: 'image',
+                        image_field: 'thumbnail',
+                        content_field: 'description'
+                    },
+                    editor: {
+                        fields: [
+                            { field: 'title', label: 'Title' },
+                            { field: 'url', label: 'URL', auto_fetch: true },
+                            { field: 'description', label: 'Description', multiline: true, rows: 4 },
+                            { field: 'thumbnail', label: 'Thumbnail', widget: 'thumbnail-upload' }
+                        ]
+                    },
+                    style: {
+                        variables: {
+                            '--preview-bg': 'linear-gradient(135deg, #f8f6f3 0%, #e8e4df 100%)'
+                        }
+                    },
+                    ui: {
+                        button_label: 'Bookmark',
+                        icon: '🔗',
+                        sort_order: 3
+                    }
+                }
+            };
+        }
+
+        // Generate YAML content for a template file
+        function getTemplateFileContent(templateName) {
+            const templates = getDefaultTemplates();
+            const template = templates[templateName];
+            if (!template) return null;
+
+            // Convert template object to YAML string
+            return jsyaml.dump(template, {
+                indent: 2,
+                lineWidth: -1,  // No line wrapping
+                quotingType: '"',
+                forceQuotes: false
+            });
+        }
+
+        // Generate YAML content for extensions.yaml
+        function getExtensionRegistryContent() {
+            const registry = getDefaultExtensionRegistry();
+            return jsyaml.dump({ extensions: registry }, {
+                indent: 2,
+                lineWidth: -1,
+                quotingType: '"',
+                forceQuotes: false
+            });
+        }
+
+        // Load extension registry from filesystem (or use defaults)
+        async function loadExtensionRegistry(dirHandle) {
+            if (!dirHandle) {
+                extensionRegistry = getDefaultExtensionRegistry();
+                return extensionRegistry;
+            }
+
+            try {
+                const extFile = await dirHandle.getFileHandle('extensions.yaml');
+                const file = await extFile.getFile();
+                const content = await file.text();
+                const parsed = jsyaml.load(content);
+                extensionRegistry = parsed.extensions || getDefaultExtensionRegistry();
+                console.log('[Templates] Loaded extensions.yaml');
+            } catch (e) {
+                // File doesn't exist, use defaults
+                extensionRegistry = getDefaultExtensionRegistry();
+                console.log('[Templates] Using default extension registry');
+            }
+            return extensionRegistry;
+        }
+
+        // Load templates from filesystem (or use defaults)
+        async function loadTemplates(dirHandle) {
+            templateRegistry = {};
+
+            if (!dirHandle) {
+                templateRegistry = getDefaultTemplates();
+                return templateRegistry;
+            }
+
+            // Scan root directory for .template.yaml files
+            let foundTemplates = false;
+            try {
+                for await (const [name, handle] of dirHandle.entries()) {
+                    if (handle.kind === 'file' && name.endsWith('.template.yaml')) {
+                        try {
+                            const file = await handle.getFile();
+                            const content = await file.text();
+                            const template = jsyaml.load(content);
+                            if (template && template.name) {
+                                templateRegistry[template.name] = template;
+                                foundTemplates = true;
+                                console.log(`[Templates] Loaded ${name}`);
+                            }
+                        } catch (e) {
+                            console.error(`[Templates] Error parsing ${name}:`, e);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('[Templates] Error scanning for templates:', e);
+            }
+
+            // If no templates found, use defaults
+            if (!foundTemplates) {
+                templateRegistry = getDefaultTemplates();
+                console.log('[Templates] Using default templates');
+            }
+
+            return templateRegistry;
+        }
+
+        // Ensure template files exist in notebook (called on save if missing)
+        async function ensureTemplateFiles(dirHandle) {
+            if (!dirHandle) return;
+
+            const filesToCreate = [
+                { name: 'extensions.yaml', getContent: getExtensionRegistryContent },
+                { name: 'note.template.yaml', getContent: () => getTemplateFileContent('note') },
+                { name: 'code.template.yaml', getContent: () => getTemplateFileContent('code') },
+                { name: 'bookmark.template.yaml', getContent: () => getTemplateFileContent('bookmark') }
+            ];
+
+            let createdFiles = [];
+
+            for (const { name, getContent } of filesToCreate) {
+                try {
+                    await dirHandle.getFileHandle(name);
+                    // File exists, don't overwrite
+                } catch (e) {
+                    // File doesn't exist, create it
+                    try {
+                        const fileHandle = await dirHandle.getFileHandle(name, { create: true });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(getContent());
+                        await writable.close();
+                        createdFiles.push(name);
+                        console.log(`[Templates] Created ${name}`);
+                    } catch (writeError) {
+                        console.error(`[Templates] Error creating ${name}:`, writeError);
+                    }
+                }
+            }
+
+            if (createdFiles.length > 0) {
+                showToast(`📋 Created template files: ${createdFiles.join(', ')}`);
+            }
+
+            return createdFiles;
+        }
+
+        // ===== Parsers =====
+        // Parse file content based on parser type from extension registry
+
+        const parsers = {
+            // Parse markdown with YAML frontmatter
+            'yaml-frontmatter': {
+                parse(content) {
+                    const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+                    if (match) {
+                        // Parse frontmatter as simple key-value (not full YAML to avoid issues)
+                        const frontmatter = {};
+                        match[1].split('\n').forEach(line => {
+                            const m = line.match(/^(\w+):\s*(.*)$/);
+                            if (m) {
+                                frontmatter[m[1]] = m[2];
+                            }
+                        });
+                        return {
+                            frontmatter,
+                            body: match[2].trim() || null
+                        };
+                    }
+                    // No frontmatter, entire content is body
+                    return { frontmatter: {}, body: content };
+                }
+            },
+
+            // Parse Python with comment-based frontmatter
+            'comment-frontmatter': {
+                parse(content) {
+                    const lines = content.split('\n');
+                    const frontmatter = {};
+                    let bodyStart = 0;
+                    let inFrontmatter = false;
+
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i];
+                        if (line === '# ---') {
+                            if (!inFrontmatter) {
+                                inFrontmatter = true;
+                                continue;
+                            } else {
+                                bodyStart = i + 1;
+                                break;
+                            }
+                        }
+                        if (inFrontmatter) {
+                            const match = line.match(/^# (\w+):\s*(.*)$/);
+                            if (match) {
+                                let value = match[2];
+                                // Convert boolean strings
+                                if (value === 'true') value = true;
+                                else if (value === 'false') value = false;
+                                frontmatter[match[1]] = value;
+                            }
+                        } else if (line.trim() && !line.startsWith('#')) {
+                            // Non-comment, non-empty line before frontmatter - no frontmatter
+                            bodyStart = 0;
+                            break;
+                        }
+                    }
+
+                    return {
+                        frontmatter,
+                        body: lines.slice(bodyStart).join('\n').trim() || null
+                    };
+                }
+            },
+
+            // Parse JSON file
+            'json': {
+                parse(content) {
+                    return { frontmatter: JSON.parse(content), body: null };
+                }
+            },
+
+            // Parse YAML file
+            'yaml': {
+                parse(content) {
+                    return { frontmatter: jsyaml.load(content), body: null };
+                }
+            }
+        };
+
+        // ===== Serializers =====
+        // Serialize card data back to file content
+
+        const serializers = {
+            // Serialize to markdown with YAML frontmatter
+            'yaml-frontmatter': {
+                serialize(frontmatter, body) {
+                    const lines = ['---'];
+                    for (const [key, value] of Object.entries(frontmatter)) {
+                        if (value !== undefined && value !== null) {
+                            lines.push(`${key}: ${value}`);
+                        }
+                    }
+                    lines.push('---', '');
+                    if (body) {
+                        lines.push(body);
+                    }
+                    return lines.join('\n');
+                }
+            },
+
+            // Serialize to Python with comment-based frontmatter
+            'comment-frontmatter': {
+                serialize(frontmatter, body) {
+                    const lines = ['# ---'];
+                    for (const [key, value] of Object.entries(frontmatter)) {
+                        if (value !== undefined && value !== null) {
+                            lines.push(`# ${key}: ${value}`);
+                        }
+                    }
+                    lines.push('# ---', '');
+                    if (body) {
+                        lines.push(body);
+                    }
+                    return lines.join('\n');
+                }
+            },
+
+            // Serialize to JSON
+            'json': {
+                serialize(frontmatter, body) {
+                    return JSON.stringify(frontmatter, null, 2);
+                }
+            },
+
+            // Serialize to YAML
+            'yaml': {
+                serialize(frontmatter, body) {
+                    return jsyaml.dump(frontmatter, { indent: 2, lineWidth: -1 });
+                }
+            }
+        };
+
+        // Get extension config for a filename
+        function getExtensionConfig(filename) {
+            if (!extensionRegistry) {
+                extensionRegistry = getDefaultExtensionRegistry();
+            }
+            // Check extensions in order of specificity (longer matches first)
+            const extensions = Object.keys(extensionRegistry).sort((a, b) => b.length - a.length);
+            for (const ext of extensions) {
+                if (filename.endsWith(ext)) {
+                    return { extension: ext, config: extensionRegistry[ext] };
+                }
+            }
+            return null;
+        }
+
+        // Load a card from file content using extension registry
+        function loadCard(filename, content, sectionName, companionData = {}) {
+            const extMatch = getExtensionConfig(filename);
+            if (!extMatch) {
+                console.warn(`[Templates] Unknown extension for ${filename}`);
+                return null;
+            }
+
+            const { extension, config } = extMatch;
+            const parser = parsers[config.parser];
+            if (!parser) {
+                console.warn(`[Templates] Unknown parser: ${config.parser}`);
+                return null;
+            }
+
+            // Parse file content
+            const { frontmatter, body } = parser.parse(content);
+
+            // Determine template (frontmatter overrides extension default)
+            const templateName = frontmatter.template || config.defaultTemplate;
+            if (!templateName) {
+                console.warn(`[Templates] No template specified for ${filename}`);
+                return null;
+            }
+
+            // Assign body to bodyField (defined by extension)
+            if (body && config.bodyField) {
+                frontmatter[config.bodyField] = body;
+            }
+
+            // Add companion file data
+            if (config.companionFiles) {
+                for (const companion of config.companionFiles) {
+                    if (companionData[companion.field]) {
+                        frontmatter[companion.field] = companionData[companion.field];
+                    }
+                }
+            }
+
+            // Generate ID if missing
+            if (!frontmatter.id) {
+                frontmatter.id = Date.now().toString();
+            }
+
+            // For backwards compatibility, set 'type' field based on template
+            // This ensures existing render functions work
+            frontmatter.type = templateName;
+
+            // Set language for code files (required by render functions)
+            if (extension === '.code.py') {
+                frontmatter.language = 'python';
+            }
+
+            // Store source info for saving
+            frontmatter._source = {
+                filename,
+                format: config.parser,
+                section: sectionName,
+                extension
+            };
+
+            // For backwards compatibility with old code, also store _filename
+            if (extension === '.md') {
+                frontmatter._filename = filename;
+            } else if (extension === '.code.py') {
+                frontmatter._filename = filename.replace('.code.py', '');
+            } else if (extension === '.bookmark.json') {
+                frontmatter._filename = filename.replace('.bookmark.json', '');
+            }
+
+            return frontmatter;
+        }
+
+        // Prepare card data for saving (serialize to file content)
+        function serializeCard(card) {
+            // Determine format from _source or derive from type
+            let format, bodyField, extension;
+
+            if (card._source) {
+                const extConfig = extensionRegistry[card._source.extension];
+                format = card._source.format;
+                bodyField = extConfig?.bodyField;
+                extension = card._source.extension;
+            } else {
+                // New card - determine format from template/type
+                if (card.type === 'note' || card.template === 'note') {
+                    format = 'yaml-frontmatter';
+                    bodyField = 'content';
+                    extension = '.md';
+                } else if (card.type === 'code' || card.template === 'code') {
+                    format = 'comment-frontmatter';
+                    bodyField = 'code';
+                    extension = '.code.py';
+                } else if (card.type === 'bookmark' || card.template === 'bookmark') {
+                    format = 'json';
+                    bodyField = null;
+                    extension = '.bookmark.json';
+                } else {
+                    format = 'yaml';
+                    bodyField = null;
+                    extension = '.card.yaml';
+                }
+            }
+
+            // Clone card data without internal fields
+            const { _source, _filename, type, ...cardData } = card;
+
+            // Extract body field for formats that separate it
+            let body = null;
+            const frontmatter = { ...cardData };
+
+            if (bodyField && format !== 'yaml' && format !== 'json') {
+                body = frontmatter[bodyField];
+                delete frontmatter[bodyField];
+            }
+
+            // For JSON format (bookmarks), keep all fields together
+            if (format === 'json') {
+                frontmatter.type = type;  // Keep type for backwards compatibility
+            }
+
+            const serializer = serializers[format];
+            const content = serializer.serialize(frontmatter, body);
+
+            return { content, extension, format, bodyField };
+        }
+
         // ========== SECTION: DATA_PERSISTENCE ==========
         // IndexedDB operations: loadData, openDB, saveData
         // Storage config: IDB_NAME, IDB_STORE, IDB_KEY
@@ -2430,138 +3009,9 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             return slug.substring(0, maxLength) || 'untitled';
         }
 
-        // Convert note object to markdown with YAML frontmatter
-        function noteToMarkdown(note) {
-            const frontmatter = [
-                '---',
-                `id: ${note.id || ''}`,
-                `title: ${note.title || 'Untitled'}`,
-                `created: ${note.created || new Date().toISOString()}`,
-                `modified: ${note.modified || new Date().toISOString()}`,
-                '---',
-                ''
-            ].join('\n');
-            return frontmatter + (note.content || '');
-        }
-
-        // Parse markdown with YAML frontmatter to note object
-        function markdownToNote(content, filename) {
-            const note = { type: 'note' };
-            // Store original filename for reliable deletion when title changes
-            note._filename = filename;
-            const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-
-            if (frontmatterMatch) {
-                const frontmatter = frontmatterMatch[1];
-                note.content = frontmatterMatch[2];
-
-                // Parse YAML-like frontmatter
-                frontmatter.split('\n').forEach(line => {
-                    const match = line.match(/^(\w+):\s*(.*)$/);
-                    if (match) {
-                        const [, key, value] = match;
-                        if (key === 'id') note.id = value;
-                        else if (key === 'title') note.title = value;
-                        else if (key === 'created') note.created = value;
-                        else if (key === 'modified') note.modified = value;
-                    }
-                });
-            } else {
-                // No frontmatter - use file content as-is
-                note.content = content;
-                note.title = filename.replace(/\.md$/, '');
-            }
-
-            if (!note.id) note.id = Date.now().toString();
-            if (!note.title) note.title = filename.replace(/\.md$/, '');
-
-            return note;
-        }
-
-        // Convert code object to Python file with frontmatter comment
-        function codeToFile(code) {
-            const lines = [
-                '# ---',
-                `# id: ${code.id || ''}`,
-                `# title: ${code.title || 'Untitled'}`,
-                `# created: ${code.created || new Date().toISOString()}`,
-                `# modified: ${code.modified || new Date().toISOString()}`,
-            ];
-            if (code.output) {
-                lines.push(`# output: ${slugify(code.title)}.output.html`);
-                lines.push(`# showOutput: ${code.showOutput !== false}`);
-            }
-            lines.push('# ---', '');
-            return lines.join('\n') + (code.code || '');
-        }
-
-        // Parse Python file with frontmatter comment to code object
-        function fileToCode(content, filename, outputContent = null) {
-            const code = { type: 'code', language: 'python' };
-            // Store original filename (without extension) for reliable deletion when title changes
-            code._filename = filename.replace(/\.code\.py$/, '');
-            const frontmatterMatch = content.match(/^# ---\n((?:# .*\n)*?)# ---\n?([\s\S]*)$/);
-
-            if (frontmatterMatch) {
-                const frontmatter = frontmatterMatch[1];
-                code.code = frontmatterMatch[2];
-
-                frontmatter.split('\n').forEach(line => {
-                    const match = line.match(/^# (\w+):\s*(.*)$/);
-                    if (match) {
-                        const [, key, value] = match;
-                        if (key === 'id') code.id = value;
-                        else if (key === 'title') code.title = value;
-                        else if (key === 'created') code.created = value;
-                        else if (key === 'modified') code.modified = value;
-                        else if (key === 'showOutput') code.showOutput = value === 'true';
-                    }
-                });
-            } else {
-                code.code = content;
-                code.title = filename.replace(/\.code\.py$/, '');
-            }
-
-            if (!code.id) code.id = Date.now().toString();
-            if (!code.title) code.title = filename.replace(/\.code\.py$/, '');
-            if (outputContent) code.output = outputContent;
-
-            return code;
-        }
-
-        // Convert bookmark object to JSON
-        function bookmarkToJson(bookmark, thumbnailPath = null) {
-            return {
-                id: bookmark.id || '',
-                type: 'bookmark',
-                title: bookmark.title || 'Untitled',
-                url: bookmark.url || '',
-                description: bookmark.description || '',
-                thumbnail: thumbnailPath || bookmark.thumbnail || null,
-                created: bookmark.created || new Date().toISOString(),
-                modified: bookmark.modified || new Date().toISOString()
-            };
-        }
-
-        // Parse JSON to bookmark object
-        function jsonToBookmark(json, thumbnailDataUrl = null, filename = null) {
-            const bookmark = {
-                type: 'bookmark',
-                id: json.id || Date.now().toString(),
-                title: json.title || 'Untitled',
-                url: json.url || '',
-                description: json.description || '',
-                created: json.created || new Date().toISOString(),
-                modified: json.modified || new Date().toISOString()
-            };
-            // Store original filename (without extension) for reliable deletion when title changes
-            if (filename) {
-                bookmark._filename = filename.replace(/\.bookmark\.json$/, '');
-            }
-            // Use data URL if provided (loaded from separate file), else use stored value
-            bookmark.thumbnail = thumbnailDataUrl || json.thumbnail || null;
-            return bookmark;
-        }
+        // Note: Old type-specific conversion functions (noteToMarkdown, markdownToNote,
+        // codeToFile, fileToCode, bookmarkToJson, jsonToBookmark) have been replaced by
+        // the generic loadCard() and serializeCard() functions in TEMPLATE_SYSTEM section.
 
         // Save directory handle to IndexedDB for persistence
         async function saveDirHandle(handle) {
@@ -2621,6 +3071,11 @@ Create \`sections/{section-name}/{slug}.code.py\`:
         // Load notebook data from filesystem
         async function loadFromFilesystem(dirHandle) {
             console.log('[Filesystem] Loading from directory...');
+
+            // Load extension registry and templates first
+            await loadExtensionRegistry(dirHandle);
+            await loadTemplates(dirHandle);
+
             const loadedData = {
                 title: 'Research Notebook',
                 subtitle: 'Bookmarks, notes, and connections',
@@ -2642,7 +3097,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 }
 
                 // Read system notes (text files at root)
-                // Include: .md, .txt, dotfiles like .gitignore
+                // Include: .md, .txt, .yaml (including templates), dotfiles like .gitignore
                 // Exclude: .json, .html, .js, binary files
                 const excludedExtensions = ['.json', '.html', '.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico'];
                 const includedDotfiles = ['.gitignore', '.env.example', '.editorconfig', '.prettierrc', '.eslintrc'];
@@ -2665,7 +3120,16 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 
                         // Determine format based on extension
                         const isMarkdown = filename.endsWith('.md');
-                        const titleFromFilename = isMarkdown ? filename.replace(/\.md$/, '') : filename;
+                        const isYaml = filename.endsWith('.yaml');
+                        let titleFromFilename = filename;
+                        if (isMarkdown) titleFromFilename = filename.replace(/\.md$/, '');
+                        else if (filename.endsWith('.template.yaml')) titleFromFilename = filename.replace(/\.template\.yaml$/, '') + ' (template)';
+                        else if (isYaml) titleFromFilename = filename.replace(/\.yaml$/, '');
+
+                        // Determine format for rendering
+                        let format = 'text';
+                        if (isMarkdown) format = 'markdown';
+                        else if (isYaml) format = 'yaml';
 
                         loadedData.systemNotes.push({
                             type: 'note',
@@ -2674,10 +3138,10 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                             filename: filename,
                             title: titleFromFilename,
                             content: content,
-                            format: isMarkdown ? 'markdown' : 'text',
+                            format: format,
                             modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
                         });
-                        console.log(`[Filesystem] Loaded system note: ${filename} (${isMarkdown ? 'markdown' : 'text'})`);
+                        console.log(`[Filesystem] Loaded system note: ${filename} (${format})`);
                     } catch (e) {
                         console.error(`[Filesystem] Error reading system note ${filename}:`, e);
                     }
@@ -2713,68 +3177,87 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                         // No metadata file, use directory name
                     }
 
-                    // Read all files in section
+                    // First pass: collect all files and identify companion files
+                    const files = {};
+                    const companionFiles = {};
                     for await (const [filename, fileHandle] of sectionHandle.entries()) {
                         if (fileHandle.kind !== 'file') continue;
                         if (filename.startsWith('_')) continue;  // Skip metadata files
-                        if (filename.endsWith('.output.html')) continue;  // Skip output files (loaded with code)
 
+                        // Check if this is a companion file (e.g., .output.html)
+                        let isCompanion = false;
+                        for (const ext of Object.keys(extensionRegistry)) {
+                            const config = extensionRegistry[ext];
+                            if (config.companionFiles) {
+                                for (const companion of config.companionFiles) {
+                                    if (filename.endsWith(companion.suffix)) {
+                                        // Store companion content by base filename
+                                        const baseFilename = filename.slice(0, -companion.suffix.length) + ext;
+                                        if (!companionFiles[baseFilename]) companionFiles[baseFilename] = {};
+                                        try {
+                                            const file = await fileHandle.getFile();
+                                            companionFiles[baseFilename][companion.field] = await file.text();
+                                        } catch (e) {
+                                            console.warn(`[Filesystem] Error reading companion file ${filename}:`, e);
+                                        }
+                                        isCompanion = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (isCompanion) break;
+                        }
+
+                        if (!isCompanion) {
+                            files[filename] = fileHandle;
+                        }
+                    }
+
+                    // Second pass: load cards with their companion data
+                    for (const [filename, fileHandle] of Object.entries(files)) {
                         try {
                             const file = await fileHandle.getFile();
                             const content = await file.text();
 
-                            if (filename.endsWith('.md')) {
-                                // Note file
-                                const note = markdownToNote(content, filename);
-                                section.items.push(note);
+                            // Get companion data for this file
+                            const companionData = companionFiles[filename] || {};
 
-                            } else if (filename.endsWith('.code.py')) {
-                                // Code file - also try to load output
-                                const outputFilename = filename.replace('.code.py', '.output.html');
-                                let outputContent = null;
+                            // Special handling for bookmarks: load thumbnail from assets
+                            if (filename.endsWith('.bookmark.json')) {
                                 try {
-                                    const outputFile = await sectionHandle.getFileHandle(outputFilename);
-                                    const outFile = await outputFile.getFile();
-                                    outputContent = await outFile.text();
-                                } catch (e) {
-                                    // No output file
-                                }
-                                const code = fileToCode(content, filename, outputContent);
-                                section.items.push(code);
+                                    const bookmarkData = JSON.parse(content);
+                                    if (bookmarkData.thumbnail && !bookmarkData.thumbnail.startsWith('data:')) {
+                                        // It's a file path, need to load the actual image
+                                        try {
+                                            const assetsDir = await dirHandle.getDirectoryHandle('assets');
+                                            const thumbsDir = await assetsDir.getDirectoryHandle('thumbnails');
+                                            const thumbFilename = bookmarkData.thumbnail.split('/').pop();
+                                            const thumbHandle = await thumbsDir.getFileHandle(thumbFilename);
+                                            const thumbFile = await thumbHandle.getFile();
 
-                            } else if (filename.endsWith('.bookmark.json')) {
-                                // Bookmark file
-                                const bookmarkData = JSON.parse(content);
-
-                                // Load thumbnail from assets if path reference
-                                let thumbnailDataUrl = null;
-                                if (bookmarkData.thumbnail && !bookmarkData.thumbnail.startsWith('data:')) {
-                                    // It's a file path, need to load the actual image
-                                    try {
-                                        // Get assets/thumbnails directory
-                                        const assetsDir = await dirHandle.getDirectoryHandle('assets');
-                                        const thumbsDir = await assetsDir.getDirectoryHandle('thumbnails');
-
-                                        // Extract filename from path (e.g., "../../assets/thumbnails/foo.png" -> "foo.png")
-                                        const thumbFilename = bookmarkData.thumbnail.split('/').pop();
-
-                                        const thumbHandle = await thumbsDir.getFileHandle(thumbFilename);
-                                        const thumbFile = await thumbHandle.getFile();
-
-                                        // Convert to data URL
-                                        const reader = new FileReader();
-                                        thumbnailDataUrl = await new Promise((resolve, reject) => {
-                                            reader.onload = () => resolve(reader.result);
-                                            reader.onerror = reject;
-                                            reader.readAsDataURL(thumbFile);
-                                        });
-                                    } catch (e) {
-                                        console.warn(`[Filesystem] Could not load thumbnail ${bookmarkData.thumbnail}:`, e);
+                                            const reader = new FileReader();
+                                            companionData.thumbnail = await new Promise((resolve, reject) => {
+                                                reader.onload = () => resolve(reader.result);
+                                                reader.onerror = reject;
+                                                reader.readAsDataURL(thumbFile);
+                                            });
+                                        } catch (e) {
+                                            console.warn(`[Filesystem] Could not load thumbnail ${bookmarkData.thumbnail}:`, e);
+                                        }
                                     }
+                                } catch (e) {
+                                    // JSON parse error, will be caught below
                                 }
+                            }
 
-                                const bookmark = jsonToBookmark(bookmarkData, thumbnailDataUrl, filename);
-                                section.items.push(bookmark);
+                            // Use generic loadCard function
+                            const card = loadCard(filename, content, sectionName, companionData);
+                            if (card) {
+                                // Apply thumbnail from companion data if loaded
+                                if (companionData.thumbnail) {
+                                    card.thumbnail = companionData.thumbnail;
+                                }
+                                section.items.push(card);
                             }
                         } catch (e) {
                             console.error(`[Filesystem] Error reading ${filename}:`, e);
@@ -2855,62 +3338,59 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                     }, null, 2));
                     await sectionMetaWritable.close();
 
-                    // Write each item
+                    // Write each item using generic serialization
                     for (const item of section.items) {
                         const titleSlug = slugify(item.title);
+                        const { content, extension, format } = serializeCard(item);
 
-                        if (item.type === 'note') {
-                            const filename = `${titleSlug}.md`;
-                            const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
-                            const writable = await fileHandle.createWritable();
-                            await writable.write(noteToMarkdown(item));
-                            await writable.close();
+                        // Special handling for bookmarks: save thumbnail to assets folder
+                        if ((item.type === 'bookmark' || item.template === 'bookmark') && item.thumbnail && item.thumbnail.startsWith('data:')) {
+                            const thumbFilename = `${item.id || titleSlug}.png`;
+                            const thumbnailPath = `../../assets/thumbnails/${thumbFilename}`;
 
-                        } else if (item.type === 'code') {
-                            const filename = `${titleSlug}.code.py`;
-                            const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
-                            const writable = await fileHandle.createWritable();
-                            await writable.write(codeToFile(item));
-                            await writable.close();
+                            try {
+                                const response = await fetch(item.thumbnail);
+                                const blob = await response.blob();
+                                const thumbHandle = await thumbsDir.getFileHandle(thumbFilename, { create: true });
+                                const thumbWritable = await thumbHandle.createWritable();
+                                await thumbWritable.write(blob);
+                                await thumbWritable.close();
 
-                            // Write output file if exists
-                            if (item.output) {
-                                const outputFilename = `${titleSlug}.output.html`;
-                                const outputHandle = await sectionDir.getFileHandle(outputFilename, { create: true });
-                                const outputWritable = await outputHandle.createWritable();
-                                await outputWritable.write(item.output);
-                                await outputWritable.close();
+                                // Update content to use path instead of data URL
+                                const bookmarkJson = JSON.parse(content);
+                                bookmarkJson.thumbnail = thumbnailPath;
+                                const updatedContent = JSON.stringify(bookmarkJson, null, 2);
+
+                                const filename = `${titleSlug}${extension}`;
+                                const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
+                                const writable = await fileHandle.createWritable();
+                                await writable.write(updatedContent);
+                                await writable.close();
+                            } catch (e) {
+                                console.error('[Filesystem] Error saving bookmark with thumbnail:', e);
                             }
+                        } else {
+                            // Write main card file
+                            const filename = `${titleSlug}${extension}`;
+                            const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
+                            const writable = await fileHandle.createWritable();
+                            await writable.write(content);
+                            await writable.close();
+                        }
 
-                        } else if (item.type === 'bookmark') {
-                            const filename = `${titleSlug}.bookmark.json`;
-
-                            // Handle thumbnail - save to assets if data URL
-                            let thumbnailPath = null;
-                            if (item.thumbnail && item.thumbnail.startsWith('data:')) {
-                                // Save thumbnail as separate file
-                                const thumbFilename = `${item.id || titleSlug}.png`;
-                                thumbnailPath = `../../assets/thumbnails/${thumbFilename}`;
-
-                                try {
-                                    // Convert data URL to blob
-                                    const response = await fetch(item.thumbnail);
-                                    const blob = await response.blob();
-
-                                    const thumbHandle = await thumbsDir.getFileHandle(thumbFilename, { create: true });
-                                    const thumbWritable = await thumbHandle.createWritable();
-                                    await thumbWritable.write(blob);
-                                    await thumbWritable.close();
-                                } catch (e) {
-                                    console.error('[Filesystem] Error saving thumbnail:', e);
-                                    thumbnailPath = null;
+                        // Handle companion files based on extension registry
+                        const extConfig = extensionRegistry[extension];
+                        if (extConfig?.companionFiles) {
+                            for (const companion of extConfig.companionFiles) {
+                                const fieldValue = item[companion.field];
+                                if (fieldValue) {
+                                    const companionFilename = `${titleSlug}${companion.suffix}`;
+                                    const companionHandle = await sectionDir.getFileHandle(companionFilename, { create: true });
+                                    const companionWritable = await companionHandle.createWritable();
+                                    await companionWritable.write(fieldValue);
+                                    await companionWritable.close();
                                 }
                             }
-
-                            const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
-                            const writable = await fileHandle.createWritable();
-                            await writable.write(JSON.stringify(bookmarkToJson(item, thumbnailPath), null, 2));
-                            await writable.close();
                         }
                     }
                 }
@@ -2918,9 +3398,9 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 // Write system notes (text files at root)
                 if (data.systemNotes) {
                     for (const note of data.systemNotes) {
-                        // For raw text notes, preserve original filename
+                        // For raw text/yaml notes, preserve original filename
                         // For markdown notes, use title + .md
-                        const newFilename = note.format === 'text' ? note.filename : (note.title + '.md');
+                        const newFilename = (note.format === 'text' || note.format === 'yaml') ? note.filename : (note.title + '.md');
                         const oldFilename = note.filename;
 
                         // If filename changed (markdown notes only), delete old file
@@ -2991,42 +3471,22 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             recordSave('notebook.json');
         }
 
-        // Save a single note file
-        async function saveNoteFile(sectionId, note) {
+        // Generic card save function using template system
+        async function saveCardFile(sectionId, card) {
             if (!filesystemLinked || !notebookDirHandle) return;
 
-            if (sectionId === '_system') {
-                // System note - save at root
-                // Use existing filename for raw text files, or title + .md for new markdown notes
-                const filename = note.filename || (note.title + '.md');
+            // System notes are handled specially (saved at root with raw content)
+            if (sectionId === '_system' && card.system) {
+                const filename = card.filename || (card.title + '.md');
                 const fileHandle = await notebookDirHandle.getFileHandle(filename, { create: true });
                 const writable = await fileHandle.createWritable();
-                await writable.write(note.content);
+                await writable.write(card.content);
                 await writable.close();
-                note.filename = filename;
-                note.id = 'system-' + filename;
+                card.filename = filename;
+                card.id = 'system-' + filename;
                 recordSave(filename);
-            } else {
-                // Regular note - save in section folder
-                const section = data.sections.find(s => s.id === sectionId);
-                if (!section) return;
-
-                const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
-                const sectionSlug = slugify(section.name);
-                const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug, { create: true });
-
-                const filename = `${slugify(note.title)}.md`;
-                const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(noteToMarkdown(note));
-                await writable.close();
-                recordSave(`sections/${sectionSlug}/${filename}`);
+                return;
             }
-        }
-
-        // Save a single code file (and its output)
-        async function saveCodeFile(sectionId, codeItem) {
-            if (!filesystemLinked || !notebookDirHandle) return;
 
             const section = data.sections.find(s => s.id === sectionId);
             if (!section) return;
@@ -3034,71 +3494,67 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
             const sectionSlug = slugify(section.name);
             const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug, { create: true });
+            const titleSlug = slugify(card.title);
 
-            const titleSlug = slugify(codeItem.title);
+            // Use serializeCard to get the file content and extension
+            const { content, extension, format } = serializeCard(card);
 
-            // Write code file
-            const filename = `${titleSlug}.code.py`;
-            const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(codeToFile(codeItem));
-            await writable.close();
-            recordSave(`sections/${sectionSlug}/${filename}`);
-
-            // Write output file if exists
-            if (codeItem.output) {
-                const outputFilename = `${titleSlug}.output.html`;
-                const outputHandle = await sectionDir.getFileHandle(outputFilename, { create: true });
-                const outputWritable = await outputHandle.createWritable();
-                await outputWritable.write(codeItem.output);
-                await outputWritable.close();
-                recordSave(`sections/${sectionSlug}/${outputFilename}`);
-            }
-        }
-
-        // Save a single bookmark file (and its thumbnail)
-        async function saveBookmarkFile(sectionId, bookmark) {
-            if (!filesystemLinked || !notebookDirHandle) return;
-
-            const section = data.sections.find(s => s.id === sectionId);
-            if (!section) return;
-
-            const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
-            const sectionSlug = slugify(section.name);
-            const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug, { create: true });
-
-            const titleSlug = slugify(bookmark.title);
-
-            // Handle thumbnail - save to assets if data URL
-            let thumbnailPath = null;
-            if (bookmark.thumbnail && bookmark.thumbnail.startsWith('data:')) {
+            // Special handling for bookmarks: save thumbnail to assets folder
+            if ((card.type === 'bookmark' || card.template === 'bookmark') && card.thumbnail && card.thumbnail.startsWith('data:')) {
                 const assetsDir = await notebookDirHandle.getDirectoryHandle('assets', { create: true });
                 const thumbsDir = await assetsDir.getDirectoryHandle('thumbnails', { create: true });
-
-                const thumbFilename = `${bookmark.id || titleSlug}.png`;
-                thumbnailPath = `../../assets/thumbnails/${thumbFilename}`;
+                const thumbFilename = `${card.id || titleSlug}.png`;
+                const thumbnailPath = `../../assets/thumbnails/${thumbFilename}`;
 
                 try {
-                    const response = await fetch(bookmark.thumbnail);
+                    const response = await fetch(card.thumbnail);
                     const blob = await response.blob();
                     const thumbHandle = await thumbsDir.getFileHandle(thumbFilename, { create: true });
                     const thumbWritable = await thumbHandle.createWritable();
                     await thumbWritable.write(blob);
                     await thumbWritable.close();
                     recordSave(`assets/thumbnails/${thumbFilename}`);
+
+                    // Update the serialized content to use path instead of data URL
+                    const bookmarkJson = JSON.parse(content);
+                    bookmarkJson.thumbnail = thumbnailPath;
+                    const updatedContent = JSON.stringify(bookmarkJson, null, 2);
+
+                    const filename = `${titleSlug}${extension}`;
+                    const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(updatedContent);
+                    await writable.close();
+                    recordSave(`sections/${sectionSlug}/${filename}`);
+                    return;
                 } catch (e) {
                     console.error('[Filesystem] Error saving thumbnail:', e);
-                    thumbnailPath = null;
                 }
             }
 
-            // Write bookmark JSON
-            const filename = `${titleSlug}.bookmark.json`;
+            // Write main card file
+            const filename = `${titleSlug}${extension}`;
             const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
             const writable = await fileHandle.createWritable();
-            await writable.write(JSON.stringify(bookmarkToJson(bookmark, thumbnailPath), null, 2));
+            await writable.write(content);
             await writable.close();
             recordSave(`sections/${sectionSlug}/${filename}`);
+
+            // Handle companion files based on extension registry
+            const extConfig = extensionRegistry[extension];
+            if (extConfig?.companionFiles) {
+                for (const companion of extConfig.companionFiles) {
+                    const fieldValue = card[companion.field];
+                    if (fieldValue) {
+                        const companionFilename = `${titleSlug}${companion.suffix}`;
+                        const companionHandle = await sectionDir.getFileHandle(companionFilename, { create: true });
+                        const companionWritable = await companionHandle.createWritable();
+                        await companionWritable.write(fieldValue);
+                        await companionWritable.close();
+                        recordSave(`sections/${sectionSlug}/${companionFilename}`);
+                    }
+                }
+            }
         }
 
         // Create a new section directory with _section.json
@@ -3254,8 +3710,16 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                     render();
                     showToast(`📁 Linked to folder (loaded ${data.sections.length} sections)`);
                 } else {
-                    // Save current data to filesystem (creates README.md, CLAUDE.md, etc.)
+                    // New notebook: create default section and all system files including templates
+                    const defaultSection = {
+                        id: 'section-' + Date.now(),
+                        name: 'Research',
+                        items: []
+                    };
+                    data.sections = [defaultSection];
                     await saveToFilesystem(handle);
+                    await createSectionDir(defaultSection);  // Create section directory
+                    await ensureTemplateFiles(handle);  // Create template files for new notebooks
                     // Reload to pick up the newly created system notes
                     const fsData = await loadFromFilesystem(handle);
                     data = fsData;
@@ -3837,7 +4301,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             btn.disabled = false;
 
             await saveData();
-            await saveBookmarkFile(sectionId, bookmarkData);  // Only writes this bookmark
+            await saveCardFile(sectionId, bookmarkData);  // Only writes this bookmark
             render();
             closeBookmarkModal();
             showToast(editingBookmark ? 'Bookmark updated' : 'Bookmark added');
@@ -3905,8 +4369,8 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 previewTab.classList.add('active');
                 textarea.style.display = 'none';
                 preview.classList.add('active');
-                // Use format from editingNote if available (raw text for non-.md system notes)
-                if (editingNote?.format === 'text') {
+                // Use format from editingNote if available (raw text/yaml for non-.md system notes)
+                if (editingNote?.format === 'text' || editingNote?.format === 'yaml') {
                     preview.innerHTML = `<pre style="margin: 0; white-space: pre-wrap; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; font-size: 0.9rem; line-height: 1.5;">${escapeHtml(textarea.value)}</pre>`;
                 } else {
                     preview.innerHTML = renderMarkdownWithLinks(textarea.value);
@@ -3994,7 +4458,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             }
 
             await saveData();
-            await saveNoteFile(sectionId, noteData);  // Only writes this note
+            await saveCardFile(sectionId, noteData);  // Only writes this note
             render();
             closeNoteModal();
             showToast(editingNote ? 'Note updated' : 'Note created');
@@ -4025,7 +4489,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 
             // Render content based on format
             let content;
-            if (note.format === 'text') {
+            if (note.format === 'text' || note.format === 'yaml') {
                 content = `<pre style="margin: 0; white-space: pre-wrap; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; font-size: 0.9rem; line-height: 1.5;">${escapeHtml(note.content)}</pre>`;
             } else {
                 content = renderMarkdownWithLinks(note.content);
@@ -4522,7 +4986,7 @@ sys.stderr = sys.__stderr__
             }
 
             await saveData();
-            await saveCodeFile(sectionId, codeData);  // Only writes this code file
+            await saveCardFile(sectionId, codeData);  // Only writes this code file
             render();
             closeCodeModal();
             submitBtn.disabled = false;
@@ -4643,7 +5107,7 @@ sys.stderr = sys.__stderr__
                         codeNote.modified = new Date().toISOString();
                         currentViewingCode.output = result;
                         await saveData();
-                        await saveCodeFile(currentViewingCode.sectionId, codeNote);  // Save code file with new output
+                        await saveCardFile(currentViewingCode.sectionId, codeNote);  // Save code file with new output
                         render();
 
                         // Re-render the viewer with new output
@@ -4739,8 +5203,8 @@ sys.stderr = sys.__stderr__
         function renderNotePreview(text, format = 'markdown', maxLength = 1200) {
             if (!text) return '';
 
-            // For raw text format, just escape and truncate
-            if (format === 'text') {
+            // For raw text or yaml format, just escape and truncate
+            if (format === 'text' || format === 'yaml') {
                 let truncated = text;
                 if (text.length > maxLength) {
                     truncated = text.substring(0, maxLength);
@@ -5063,7 +5527,7 @@ sys.stderr = sys.__stderr__
 
             codeNote.showOutput = !codeNote.showOutput;
             await saveData();
-            await saveCodeFile(sectionId, codeNote);  // Save code file with updated showOutput
+            await saveCardFile(sectionId, codeNote);  // Save code file with updated showOutput
             render();
         }
 
@@ -5152,6 +5616,38 @@ sys.stderr = sys.__stderr__
         // ========== SECTION: RENDER_FUNCTIONS ==========
         // Main render and card templates: render, renderBookmarkCard, renderNoteCard, renderCodeCard, findNote, findCode, escapeHtml
 
+        // Generate template-driven "New X" buttons for a section
+        function renderTemplateButtons(sectionId) {
+            // Get templates sorted by sort_order
+            const templates = Object.values(templateRegistry)
+                .filter(t => t.ui?.show_create_button !== false)
+                .sort((a, b) => (a.ui?.sort_order || 99) - (b.ui?.sort_order || 99));
+
+            // Map template names to modal openers (for backwards compatibility with existing modals)
+            const modalOpeners = {
+                note: `openNoteModal('${sectionId}')`,
+                code: `openCodeModal('${sectionId}')`,
+                bookmark: `openBookmarkModal('${sectionId}')`
+            };
+
+            // Button styles by template type
+            const buttonStyles = {
+                note: 'btn-note',
+                code: 'btn-code',
+                bookmark: 'btn-secondary'
+            };
+
+            return templates.map(t => {
+                const opener = modalOpeners[t.name] || `openNoteModal('${sectionId}')`; // fallback
+                const style = buttonStyles[t.name] || 'btn-secondary';
+                const label = t.ui?.button_label || t.name;
+                const icon = t.ui?.icon || '';
+                return `<button class="btn ${style} btn-small" onclick="${opener}">
+                    ${icon ? icon + ' ' : '+ '}${label}
+                </button>`;
+            }).join('');
+        }
+
         // Render the UI
         function render() {
             // Update header and page title with current title and subtitle
@@ -5191,15 +5687,7 @@ sys.stderr = sys.__stderr__
                             ${isCollapsed && itemCount > 0 ? `<span class="section-count">(${itemCount})</span>` : ''}
                         </h2>
                         <div class="section-actions">
-                            <button class="btn btn-code btn-small" onclick="openCodeModal('${section.id}')">
-                                + Code
-                            </button>
-                            <button class="btn btn-note btn-small" onclick="openNoteModal('${section.id}')">
-                                + Note
-                            </button>
-                            <button class="btn btn-secondary btn-small" onclick="openBookmarkModal('${section.id}')">
-                                + Bookmark
-                            </button>
+                            ${renderTemplateButtons(section.id)}
                         </div>
                     </div>
                     <div class="items-grid ${isCollapsed ? 'collapsed' : ''}">

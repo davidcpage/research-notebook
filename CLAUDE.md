@@ -42,8 +42,8 @@ These comments are parsed by generate_index.py.
 
 Use `grep -n "SECTION:" research_notebook_with_code.html` for current line numbers.
 
-Key sections: HTML_HEAD (CSS), HTML_BODY_AND_MODALS, STATE_AND_CONFIG, DATA_PERSISTENCE,
-FILESYSTEM_STORAGE, NOTE_MODAL, PYODIDE_RUNTIME, CODE_MODAL, RENDER_FUNCTIONS, EVENT_HANDLERS_AND_INIT
+Key sections: HTML_HEAD (CSS), HTML_BODY_AND_MODALS, STATE_AND_CONFIG, TEMPLATE_SYSTEM,
+DATA_PERSISTENCE, FILESYSTEM_STORAGE, NOTE_MODAL, PYODIDE_RUNTIME, CODE_MODAL, RENDER_FUNCTIONS, EVENT_HANDLERS_AND_INIT
 
 ### When Making Changes
 
@@ -66,13 +66,22 @@ FILESYSTEM_STORAGE, NOTE_MODAL, PYODIDE_RUNTIME, CODE_MODAL, RENDER_FUNCTIONS, E
 3. Update `render()` and card render functions
 4. Update filesystem read/write functions if format changes
 
-**Adding a new item type:**
-1. Add modal HTML (HTML_BODY_AND_MODALS)
-2. Add viewer modal HTML
-3. Add modal functions (new section)
-4. Add viewer functions (new section)
-5. Update `render()` switch statement
-6. Add `renderXxxCard()` function
+**Adding a new item type (with Template System):**
+The app uses a template system defined in TEMPLATE_SYSTEM section. Key concepts:
+- `extensionRegistry`: Maps file extensions to parsers (e.g., `.md` → yaml-frontmatter parser)
+- `templateRegistry`: Defines card types with schema, layout, and styling
+- `loadCard()`: Generic function to parse any card file using extension registry
+- `serializeCard()`: Generic function to serialize any card to its file format
+- `saveCardFile()`: Generic function to save any card type
+- Templates are stored as `*.template.yaml` files in notebook root
+- Extension mappings are in `extensions.yaml`
+
+To add a new card type:
+1. Add template to `getDefaultTemplates()` in TEMPLATE_SYSTEM
+2. Add extension mapping to `getDefaultExtensionRegistry()` if using new file format
+3. Add modal HTML (HTML_BODY_AND_MODALS)
+4. Add modal/viewer functions
+5. Add `renderXxxCard()` function in RENDER_FUNCTIONS
 
 **Debugging Pyodide:**
 1. Check browser console for `[Pyodide]` logs
