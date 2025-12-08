@@ -5434,6 +5434,11 @@ sys.stderr = sys.__stderr__
         // ========== SECTION: UTILITY_FUNCTIONS ==========
         // Misc utility functions
 
+        // Generate unique ID
+        function generateId() {
+            return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        }
+
         // Format date
         function formatDate(dateString) {
             const date = new Date(dateString);

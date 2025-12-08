@@ -59,7 +59,7 @@ To add a new card type (fully automatic with template system):
 Note: Card rendering, viewer display, and editing all work automatically via templates.
 
 **Debugging JavaScript errors:**
-When reporting errors, always check browser DevTools (Console tab) for the full stack trace, not just the toast/popup message. The stack trace shows the exact line number and call chain, which is essential for debugging.
+**IMPORTANT FOR BUG REPORTS**: When reporting bugs, ALWAYS check the browser DevTools Console (F12 or Cmd+Option+I) for the full error message and stack trace. The console shows the exact line number and function call chain - this is ESSENTIAL for debugging. Toast messages alone are not sufficient for diagnosing issues.
 
 **Debugging Pyodide:**
 1. Check browser console for `[Pyodide]` logs
