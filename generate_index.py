@@ -6,6 +6,8 @@ Usage:
     python generate_index.py                    # Full index (markdown)
     python generate_index.py --section NAME     # Single section details
     python generate_index.py --sections         # Just section headers + line counts
+    python generate_index.py --func NAME        # Find function by name (quick lookup)
+    python generate_index.py --search TERM      # Search functions by name or comment
     python generate_index.py --json             # Output as JSON (for tooling)
 
 The script parses section markers in both formats:
@@ -201,6 +203,50 @@ def format_sections_only(sections: list[Section]) -> str:
     return "\n".join(output)
 
 
+def find_function(sections: list[Section], func_name: str) -> list[tuple[Section, Function]]:
+    """Find functions matching the given name (case-insensitive, supports partial match)."""
+    results = []
+    func_name_lower = func_name.lower()
+
+    for section in sections:
+        for func in section.functions:
+            if func_name_lower == func.name.lower():
+                # Exact match - prioritize
+                results.insert(0, (section, func))
+            elif func_name_lower in func.name.lower():
+                # Partial match
+                results.append((section, func))
+
+    return results
+
+
+def search_functions(sections: list[Section], term: str) -> list[tuple[Section, Function]]:
+    """Search functions by name or comment containing the term."""
+    results = []
+    term_lower = term.lower()
+
+    for section in sections:
+        for func in section.functions:
+            if term_lower in func.name.lower() or term_lower in func.comment.lower():
+                results.append((section, func))
+
+    return results
+
+
+def format_function_results(results: list[tuple[Section, Function]], query: str) -> str:
+    """Format function search/lookup results."""
+    if not results:
+        return f"No functions found matching '{query}'"
+
+    output = []
+    for section, func in results:
+        async_marker = "async " if func.is_async else ""
+        comment = f" - {func.comment}" if func.comment else ""
+        output.append(f"{async_marker}{func.name}() @ line {func.line} [{section.name}]{comment}")
+
+    return "\n".join(output)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate index of sections and functions from research_notebook_with_code.html"
@@ -219,6 +265,16 @@ def main():
         '--json',
         action='store_true',
         help='Output as JSON'
+    )
+    parser.add_argument(
+        '--func', '-fn',
+        type=str,
+        help='Find function by name (case-insensitive, partial match)'
+    )
+    parser.add_argument(
+        '--search',
+        type=str,
+        help='Search functions by name or comment'
     )
     parser.add_argument(
         '--file', '-f',
@@ -285,6 +341,14 @@ def main():
 
         for section in matching:
             print(format_section_detail(section, lines))
+
+    elif args.func:
+        results = find_function(sections, args.func)
+        print(format_function_results(results, args.func))
+
+    elif args.search:
+        results = search_functions(sections, args.search)
+        print(format_function_results(results, args.search))
 
     elif args.sections:
         print(format_sections_only(sections))

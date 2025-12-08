@@ -8,49 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### How to Navigate
 
-1. **Use generate_index.py** - Auto-generates accurate section/function index:
-   ```bash
-   python3 generate_index.py              # Full index with all sections and functions
-   python3 generate_index.py --sections   # Just section names and line counts
-   python3 generate_index.py --section FILESYSTEM_STORAGE  # Details for one section
-   python3 generate_index.py --json       # Machine-readable output
-   ```
-2. **Use grep to find sections** - Search for section markers:
-   ```bash
-   grep -n "SECTION:" research_notebook_with_code.html
-   ```
-3. **Read targeted line ranges** - Use the Read tool with offset/limit parameters:
-   ```
-   # First: grep -n "SECTION: PYODIDE" to get line number, then:
-   Read file_path with offset=<line_number> limit=200
-   ```
-4. **Search for specific functions**:
-   ```bash
-   grep -n "function saveBookmark" research_notebook_with_code.html
-   ```
-
-### Section Marker Format
-
-The file uses consistent section markers:
-- HTML sections: `<!-- ========== SECTION: NAME ========== -->`
-- JavaScript sections: `// ========== SECTION: NAME ==========`
-
-Each function should have a comment on the line immediately above describing its purpose.
-These comments are parsed by generate_index.py.
-
-### Quick Section Reference
-
-Use `grep -n "SECTION:" research_notebook_with_code.html` for current line numbers.
+Run `/start` or `python3 generate_index.py --sections` to see section layout with line numbers.
 
 Key sections: HTML_HEAD (CSS), HTML_BODY_AND_MODALS, STATE_AND_CONFIG, TEMPLATE_SYSTEM,
 DATA_PERSISTENCE, FILESYSTEM_STORAGE, NOTE_MODAL, PYODIDE_RUNTIME, CODE_MODAL, RENDER_FUNCTIONS, EVENT_HANDLERS_AND_INIT
 
-### When Making Changes
+Section markers: `// ========== SECTION: NAME ==========` (JS) or `<!-- ========== SECTION: NAME ========== -->` (HTML)
 
-1. Use grep or generate_index.py to locate the relevant section
-2. Read only the lines you need to understand
-3. Make targeted edits
-4. Add a comment above any new functions describing their purpose
+Add a comment above new functions describing their purpose (parsed by generate_index.py).
 
 ### Common Tasks
 
@@ -218,22 +183,7 @@ Since this is a single HTML file:
 - Data stored in IndexedDB: Database `ResearchNotebookDB`, Store `notebook`
 - View data in DevTools → Application → IndexedDB
 
-### Making Changes
-
-**Editing Flow**:
-1. Run `python3 generate_index.py --sections` to see current section layout
-2. Use grep to locate the specific section (see "Navigating the Large Single-File Application" above)
-3. Read targeted line ranges using offset/limit
-4. Use Edit tool to make precise changes
-5. Test by opening in browser
-
-**Section Locations** (use `python3 generate_index.py --sections` for current line numbers):
-- CSS styles: HTML_HEAD section
-- HTML modals: HTML_BODY_AND_MODALS section
-- State/config: STATE_AND_CONFIG section
-- Render functions: RENDER_FUNCTIONS section
-
-**Important Patterns**:
+### Important Patterns
 - After any data modification, always call `await saveData()` then `render()` (saveData is async!)
 - Modal workflow: open modal → populate fields → save → close modal → render
 - Type safety: All items must have valid `type` field ('bookmark', 'note', or 'code')
@@ -382,3 +332,75 @@ All viewers share consistent styling:
 - Event delegation checks if link is inside viewer modal: `link.closest('#noteViewerModal, #bookmarkViewerModal, #codeViewerModal')`
 - Links only work in viewer modals, not in card previews
 - Clicking internal link closes current viewer and opens target item's viewer
+
+---
+
+## Creating Notebook Content via Files (for Claude Code)
+
+When creating notebook items by writing files directly (rather than through the app UI), be aware of these gotchas:
+
+### Notes (.md files)
+Notes work straightforwardly. Use YAML frontmatter:
+```markdown
+---
+id: unique-id
+title: Note Title
+created: 2024-12-08T09:00:00Z
+modified: 2024-12-08T09:00:00Z
+---
+
+Your markdown content here...
+```
+
+### Bookmarks (.bookmark.json files)
+**Thumbnail limitation**: Bookmarks created via files won't have auto-generated thumbnails.
+
+Options:
+1. **Leave thumbnail empty** - User can edit in app to auto-fetch
+2. **Manually add thumbnail** - Save image to `assets/thumbnails/{id}.png` and reference as `"thumbnail": "../../assets/thumbnails/{id}.png"`
+
+Example bookmark JSON:
+```json
+{
+  "id": "bookmark-example",
+  "title": "Example Site",
+  "url": "https://example.com",
+  "description": "Description here",
+  "created": "2024-12-08T09:00:00Z",
+  "modified": "2024-12-08T09:00:00Z"
+}
+```
+
+### Code Cells (.code.py files)
+**Matplotlib gotcha**: The app auto-detects matplotlib figures. Key rules:
+
+1. **DON'T use `plt.show()`** - Causes "FigureCanvasAgg is non-interactive" warning
+2. **DON'T use `plt.close()`** - Prevents auto-detection of figures
+3. **DON'T print HTML manually** - stdout is HTML-escaped by the app
+
+Correct pattern:
+```python
+# ---
+# id: code-example
+# title: Plot Example
+# created: 2024-12-08T09:00:00Z
+# modified: 2024-12-08T09:00:00Z
+# ---
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 100)
+plt.plot(x, np.sin(x))
+plt.title('Sine Wave')
+# Don't call plt.show() or plt.close()
+# App auto-captures the figure
+```
+
+The app's `executePythonCode()` function:
+- Escapes stdout with `escapeHtml()` (so printed HTML won't render)
+- Checks `plt.get_fignums() > 0` to detect figures
+- Uses `_get_plot_as_base64()` to capture figures properly
+
+### Bug Fixed: System Notes Leak
+When creating a new notebook folder, always clear `data.systemNotes = []` in addition to `data.sections`. Otherwise, system notes from the previously open notebook get copied to the new folder.

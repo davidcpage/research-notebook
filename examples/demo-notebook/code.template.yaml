@@ -1,0 +1,57 @@
+name: code
+description: Executable Python code with output
+schema:
+  title:
+    type: text
+    required: true
+  code:
+    type: code
+    language: python
+    required: true
+  output:
+    type: html
+  showOutput:
+    type: boolean
+    default: true
+card:
+  layout: split-pane
+  slots:
+    left:
+      field: output
+      width: 60%
+    right:
+      field: code
+      width: 40%
+  fallback_layout: document
+  fallback_field: code
+  placeholder: 🐍
+viewer:
+  layout: split-pane
+  slots:
+    left:
+      field: output
+      width: 60%
+    right:
+      field: code
+      width: 40%
+editor:
+  fields:
+    - field: title
+      label: Title
+    - field: code
+      label: Code
+      multiline: true
+      rows: 20
+      monospace: true
+  actions:
+    - label: Run
+      action: execute
+      icon: ▶
+style:
+  variables:
+    "--preview-bg": "#f8faf8"
+    "--code-bg": "#f5f5f5"
+ui:
+  button_label: Code
+  icon: 🐍
+  sort_order: 2

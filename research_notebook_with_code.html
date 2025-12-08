@@ -3717,6 +3717,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                         items: []
                     };
                     data.sections = [defaultSection];
+                    data.systemNotes = [];  // Clear system notes from previous notebook
                     await saveToFilesystem(handle);
                     await createSectionDir(defaultSection);  // Create section directory
                     await ensureTemplateFiles(handle);  // Create template files for new notebooks

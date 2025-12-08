@@ -1,0 +1,18 @@
+extensions:
+  .md:
+    parser: yaml-frontmatter
+    defaultTemplate: note
+    bodyField: content
+  .code.py:
+    parser: comment-frontmatter
+    defaultTemplate: code
+    bodyField: code
+    companionFiles:
+      - suffix: .output.html
+        field: output
+  .bookmark.json:
+    parser: json
+    defaultTemplate: bookmark
+  .card.yaml:
+    parser: yaml
+    defaultTemplate: null
