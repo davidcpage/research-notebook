@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Run `/start` or `python3 generate_index.py --sections` to see section layout with line numbers.
 
-Key sections: HTML_HEAD (CSS), HTML_BODY_AND_MODALS, STATE_AND_CONFIG, TEMPLATE_SYSTEM,
+Key sections: HTML_HEAD (CSS), HTML_BODY_AND_MODALS, STATE_AND_CONFIG, TEMPLATE_SYSTEM, GENERIC_EDITOR,
 DATA_PERSISTENCE, FILESYSTEM_STORAGE, NOTE_MODAL, PYODIDE_RUNTIME, CODE_MODAL, RENDER_FUNCTIONS, EVENT_HANDLERS_AND_INIT
 
 Section markers: `// ========== SECTION: NAME ==========` (JS) or `<!-- ========== SECTION: NAME ========== -->` (HTML)
@@ -32,26 +32,31 @@ Add a comment above new functions describing their purpose (parsed by generate_i
 4. Update filesystem read/write functions if format changes
 
 **Adding a new item type (with Template System):**
-The app uses a template system defined in TEMPLATE_SYSTEM section. Key concepts:
+The app uses a template system defined in TEMPLATE_SYSTEM and GENERIC_EDITOR sections. Key concepts:
 - `extensionRegistry`: Maps file extensions to parsers (e.g., `.md` → yaml-frontmatter parser)
-- `templateRegistry`: Defines card types with schema, layout, and styling
+- `templateRegistry`: Defines card types with schema, layout, styling, and editor configuration
 - `loadCard()`: Generic function to parse any card file using extension registry
 - `serializeCard()`: Generic function to serialize any card to its file format
 - `saveCardFile()`: Generic function to save any card type
-- `renderCard()`: Generic card renderer using template definitions (Phase 2)
-- `openViewer()`: Generic viewer modal that adapts to any template (Phase 2)
+- `renderCard()`: Generic card renderer using template definitions
+- `openViewer()`: Generic viewer modal that adapts to any template
+- `openEditor()`: Generic editor modal that builds form from template definition
 - Templates are stored as `*.template.yaml` files in notebook root
 - Extension mappings are in `extensions.yaml`
 - Optional `theme.css` for custom styling
 
-To add a new card type (Phase 2 - cards/viewers are now automatic):
+To add a new card type (fully automatic with template system):
 1. Add template to `getDefaultTemplates()` in TEMPLATE_SYSTEM (or create `.template.yaml` file)
 2. Add extension mapping to `getDefaultExtensionRegistry()` if using new file format
-3. Define `card.layout` (document, image, split-pane, fields) and `viewer.layout` in template
-4. Add editor modal HTML (HTML_BODY_AND_MODALS) - Phase 3 will make this automatic
-5. Add editor open/save functions - Phase 3 will make this automatic
+3. Define in template:
+   - `schema`: Field definitions with types (text, markdown, code, url, thumbnail, etc.)
+   - `card.layout`: Preview layout (document, image, split-pane, fields)
+   - `viewer.layout`: Viewer layout and field mappings
+   - `editor.fields`: Field order and widget configuration for the edit form
+   - `editor.actions`: Optional action buttons (e.g., Run for code)
+   - `ui`: Button label, icon, sort order for toolbar
 
-Note: Card rendering and viewer display now work automatically via `renderCard()` and `openViewer()`.
+Note: Card rendering, viewer display, and editing all work automatically via templates.
 
 **Debugging JavaScript errors:**
 When reporting errors, always check browser DevTools (Console tab) for the full stack trace, not just the toast/popup message. The stack trace shows the exact line number and call chain, which is essential for debugging.

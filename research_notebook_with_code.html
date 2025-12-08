@@ -1201,7 +1201,7 @@
             resize: vertical;
         }
 
-        .form-group textarea.note-editor {
+        .form-group textarea.markdown-editor {
             min-height: 300px;
             font-family: 'Source Sans 3', sans-serif;
             line-height: 1.6;
@@ -1213,7 +1213,7 @@
             margin-top: 0.5rem;
         }
 
-        .bookmark-thumbnail-preview {
+        .thumbnail-upload {
             width: 100%;
             height: 180px;
             background: linear-gradient(135deg, var(--bg-primary) 0%, var(--border) 100%);
@@ -1228,26 +1228,26 @@
             transition: all 0.3s;
         }
 
-        .bookmark-thumbnail-preview:hover {
+        .thumbnail-upload:hover {
             border-color: var(--accent);
             background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--border) 100%);
         }
 
-        .bookmark-thumbnail-preview.drag-over {
+        .thumbnail-upload.drag-over {
             border-color: var(--accent);
             border-style: solid;
             background: var(--bg-secondary);
             transform: scale(1.02);
         }
 
-        .bookmark-thumbnail-preview img {
+        .thumbnail-upload img {
             width: 100%;
             height: 100%;
             object-fit: contain;
             object-position: center top;
         }
 
-        .bookmark-thumbnail-placeholder {
+        .thumbnail-placeholder {
             text-align: center;
             pointer-events: none;
         }
@@ -1266,7 +1266,7 @@
             line-height: 1.5;
         }
 
-        .bookmark-thumbnail-preview.has-image .bookmark-thumbnail-placeholder {
+        .thumbnail-upload.has-image .thumbnail-placeholder {
             display: none;
         }
 
@@ -1276,6 +1276,39 @@
             display: flex;
             justify-content: flex-end;
             gap: 0.75rem;
+        }
+
+        /* Generic editor modal footer layout */
+        #editorModal .modal-footer {
+            justify-content: space-between;
+        }
+        .editor-actions-left {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .editor-actions-right {
+            display: flex;
+            gap: 0.75rem;
+        }
+        .editor-status {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Constrain thumbnail preview in generic editor */
+        #editorModal .thumbnail-upload {
+            max-width: 400px;
+        }
+
+        /* Field width variants for generic editor */
+        .form-field-half {
+            display: inline-block;
+            width: calc(50% - 0.5rem);
+            vertical-align: top;
+        }
+        .form-field-half:nth-child(odd) {
+            margin-right: 0.5rem;
         }
 
         .loading-spinner {
@@ -1453,8 +1486,8 @@
                 </div>
                 <div class="form-group">
                     <label for="bookmarkThumbnailPreview">Thumbnail (optional)</label>
-                    <div class="bookmark-thumbnail-preview" id="bookmarkThumbnailPreview">
-                        <div class="bookmark-thumbnail-placeholder">
+                    <div class="thumbnail-upload" id="bookmarkThumbnailPreview">
+                        <div class="thumbnail-placeholder">
                             <span class="thumbnail-icon">🖼️</span>
                             <p class="thumbnail-hint">Drag & drop screenshot here<br>or click to upload</p>
                         </div>
@@ -1505,7 +1538,7 @@
                         <button class="editor-tab active" onclick="switchEditorTab('write')">Write</button>
                         <button class="editor-tab" onclick="switchEditorTab('preview')">Preview</button>
                     </div>
-                    <textarea id="noteContent" class="note-editor" placeholder="Write your note in Markdown...
+                    <textarea id="noteContent" class="markdown-editor" placeholder="Write your note in Markdown...
 
 Use [[Title]] to link to other notes or bookmarks.
 Use $x^2$ for inline math, $$E=mc^2$$ for display math."></textarea>
@@ -1575,6 +1608,31 @@ print('Hello, World!')" spellcheck="false"></textarea>
             <div class="viewer-footer">
                 <span id="viewerMeta" class="viewer-meta"></span>
                 <div id="viewerActions" class="viewer-actions"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic Editor Modal (Phase 3 Template System) -->
+    <div class="modal-overlay" id="editorModal">
+        <div class="modal modal-large" data-template="">
+            <div class="modal-header">
+                <h2 id="editorTitle">New Card</h2>
+                <button class="modal-close" onclick="closeEditor()">×</button>
+            </div>
+            <div class="modal-body" id="editorBody">
+                <!-- Section selector (injected first) -->
+                <!-- Dynamic fields from template.editor.fields -->
+            </div>
+            <div id="editorOutput" class="form-group" style="display: none;">
+                <label>Output</label>
+                <div class="code-output" id="editorCodeOutput"></div>
+            </div>
+            <div class="modal-footer">
+                <div id="editorActions" class="editor-actions-left"></div>
+                <div class="editor-actions-right">
+                    <button class="btn btn-secondary" onclick="closeEditor()">Cancel</button>
+                    <button class="btn btn-primary" id="editorSubmitBtn" onclick="saveEditor()">Save</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1867,10 +1925,10 @@ print('Hello, World!')" spellcheck="false"></textarea>
                     },
                     editor: {
                         fields: [
-                            { field: 'title', label: 'Title' },
+                            { field: 'thumbnail', label: 'Thumbnail (optional)', widget: 'thumbnail-upload' },
                             { field: 'url', label: 'URL', auto_fetch: true },
-                            { field: 'description', label: 'Description', multiline: true, rows: 4 },
-                            { field: 'thumbnail', label: 'Thumbnail', widget: 'thumbnail-upload' }
+                            { field: 'title', label: 'Title (optional)' },
+                            { field: 'description', label: 'Description (optional)', multiline: true, rows: 4 }
                         ]
                     },
                     style: {
@@ -2820,18 +2878,11 @@ print('Hello, World!')" spellcheck="false"></textarea>
             if (!currentViewingCard) return;
             const sectionId = currentViewingCard.sectionId;
             const card = { ...currentViewingCard };
-            const templateName = card.template || card.type;
+            const templateName = card.template || card.type || 'note';
             closeViewer();
 
-            // Route to appropriate editor based on template
-            // (Phase 3 will add generic editor; for now use existing modals)
-            if (templateName === 'note') {
-                openNoteModal(sectionId, card);
-            } else if (templateName === 'code') {
-                openCodeModal(sectionId, card);
-            } else if (templateName === 'bookmark') {
-                openBookmarkModal(sectionId, card);
-            }
+            // Use generic editor (Phase 3)
+            openEditor(templateName, sectionId, card);
         }
 
         async function deleteViewerCard() {
@@ -2893,6 +2944,592 @@ print('Hello, World!')" spellcheck="false"></textarea>
             } catch (error) {
                 contentEl.innerHTML = `<div class="viewer-error"><pre class="error">${escapeHtml(error.toString())}</pre></div>`;
             }
+        }
+
+        // ========== SECTION: GENERIC_EDITOR ==========
+        // Generic editor modal for all card types (Phase 3 Template System)
+        // Functions: openEditor, closeEditor, saveEditor, renderEditorField, getEditorFieldValue,
+        //            handleEditorAction, initEditorThumbnailUpload, runEditorCode
+
+        // State for generic editor
+        let editingCard = null;  // { templateName, sectionId, card, isNew }
+        let editorManualThumbnail = null;  // For thumbnail field uploads
+
+        // Open the generic editor modal
+        function openEditor(templateName, sectionId, card = null) {
+            const template = templateRegistry[templateName];
+            if (!template) {
+                showToast(`Unknown template: ${templateName}`);
+                return;
+            }
+
+            const isNew = !card;
+            editingCard = {
+                templateName,
+                sectionId,
+                card: card || { id: generateId(), template: templateName },
+                isNew
+            };
+            editorManualThumbnail = null;
+
+            // Set modal data-template for CSS
+            const modal = document.querySelector('#editorModal .modal');
+            modal.setAttribute('data-template', templateName);
+
+            // Set title
+            const buttonLabel = template.ui?.button_label || templateName;
+            document.getElementById('editorTitle').textContent = isNew ? `New ${buttonLabel}` : `Edit ${buttonLabel}`;
+
+            // Build form body
+            const bodyEl = document.getElementById('editorBody');
+            bodyEl.innerHTML = '';
+
+            // Section selector (for regular cards, not system notes)
+            if (sectionId !== '_system') {
+                const sectionGroup = document.createElement('div');
+                sectionGroup.className = 'form-group';
+                sectionGroup.innerHTML = `
+                    <label for="editorSection">Section</label>
+                    <select id="editorSection">
+                        ${data.sections.map(s => `
+                            <option value="${s.id}" ${s.id === sectionId ? 'selected' : ''}>${escapeHtml(s.name)}</option>
+                        `).join('')}
+                    </select>
+                `;
+                bodyEl.appendChild(sectionGroup);
+            }
+
+            // Render each field from template.editor.fields
+            const fields = template.editor?.fields || [];
+            for (const fieldConfig of fields) {
+                const fieldDef = template.schema[fieldConfig.field];
+                const value = card ? card[fieldConfig.field] : (fieldDef?.default || '');
+                const fieldEl = renderEditorField(fieldConfig, fieldDef, value);
+                bodyEl.appendChild(fieldEl);
+            }
+
+            // Handle output display for code templates
+            const outputEl = document.getElementById('editorOutput');
+            const outputContentEl = document.getElementById('editorCodeOutput');
+            if (template.schema?.output && card?.output) {
+                outputEl.style.display = 'block';
+                outputContentEl.innerHTML = card.output;
+            } else {
+                outputEl.style.display = 'none';
+                outputContentEl.innerHTML = '';
+            }
+
+            // Render action buttons (Run, etc.)
+            const actionsEl = document.getElementById('editorActions');
+            const actions = template.editor?.actions || [];
+            if (actions.length > 0) {
+                actionsEl.innerHTML = actions.map(action => {
+                    if (action.action === 'execute') {
+                        return `
+                            <button class="btn btn-run btn-small" id="editorRunBtn" onclick="runEditorCode()">
+                                ${action.icon || '▶'} ${action.label}
+                            </button>
+                            <span class="editor-status" id="editorStatus"></span>
+                        `;
+                    }
+                    return `<button class="btn btn-secondary btn-small" onclick="handleEditorAction('${action.action}')">${action.icon || ''} ${action.label}</button>`;
+                }).join('');
+
+                // Update Pyodide status if this is a code template
+                if (templateName === 'code') {
+                    updateEditorPyodideStatus();
+                }
+            } else {
+                actionsEl.innerHTML = '';
+            }
+
+            // Set submit button text
+            document.getElementById('editorSubmitBtn').textContent = isNew ? `Save ${buttonLabel}` : 'Save Changes';
+
+            // Show modal
+            document.getElementById('editorModal').classList.add('active');
+
+            // Focus first input
+            const firstInput = bodyEl.querySelector('input, textarea');
+            if (firstInput) {
+                setTimeout(() => firstInput.focus(), 100);
+            }
+
+            // Initialize thumbnail upload if present
+            initEditorThumbnailUpload();
+        }
+
+        // Render a single editor field based on its configuration
+        function renderEditorField(fieldConfig, fieldDef, value) {
+            const { field, label, width, multiline, rows, monospace, preview, widget, auto_fetch } = fieldConfig;
+            const type = fieldDef?.type || 'text';
+            const required = fieldDef?.required || false;
+
+            const div = document.createElement('div');
+            div.className = `form-group ${width === 'half' ? 'form-field-half' : ''}`;
+            div.setAttribute('data-field', field);
+
+            const labelEl = document.createElement('label');
+            labelEl.setAttribute('for', `editor-${field}`);
+            labelEl.textContent = label + (required ? ' *' : '');
+            div.appendChild(labelEl);
+
+            let inputEl;
+
+            // Handle different field types/widgets
+            if (widget === 'thumbnail-upload' || type === 'thumbnail') {
+                // Thumbnail upload widget
+                const thumbnailDiv = document.createElement('div');
+                thumbnailDiv.className = 'thumbnail-upload';
+                thumbnailDiv.id = 'editorThumbnailPreview';
+                thumbnailDiv.innerHTML = `
+                    <div class="thumbnail-placeholder">
+                        <span class="thumbnail-icon">🖼️</span>
+                        <p class="thumbnail-hint">Drag & drop image here<br>or click to upload</p>
+                    </div>
+                    <input type="file" id="editorThumbnailFile" accept="image/*" style="display: none">
+                `;
+                if (value) {
+                    thumbnailDiv.classList.add('has-image');
+                    thumbnailDiv.style.backgroundImage = `url('${value}')`;
+                    thumbnailDiv.style.backgroundSize = 'cover';
+                    thumbnailDiv.style.backgroundPosition = 'center';
+                }
+                div.appendChild(thumbnailDiv);
+            } else if (type === 'markdown' && preview) {
+                // Markdown with preview tabs
+                const tabsDiv = document.createElement('div');
+                tabsDiv.className = 'editor-tabs';
+                tabsDiv.innerHTML = `
+                    <button type="button" class="editor-tab active" onclick="switchEditorTab('write')">Write</button>
+                    <button type="button" class="editor-tab" onclick="switchEditorTab('preview')">Preview</button>
+                `;
+                div.appendChild(tabsDiv);
+
+                inputEl = document.createElement('textarea');
+                inputEl.id = `editor-${field}`;
+                inputEl.className = 'markdown-editor';
+                inputEl.rows = rows || 10;
+                inputEl.placeholder = `Write in Markdown...\n\nUse [[Title]] to link to other items.\nUse $x^2$ for inline math, $$E=mc^2$$ for display math.`;
+                inputEl.value = value || '';
+                div.appendChild(inputEl);
+
+                const previewDiv = document.createElement('div');
+                previewDiv.id = 'editorPreview';
+                previewDiv.className = 'editor-preview';
+                div.appendChild(previewDiv);
+
+                const hint = document.createElement('p');
+                hint.className = 'form-hint';
+                hint.textContent = 'Supports Markdown and LaTeX ($inline$, $$display$$). Link with [[Title]] or [[id:xyz]]';
+                div.appendChild(hint);
+            } else if (type === 'code' || (multiline && monospace)) {
+                // Code textarea
+                inputEl = document.createElement('textarea');
+                inputEl.id = `editor-${field}`;
+                inputEl.className = 'code-editor';
+                inputEl.rows = rows || 15;
+                inputEl.spellcheck = false;
+                inputEl.placeholder = `# Write Python code here\nimport numpy as np\nimport pandas as pd\nimport matplotlib.pyplot as plt\n\nprint('Hello, World!')`;
+                inputEl.value = value || '';
+                div.appendChild(inputEl);
+            } else if (multiline || type === 'markdown') {
+                // Regular textarea
+                inputEl = document.createElement('textarea');
+                inputEl.id = `editor-${field}`;
+                inputEl.rows = rows || 4;
+                inputEl.placeholder = label;
+                inputEl.value = value || '';
+                div.appendChild(inputEl);
+            } else if (type === 'url') {
+                // URL input
+                inputEl = document.createElement('input');
+                inputEl.type = 'url';
+                inputEl.id = `editor-${field}`;
+                inputEl.placeholder = 'https://example.com';
+                inputEl.value = value || '';
+                if (auto_fetch) {
+                    inputEl.setAttribute('data-auto-fetch', 'true');
+                }
+                div.appendChild(inputEl);
+            } else if (type === 'number') {
+                inputEl = document.createElement('input');
+                inputEl.type = 'number';
+                inputEl.id = `editor-${field}`;
+                inputEl.value = value || '';
+                div.appendChild(inputEl);
+            } else if (type === 'boolean') {
+                inputEl = document.createElement('input');
+                inputEl.type = 'checkbox';
+                inputEl.id = `editor-${field}`;
+                inputEl.checked = !!value;
+                div.appendChild(inputEl);
+            } else if (type === 'date') {
+                inputEl = document.createElement('input');
+                inputEl.type = 'date';
+                inputEl.id = `editor-${field}`;
+                inputEl.value = value ? value.split('T')[0] : '';
+                div.appendChild(inputEl);
+            } else if (type === 'datetime') {
+                inputEl = document.createElement('input');
+                inputEl.type = 'datetime-local';
+                inputEl.id = `editor-${field}`;
+                inputEl.value = value ? value.slice(0, 16) : '';
+                div.appendChild(inputEl);
+            } else if (type === 'enum' && fieldDef?.options) {
+                inputEl = document.createElement('select');
+                inputEl.id = `editor-${field}`;
+                fieldDef.options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt;
+                    option.selected = opt === value;
+                    inputEl.appendChild(option);
+                });
+                div.appendChild(inputEl);
+            } else {
+                // Default text input
+                inputEl = document.createElement('input');
+                inputEl.type = 'text';
+                inputEl.id = `editor-${field}`;
+                inputEl.placeholder = label;
+                inputEl.value = value || '';
+                div.appendChild(inputEl);
+            }
+
+            return div;
+        }
+
+        // Get value from an editor field
+        function getEditorFieldValue(fieldName, fieldDef) {
+            const type = fieldDef?.type || 'text';
+
+            // Special handling for thumbnail
+            if (type === 'thumbnail') {
+                return editorManualThumbnail || editingCard.card[fieldName] || null;
+            }
+
+            const el = document.getElementById(`editor-${fieldName}`);
+            if (!el) return null;
+
+            if (type === 'boolean') {
+                return el.checked;
+            } else if (type === 'number') {
+                return el.value ? parseFloat(el.value) : null;
+            } else if (type === 'datetime' && el.value) {
+                return new Date(el.value).toISOString();
+            } else if (type === 'date' && el.value) {
+                return el.value;
+            }
+
+            return el.value;
+        }
+
+        // Switch between write/preview tabs
+        function switchEditorTab(tab) {
+            const tabs = document.querySelectorAll('#editorBody .editor-tab');
+            const textarea = document.querySelector('#editorBody textarea.markdown-editor');
+            const preview = document.getElementById('editorPreview');
+
+            if (!textarea || !preview) return;
+
+            tabs.forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            if (tab === 'preview') {
+                textarea.style.display = 'none';
+                preview.style.display = 'block';
+                preview.classList.add('active');
+
+                // Render markdown preview
+                const content = textarea.value;
+                const format = editingCard.card.format || 'markdown';
+                if (format === 'markdown') {
+                    preview.innerHTML = renderMarkdownWithLinks(content);
+                } else {
+                    preview.innerHTML = `<pre>${escapeHtml(content)}</pre>`;
+                }
+            } else {
+                textarea.style.display = 'block';
+                preview.style.display = 'none';
+                preview.classList.remove('active');
+            }
+        }
+
+        // Initialize thumbnail drag-drop for editor
+        function initEditorThumbnailUpload() {
+            const previewEl = document.getElementById('editorThumbnailPreview');
+            const fileInput = document.getElementById('editorThumbnailFile');
+            if (!previewEl || !fileInput) return;
+
+            // Click to upload
+            previewEl.addEventListener('click', () => fileInput.click());
+
+            // File input change
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    handleEditorThumbnailFile(e.target.files[0]);
+                }
+            });
+
+            // Drag and drop
+            previewEl.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                previewEl.classList.add('drag-over');
+            });
+
+            previewEl.addEventListener('dragleave', () => {
+                previewEl.classList.remove('drag-over');
+            });
+
+            previewEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+                previewEl.classList.remove('drag-over');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleEditorThumbnailFile(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
+        // Handle thumbnail file selection
+        function handleEditorThumbnailFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showToast('Please select an image file');
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('Image must be smaller than 5MB');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                editorManualThumbnail = e.target.result;
+                const previewEl = document.getElementById('editorThumbnailPreview');
+                if (previewEl) {
+                    previewEl.classList.add('has-image');
+                    previewEl.style.backgroundImage = `url('${editorManualThumbnail}')`;
+                    previewEl.style.backgroundSize = 'cover';
+                    previewEl.style.backgroundPosition = 'center';
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Update Pyodide status in editor
+        function updateEditorPyodideStatus() {
+            const statusEl = document.getElementById('editorStatus');
+            if (!statusEl) return;
+
+            if (pyodideReady) {
+                statusEl.textContent = '🟢 Python ready';
+            } else if (pyodideLoading) {
+                statusEl.textContent = '⏳ Loading Python...';
+            } else {
+                statusEl.textContent = 'Will load on first run';
+            }
+        }
+
+        // Run code in editor (for code template)
+        async function runEditorCode() {
+            const codeEl = document.getElementById('editor-code');
+            const outputEl = document.getElementById('editorCodeOutput');
+            const outputContainer = document.getElementById('editorOutput');
+            const runBtn = document.getElementById('editorRunBtn');
+
+            if (!codeEl || !outputEl) return;
+
+            const code = codeEl.value;
+            if (!code.trim()) {
+                showToast('Please enter some code first');
+                return;
+            }
+
+            // Show output area
+            outputContainer.style.display = 'block';
+            outputEl.innerHTML = '<div style="color: var(--text-muted);">⏳ Running...</div>';
+
+            if (runBtn) {
+                runBtn.disabled = true;
+                runBtn.innerHTML = '⏳ Running...';
+            }
+
+            try {
+                const py = await initPyodide();
+                const result = await executePythonCode(py, code);
+                outputEl.innerHTML = result;
+            } catch (error) {
+                outputEl.innerHTML = `<pre class="error">${escapeHtml(error.toString())}</pre>`;
+            }
+
+            if (runBtn) {
+                runBtn.disabled = false;
+                runBtn.innerHTML = '▶ Run';
+            }
+
+            updateEditorPyodideStatus();
+        }
+
+        // Close the editor modal
+        function closeEditor() {
+            document.getElementById('editorModal').classList.remove('active');
+            document.getElementById('editorBody').innerHTML = '';
+            document.getElementById('editorActions').innerHTML = '';
+            document.getElementById('editorOutput').style.display = 'none';
+            document.getElementById('editorCodeOutput').innerHTML = '';
+            editingCard = null;
+            editorManualThumbnail = null;
+        }
+
+        // Save the editor content
+        async function saveEditor() {
+            if (!editingCard) return;
+
+            const { templateName, sectionId, card, isNew } = editingCard;
+            const template = templateRegistry[templateName];
+            if (!template) return;
+
+            const submitBtn = document.getElementById('editorSubmitBtn');
+            const originalText = submitBtn.textContent;
+
+            // Validate required fields and collect values
+            const fields = template.editor?.fields || [];
+            const cardData = { ...card, template: templateName };
+            let hasError = false;
+
+            for (const fieldConfig of fields) {
+                const fieldDef = template.schema[fieldConfig.field];
+                const value = getEditorFieldValue(fieldConfig.field, fieldDef);
+
+                if (fieldDef?.required && !value) {
+                    showToast(`${fieldConfig.label} is required`);
+                    hasError = true;
+                    break;
+                }
+
+                cardData[fieldConfig.field] = value;
+            }
+
+            if (hasError) return;
+
+            // Get selected section (may have changed)
+            const sectionSelect = document.getElementById('editorSection');
+            const newSectionId = sectionSelect ? sectionSelect.value : sectionId;
+
+            // Set timestamps
+            const now = new Date().toISOString();
+            if (isNew) {
+                cardData.created = now;
+            }
+            cardData.modified = now;
+
+            // Handle thumbnail auto-generation for bookmarks
+            if (templateName === 'bookmark' && cardData.url) {
+                if (editorManualThumbnail) {
+                    cardData.thumbnail = editorManualThumbnail;
+                } else if (!cardData.thumbnail || isNew) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span class="loading-spinner"></span> Generating thumbnail...';
+                    try {
+                        cardData.thumbnail = await generateThumbnail(cardData.url);
+                    } catch (e) {
+                        console.log('Thumbnail generation failed:', e);
+                    }
+                }
+            }
+
+            // Handle auto-execute for code
+            if (templateName === 'code' && cardData.code) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '⏳ Running & Saving...';
+                try {
+                    const py = await initPyodide();
+                    cardData.output = await executePythonCode(py, cardData.code);
+                    cardData.showOutput = true;
+                } catch (e) {
+                    cardData.output = `<pre class="error">${escapeHtml(e.toString())}</pre>`;
+                }
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading-spinner"></span> Saving...';
+
+            try {
+                // Handle system notes
+                if (sectionId === '_system') {
+                    const idx = data.systemNotes.findIndex(n => n.id === card.id);
+                    if (idx >= 0) {
+                        // Preserve system note properties
+                        cardData.system = true;
+                        cardData.filename = card.filename;
+                        data.systemNotes[idx] = { ...data.systemNotes[idx], ...cardData };
+                    }
+                    await saveData();
+                    await saveCardFile('_system', cardData);
+                    closeEditor();
+                    render();
+                    showToast('System note saved');
+                    return;
+                }
+
+                // Handle section change
+                if (!isNew && newSectionId !== sectionId) {
+                    // Remove from old section
+                    const oldSection = data.sections.find(s => s.id === sectionId);
+                    if (oldSection) {
+                        const idx = oldSection.items.findIndex(i => i.id === card.id);
+                        if (idx >= 0) {
+                            oldSection.items.splice(idx, 1);
+                            // Delete old file
+                            await deleteItemFile(sectionId, card);
+                        }
+                    }
+                    // Add to new section
+                    const newSection = data.sections.find(s => s.id === newSectionId);
+                    if (newSection) {
+                        newSection.items.push(cardData);
+                    }
+                } else {
+                    // Same section - update or add
+                    const section = data.sections.find(s => s.id === newSectionId);
+                    if (section) {
+                        if (isNew) {
+                            section.items.push(cardData);
+                        } else {
+                            const idx = section.items.findIndex(i => i.id === card.id);
+                            if (idx >= 0) {
+                                // Handle title change (requires file rename)
+                                if (card.title && card.title !== cardData.title) {
+                                    await deleteItemFile(newSectionId, card);
+                                }
+                                section.items[idx] = cardData;
+                            }
+                        }
+                    }
+                }
+
+                await saveData();
+                await saveCardFile(newSectionId, cardData);
+
+                closeEditor();
+                render();
+                showToast(isNew ? `${template.ui?.button_label || 'Card'} created` : 'Changes saved');
+
+            } catch (error) {
+                console.error('Save error:', error);
+                showToast('Error saving: ' + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        }
+
+        // Handle generic editor actions
+        function handleEditorAction(action) {
+            if (action === 'execute') {
+                runEditorCode();
+            }
+            // Add other actions as needed
         }
 
         // ========== SECTION: DATA_PERSISTENCE ==========
@@ -3690,16 +4327,31 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
             const sectionSlug = slugify(section.name);
             const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug, { create: true });
-            const titleSlug = slugify(card.title);
 
             // Use serializeCard to get the file content and extension
             const { content, extension, format } = serializeCard(card);
+
+            // Preserve original filename if card was loaded from filesystem
+            // Otherwise derive from title (for new cards)
+            let baseFilename;
+            if (card._source?.filename) {
+                // Strip extension from original filename to get base
+                const origFilename = card._source.filename;
+                if (origFilename.endsWith(extension)) {
+                    baseFilename = origFilename.slice(0, -extension.length);
+                } else {
+                    // Extension changed or doesn't match - use original without any known extension
+                    baseFilename = origFilename.replace(/\.(md|code\.py|bookmark\.json|card\.yaml)$/, '');
+                }
+            } else {
+                baseFilename = slugify(card.title);
+            }
 
             // Special handling for bookmarks: save thumbnail to assets folder
             if ((card.type === 'bookmark' || card.template === 'bookmark') && card.thumbnail && card.thumbnail.startsWith('data:')) {
                 const assetsDir = await notebookDirHandle.getDirectoryHandle('assets', { create: true });
                 const thumbsDir = await assetsDir.getDirectoryHandle('thumbnails', { create: true });
-                const thumbFilename = `${card.id || titleSlug}.png`;
+                const thumbFilename = `${card.id || baseFilename}.png`;
                 const thumbnailPath = `../../assets/thumbnails/${thumbFilename}`;
 
                 try {
@@ -3716,7 +4368,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                     bookmarkJson.thumbnail = thumbnailPath;
                     const updatedContent = JSON.stringify(bookmarkJson, null, 2);
 
-                    const filename = `${titleSlug}${extension}`;
+                    const filename = `${baseFilename}${extension}`;
                     const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
                     const writable = await fileHandle.createWritable();
                     await writable.write(updatedContent);
@@ -3729,7 +4381,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             }
 
             // Write main card file
-            const filename = `${titleSlug}${extension}`;
+            const filename = `${baseFilename}${extension}`;
             const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
             const writable = await fileHandle.createWritable();
             await writable.write(content);
@@ -3742,7 +4394,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 for (const companion of extConfig.companionFiles) {
                     const fieldValue = card[companion.field];
                     if (fieldValue) {
-                        const companionFilename = `${titleSlug}${companion.suffix}`;
+                        const companionFilename = `${baseFilename}${companion.suffix}`;
                         const companionHandle = await sectionDir.getFileHandle(companionFilename, { create: true });
                         const companionWritable = await companionHandle.createWritable();
                         await companionWritable.write(fieldValue);
@@ -3798,13 +4450,16 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 const sectionSlug = slugify(section.name);
                 const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug);
 
+                // Support both legacy type field and new template field (Phase 3)
+                const itemType = item.template || item.type;
+
                 // Use stored _filename if available (from filesystem load), otherwise derive from title
                 // This handles cases where filename doesn't match slugify(title)
-                if (item.type === 'note') {
+                if (itemType === 'note') {
                     const filename = item._filename || `${slugify(item.title)}.md`;
                     await sectionDir.removeEntry(filename);
                     recordSave(`sections/${sectionSlug}/${filename}`);
-                } else if (item.type === 'code') {
+                } else if (itemType === 'code') {
                     const baseFilename = item._filename || slugify(item.title);
                     const filename = `${baseFilename}.code.py`;
                     await sectionDir.removeEntry(filename);
@@ -3814,7 +4469,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                         await sectionDir.removeEntry(outputFilename);
                         recordSave(`sections/${sectionSlug}/${outputFilename}`);
                     } catch (e) { /* output might not exist */ }
-                } else if (item.type === 'bookmark') {
+                } else if (itemType === 'bookmark') {
                     const baseFilename = item._filename || slugify(item.title);
                     const filename = `${baseFilename}.bookmark.json`;
                     await sectionDir.removeEntry(filename);
@@ -5500,13 +6155,6 @@ sys.stderr = sys.__stderr__
                 .filter(t => t.ui?.show_create_button !== false)
                 .sort((a, b) => (a.ui?.sort_order || 99) - (b.ui?.sort_order || 99));
 
-            // Map template names to modal openers (for backwards compatibility with existing modals)
-            const modalOpeners = {
-                note: `openNoteModal('${sectionId}')`,
-                code: `openCodeModal('${sectionId}')`,
-                bookmark: `openBookmarkModal('${sectionId}')`
-            };
-
             // Button styles by template type
             const buttonStyles = {
                 note: 'btn-note',
@@ -5515,7 +6163,8 @@ sys.stderr = sys.__stderr__
             };
 
             return templates.map(t => {
-                const opener = modalOpeners[t.name] || `openNoteModal('${sectionId}')`; // fallback
+                // Use generic editor (Phase 3)
+                const opener = `openEditor('${t.name}', '${sectionId}')`;
                 const style = buttonStyles[t.name] || 'btn-secondary';
                 const label = t.ui?.button_label || t.name;
                 const icon = t.ui?.icon || '';
@@ -5670,6 +6319,23 @@ sys.stderr = sys.__stderr__
             }
         });
 
+        // Generic editor keyboard handling (Phase 3)
+        document.getElementById('editorModal').addEventListener('keydown', (e) => {
+            // Tab in code editors
+            if (e.key === 'Tab' && e.target.classList.contains('code-editor')) {
+                e.preventDefault();
+                const start = e.target.selectionStart;
+                const end = e.target.selectionEnd;
+                e.target.value = e.target.value.substring(0, start) + '    ' + e.target.value.substring(end);
+                e.target.selectionStart = e.target.selectionEnd = start + 4;
+            }
+            // Ctrl/Cmd+Enter to save
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                saveEditor();
+            }
+        });
+
         // Close modals on overlay click
         document.querySelectorAll('.modal-overlay').forEach(overlay => {
             overlay.addEventListener('click', (e) => {
@@ -5686,9 +6352,11 @@ sys.stderr = sys.__stderr__
                 closeBookmarkModal();
                 closeNoteModal();
                 closeCodeModal();
+                closeEditor();  // Generic editor (Phase 3)
                 closeNoteViewer();
                 closeBookmarkViewer();
                 closeCodeViewer();
+                closeViewer();  // Generic viewer (Phase 2)
             }
         });
 

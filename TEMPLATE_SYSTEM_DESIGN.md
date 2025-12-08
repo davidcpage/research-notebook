@@ -1439,7 +1439,7 @@ function renderCardPreview(card, template) {
 |-------|--------|-------|
 | Phase 1: Template Infrastructure | ✅ Complete | Generic loading/saving, template files created on new notebook |
 | Phase 2: Generic Rendering | ✅ Complete | Generic card renderer and viewer, CSS with data-template selectors |
-| Phase 3: Generic Editor | ⏳ Not started | Still using type-specific modals |
+| Phase 3: Generic Editor | ✅ Complete | Generic editor modal, template-driven forms, all card types supported |
 | Phase 4: Polish | ⏳ Not started | |
 
 **Phase 1 Implementation Details:**
@@ -1469,7 +1469,26 @@ function renderCardPreview(card, template) {
 - ✅ Generic viewer modal HTML added (`#viewerModal`)
 - ✅ Legacy type-specific code removed: `renderNoteCard()`, `renderBookmarkCard()`, `renderCodeCard()`, `openNoteViewer()`, `openBookmarkViewer()`, `openCodeViewer()`, and associated HTML modals and CSS
 
-**Code Location:** TEMPLATE_SYSTEM section in `research_notebook_with_code.html` (lines ~1715-2897)
+**Phase 3 Implementation Details:**
+
+- ✅ `openEditor(templateName, sectionId, card)` - Generic editor that builds form from template definition
+- ✅ `closeEditor()` - Clears dynamic form and closes modal
+- ✅ `saveEditor()` - Validates fields, handles thumbnail generation, code execution, file operations
+- ✅ `renderEditorField(fieldConfig, fieldDef, value)` - Renders appropriate input widget for field type
+- ✅ `getEditorFieldValue(fieldName, fieldDef)` - Extracts values from dynamic form
+- ✅ Field types supported: text, markdown (with preview), code (with monospace), url, thumbnail (drag-drop upload), number, boolean, date, datetime, enum
+- ✅ Template-driven actions: Run button for code templates with Pyodide status
+- ✅ `editViewerCard()` updated to use `openEditor()` instead of type-specific modals
+- ✅ `renderTemplateButtons()` updated to call `openEditor()` for toolbar buttons
+- ✅ Keyboard handling: Tab in code editors, Ctrl/Cmd+Enter to save, Escape to close
+- ✅ `deleteItemFile()` updated to support `template` field in addition to `type`
+- ✅ Generic editor modal HTML (`#editorModal`) with dynamic body and action buttons
+
+**Code Location:** GENERIC_EDITOR section in `research_notebook_with_code.html` (lines ~2951-3531)
+
+**Note:** Legacy type-specific editor modals (`#noteModal`, `#bookmarkModal`, `#codeModal`) are retained but no longer used. They can be removed in Phase 4 cleanup.
+
+**Code Location (Template System):** TEMPLATE_SYSTEM section in `research_notebook_with_code.html` (lines ~1715-2950)
 
 ---
 
@@ -1525,23 +1544,23 @@ function renderCardPreview(card, template) {
 
 **Deliverable:** All rendering driven by templates. Adding a new template shows cards/viewers automatically.
 
-### Phase 3: Generic Editor
+### Phase 3: Generic Editor ✅
 
 **Goal:** Edit modal generated from template schema
 
-1. **Field editor components**
+1. **Field editor components** ✅
    - Text input, textarea, URL input, number input
    - Markdown editor with preview toggle
    - Code editor with monospace font
    - Thumbnail uploader with drag-drop
    - Date/datetime pickers
 
-2. **Generic edit modal**
+2. **Generic edit modal** ✅
    - Build form from `template.editor.fields`
    - Validate against schema
    - Handle template-specific actions (e.g., "Run" for code)
 
-3. **Template-driven toolbar**
+3. **Template-driven toolbar** ✅
    - Generate "+ New X" buttons from loaded templates
    - Respect `ui.show_create_button` and `ui.sort_order`
 
@@ -1549,17 +1568,46 @@ function renderCardPreview(card, template) {
 
 ### Phase 4: Polish and Documentation
 
-1. **Settings UI**
+1. **Remove legacy editor modals** (no longer used after Phase 3)
+
+   **HTML to remove** (in HTML_BODY_AND_MODALS section):
+   - `#bookmarkModal` - lines ~1442-1484
+   - `#noteModal` - lines ~1486-1521
+   - `#codeModal` - lines ~1523-1564
+
+   **JavaScript sections to remove:**
+   - `BOOKMARK_MODAL` section (~lines 5040-5163): `openBookmarkModal()`, `closeBookmarkModal()`, `saveBookmark()`
+   - `NOTE_MODAL` section (~lines 5164-5320): `openNoteModal()`, `closeNoteModal()`, `saveNote()`, `switchEditorTab()` (old version)
+   - `CODE_MODAL` section (~lines 5549-5663): `openCodeModal()`, `closeCodeModal()`, `saveCode()`, `runCode()` (old version)
+
+   **State variables to remove** (in STATE_AND_CONFIG):
+   - `editingBookmark`
+   - `editingNote`
+   - `editingCode`
+   - `manualThumbnail` (replaced by `editorManualThumbnail`)
+
+   **Event handlers to remove** (in EVENT_HANDLERS_AND_INIT):
+   - Enter key handlers for `#bookmarkUrl`, `#noteTitle`, `#codeTitle`
+   - Tab key handler for `#codeContent`
+   - `initThumbnailDragDrop()` call and function
+
+   **Escape handler cleanup:**
+   - Remove calls to `closeBookmarkModal()`, `closeNoteModal()`, `closeCodeModal()`
+   - Remove calls to legacy viewers: `closeNoteViewer()`, `closeBookmarkViewer()`, `closeCodeViewer()`
+
+   **CSS:** No CSS to remove - all classes (`.code-editor`, `.markdown-editor`, `.thumbnail-upload`, `.editor-tabs`, `.code-output`, etc.) are reused by the generic editor.
+
+2. **Settings UI**
    - Show loaded templates
    - Edit template files (or link to them)
    - Manage `theme.css`
 
-2. **Error handling**
+3. **Error handling**
    - Graceful handling of malformed templates
    - Validation warnings for unknown fields
    - Migration helpers for old notebooks
 
-3. **Documentation**
+4. **Documentation**
    - Template authoring guide
    - Field type reference
    - CSS customization guide
