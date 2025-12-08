@@ -6413,7 +6413,7 @@ sys.stderr = sys.__stderr__
             // Otherwise search by title (case-insensitive)
             const searchTitle = linkText.toLowerCase();
             for (const section of data.sections) {
-                const item = section.items.find(i => i.title.toLowerCase() === searchTitle);
+                const item = section.items.find(i => i.title && i.title.toLowerCase() === searchTitle);
                 if (item) {
                     return { ...item, sectionId: section.id };
                 }
@@ -6429,7 +6429,7 @@ sys.stderr = sys.__stderr__
             let targetTitle = null;
             for (const section of data.sections) {
                 const item = section.items.find(i => i.id === itemId);
-                if (item) {
+                if (item && item.title) {
                     targetTitle = item.title.toLowerCase();
                     break;
                 }

@@ -53,6 +53,9 @@ To add a new card type (Phase 2 - cards/viewers are now automatic):
 
 Note: Card rendering and viewer display now work automatically via `renderCard()` and `openViewer()`.
 
+**Debugging JavaScript errors:**
+When reporting errors, always check browser DevTools (Console tab) for the full stack trace, not just the toast/popup message. The stack trace shows the exact line number and call chain, which is essential for debugging.
+
 **Debugging Pyodide:**
 1. Check browser console for `[Pyodide]` logs
 2. Verify function is named `initPyodide()` not `loadPyodide()` (name collision!)
