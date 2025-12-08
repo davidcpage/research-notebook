@@ -1467,9 +1467,9 @@ function renderCardPreview(card, template) {
 - ✅ `render()` updated to use generic `renderCard()` for all items
 - ✅ `navigateToItem()` updated to use generic `openViewer()`
 - ✅ Generic viewer modal HTML added (`#viewerModal`)
-- ✅ Legacy type-specific viewers retained for backwards compatibility during transition
+- ✅ Legacy type-specific code removed: `renderNoteCard()`, `renderBookmarkCard()`, `renderCodeCard()`, `openNoteViewer()`, `openBookmarkViewer()`, `openCodeViewer()`, and associated HTML modals and CSS
 
-**Code Location:** TEMPLATE_SYSTEM section in `research_notebook_with_code.html` (lines ~2655-3250)
+**Code Location:** TEMPLATE_SYSTEM section in `research_notebook_with_code.html` (lines ~1715-2897)
 
 ---
 

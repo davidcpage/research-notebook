@@ -334,12 +334,12 @@ All viewers share consistent styling:
 - Actions: Run (re-execute), Edit, Delete
 
 **CSS Specificity**:
-- Viewer classes need `.modal.{viewer-type}` selector for proper specificity
-- Base `.modal` class (500px width) comes after some viewer definitions
-- Use combined selector to override: `.modal.code-viewer`, `.modal.bookmark-viewer`, etc.
+- Viewer styles use `.modal.viewer[data-template="..."]` selectors
+- Base `.modal.viewer` class provides common viewer styles
+- Template-specific overrides via data attribute selectors
 
 **Internal Link Behavior**:
-- Event delegation checks if link is inside viewer modal: `link.closest('#noteViewerModal, #bookmarkViewerModal, #codeViewerModal')`
+- Event delegation checks if link is inside viewer modal: `link.closest('#viewerModal')`
 - Links only work in viewer modals, not in card previews
 - Clicking internal link closes current viewer and opens target item's viewer
 
