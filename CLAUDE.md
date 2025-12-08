@@ -38,15 +38,20 @@ The app uses a template system defined in TEMPLATE_SYSTEM section. Key concepts:
 - `loadCard()`: Generic function to parse any card file using extension registry
 - `serializeCard()`: Generic function to serialize any card to its file format
 - `saveCardFile()`: Generic function to save any card type
+- `renderCard()`: Generic card renderer using template definitions (Phase 2)
+- `openViewer()`: Generic viewer modal that adapts to any template (Phase 2)
 - Templates are stored as `*.template.yaml` files in notebook root
 - Extension mappings are in `extensions.yaml`
+- Optional `theme.css` for custom styling
 
-To add a new card type:
-1. Add template to `getDefaultTemplates()` in TEMPLATE_SYSTEM
+To add a new card type (Phase 2 - cards/viewers are now automatic):
+1. Add template to `getDefaultTemplates()` in TEMPLATE_SYSTEM (or create `.template.yaml` file)
 2. Add extension mapping to `getDefaultExtensionRegistry()` if using new file format
-3. Add modal HTML (HTML_BODY_AND_MODALS)
-4. Add modal/viewer functions
-5. Add `renderXxxCard()` function in RENDER_FUNCTIONS
+3. Define `card.layout` (document, image, split-pane, fields) and `viewer.layout` in template
+4. Add editor modal HTML (HTML_BODY_AND_MODALS) - Phase 3 will make this automatic
+5. Add editor open/save functions - Phase 3 will make this automatic
+
+Note: Card rendering and viewer display now work automatically via `renderCard()` and `openViewer()`.
 
 **Debugging Pyodide:**
 1. Check browser console for `[Pyodide]` logs
@@ -121,10 +126,12 @@ data = {
 - `saveData()`: Async function that writes to IndexedDB (no size limits like localStorage)
 - **IMPORTANT**: All `saveData()` calls must use `await` since it's async
 
-**Core Rendering** (RENDER_FUNCTIONS section):
+**Core Rendering** (RENDER_FUNCTIONS + TEMPLATE_SYSTEM sections):
 - `render()`: Main function that regenerates entire UI from data model
+- `renderCard()`: Generic card renderer using template definitions (in TEMPLATE_SYSTEM)
+- `openViewer()`: Generic viewer modal (in TEMPLATE_SYSTEM)
 - Called after any data modification
-- Uses template literals to generate HTML dynamically
+- Cards use `.card[data-template="..."]` CSS selectors for styling
 
 **Item Types**:
 1. **Bookmarks** (BOOKMARK_MODAL section): URL, title, description, auto-fetches metadata

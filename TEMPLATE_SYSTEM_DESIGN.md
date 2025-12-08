@@ -1438,7 +1438,7 @@ function renderCardPreview(card, template) {
 | Phase | Status | Notes |
 |-------|--------|-------|
 | Phase 1: Template Infrastructure | ✅ Complete | Generic loading/saving, template files created on new notebook |
-| Phase 2: Generic Rendering | ⏳ Not started | Still using type-specific renderers |
+| Phase 2: Generic Rendering | ✅ Complete | Generic card renderer and viewer, CSS with data-template selectors |
 | Phase 3: Generic Editor | ⏳ Not started | Still using type-specific modals |
 | Phase 4: Polish | ⏳ Not started | |
 
@@ -1454,7 +1454,22 @@ function renderCardPreview(card, template) {
 - ✅ New notebooks get default "Research" section with all template buttons
 - ✅ YAML files (`.yaml`, `.template.yaml`) visible as editable system cards
 
-**Code Location:** TEMPLATE_SYSTEM section in `research_notebook_with_code.html` (lines ~2130-2700)
+**Phase 2 Implementation Details:**
+
+- ✅ `renderCard()` - Generic card renderer using template definitions
+- ✅ Layout renderers: `renderDocumentPreview()`, `renderImagePreview()`, `renderSplitPanePreview()`, `renderFieldsPreview()`
+- ✅ `openViewer()` - Generic viewer modal that adapts to any template
+- ✅ Viewer layouts: `renderViewerDocument()`, `renderViewerImage()`, `renderViewerSplitPane()`, `renderViewerSections()`
+- ✅ `renderViewerActions()` - Template-driven action buttons (Run for code, Open for bookmarks)
+- ✅ CSS refactored to use `.card[data-template="..."]` and `.modal.viewer[data-template="..."]` selectors
+- ✅ `loadThemeCss()` - Loads optional `theme.css` from notebook directory
+- ✅ `injectTemplateStyles()` - Injects CSS variables from template style definitions
+- ✅ `render()` updated to use generic `renderCard()` for all items
+- ✅ `navigateToItem()` updated to use generic `openViewer()`
+- ✅ Generic viewer modal HTML added (`#viewerModal`)
+- ✅ Legacy type-specific viewers retained for backwards compatibility during transition
+
+**Code Location:** TEMPLATE_SYSTEM section in `research_notebook_with_code.html` (lines ~2655-3250)
 
 ---
 
@@ -1493,17 +1508,17 @@ function renderCardPreview(card, template) {
 
 **Goal:** Card and viewer rendering driven by templates
 
-1. **Generic card renderer**
+1. **Generic card renderer** ✅
    - Replace `renderNoteCard()`, `renderCodeCard()`, `renderBookmarkCard()` with `renderCard()`
    - Implement layout renderers (document, image, split-pane, fields)
    - Apply template CSS variables
 
-2. **Generic viewer**
+2. **Generic viewer** ✅
    - Single viewer modal that adapts to template
    - Implement viewer layouts (document, sections, split-pane, image)
    - Template-driven action buttons
 
-3. **CSS refactoring**
+3. **CSS refactoring** ✅
    - Convert existing styles to use `[data-template="..."]` selectors
    - Extract template-specific variables
    - Support `theme.css` loading

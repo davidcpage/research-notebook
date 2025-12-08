@@ -58,6 +58,7 @@
             color: var(--text-primary);
             min-height: 100vh;
             line-height: 1.6;
+            overflow-x: hidden;
         }
 
         header {
@@ -1103,6 +1104,539 @@
             color: var(--code-text) !important;
         }
 
+        /* ========== Generic Card Styles (Phase 2 Template System) ========== */
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .card:hover {
+            box-shadow: 0 8px 30px var(--shadow);
+            transform: translateY(-2px);
+        }
+
+        .card.highlighted {
+            animation: highlightPulse 2s ease-out;
+        }
+
+        .card-preview {
+            width: 100%;
+            height: 180px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .card-content {
+            padding: 1.25rem;
+        }
+
+        .card-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0;
+            line-height: 1.4;
+            color: var(--text-primary);
+        }
+
+        .card-meta {
+            padding: 0 1.25rem 0.75rem 1.25rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Card Preview Layouts */
+        .preview-placeholder {
+            font-size: 3rem;
+            color: var(--text-muted);
+            opacity: 0.2;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .preview-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center top;
+        }
+
+        /* Document preview (zoomed-out page effect) */
+        .preview-page {
+            width: 100%;
+            height: 100%;
+            background: #f9f7f3;
+            box-shadow: 0 0 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+            position: relative;
+            /* Note: parent .card-preview already has padding for note cards */
+        }
+
+        .preview-scaler {
+            transform: scale(0.45);
+            transform-origin: top left;
+            width: 222%;
+            padding: 18px 24px;
+        }
+
+        .preview-content {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            overflow: hidden;
+        }
+
+        .preview-page::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background: linear-gradient(transparent, #f9f7f3);
+            pointer-events: none;
+        }
+
+        /* Code preview - dark background */
+        .preview-code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: var(--code-text);
+            line-height: 1.5;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin: 0;
+            padding: 1.25rem;
+            background: var(--code-bg);
+        }
+
+        .preview-code code {
+            font-family: inherit;
+            font-size: inherit;
+            background: transparent !important;
+            padding: 0;
+            color: var(--code-text);
+        }
+
+        .preview-code::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(transparent, var(--code-bg));
+            pointer-events: none;
+        }
+
+        /* Split pane preview */
+        .preview-split {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            gap: 1px;
+        }
+
+        .preview-split-left {
+            padding: 1rem;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid var(--border);
+        }
+
+        .preview-split-right {
+            padding: 0.75rem;
+            overflow: hidden;
+            position: relative;
+            background: var(--code-bg);
+        }
+
+        .split-output-content {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .split-output-content img {
+            max-height: 150px;
+            max-width: 100%;
+            display: block;
+        }
+
+        .split-code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.4rem;
+            color: var(--code-text);
+            line-height: 1.2;
+            margin: 0;
+            overflow: hidden;
+            background: var(--code-bg);
+            padding: 0.5rem;
+            height: 100%;
+        }
+
+        .split-code code {
+            font-family: inherit;
+            font-size: inherit;
+            background: transparent !important;
+            color: var(--code-text);
+        }
+
+        /* Fields preview */
+        .preview-fields {
+            padding: 1rem;
+        }
+
+        .preview-field {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .preview-field-label {
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        /* Template-specific card styles via data-template */
+        .card[data-template="note"] {
+            border-color: var(--note-border);
+        }
+
+        .card[data-template="note"] .card-preview {
+            background: #e8e3d8;
+            padding: 0 15%;
+        }
+
+        .card[data-template="code"] {
+            border-color: #d0dcd0;
+        }
+
+        .card[data-template="code"] .card-preview {
+            background: var(--code-bg);
+        }
+
+        .card[data-template="code"] .preview-split-left {
+            background: #eef4ee;
+            border-right: 1px solid #d0dcd0;
+        }
+
+        .card[data-template="code"] .preview-split-right {
+            background: var(--code-bg);
+        }
+
+        .card[data-template="bookmark"] .card-preview {
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--border) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* ========== Generic Viewer Styles (Phase 2 Template System) ========== */
+        .modal.viewer {
+            max-width: 900px;
+            min-height: 60vh;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            width: 90%;
+            box-sizing: border-box;
+        }
+
+        .modal.viewer * {
+            box-sizing: border-box;
+        }
+
+        .modal.viewer .modal-header {
+            padding: 1.25rem 1.25rem 1rem;
+            background: var(--bg-secondary);
+            border-bottom: none;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .modal.viewer .modal-header h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            flex: 1;
+            margin: 0;
+        }
+
+        .viewer-content {
+            padding: 1.25rem;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        /* Remove padding when content has full-width layouts */
+        .viewer-content:has(.viewer-split-pane),
+        .viewer-content:has(.viewer-code-only) {
+            padding: 0;
+        }
+
+        .viewer-backlinks {
+            padding: 0 1.25rem;
+        }
+
+        .viewer-footer {
+            padding: 1rem 1.25rem;
+            background: var(--bg-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid var(--border);
+        }
+
+        .viewer-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .viewer-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Viewer content layouts */
+        .viewer-markdown {
+            line-height: 1.7;
+            font-size: 0.925rem;
+            color: var(--text-secondary);
+        }
+
+        .viewer-markdown h1 { font-family: 'Playfair Display', serif; font-size: 1.5rem; margin-bottom: 0.75rem; color: var(--text-primary); }
+        .viewer-markdown h2 { font-family: 'Playfair Display', serif; font-size: 1.25rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .viewer-markdown h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; margin: 1rem 0 0.5rem; color: var(--text-primary); }
+        .viewer-markdown p { margin-bottom: 0.875rem; }
+        .viewer-markdown ul, .viewer-markdown ol { margin: 0.875rem 0; padding-left: 1.5rem; }
+        .viewer-markdown li { margin-bottom: 0.375rem; }
+        .viewer-markdown code { font-family: 'Consolas', 'Monaco', monospace; background: var(--bg-primary); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.9em; }
+        .viewer-markdown pre { background: var(--bg-primary); padding: 1rem; overflow-x: auto; margin: 0.875rem 0; border-radius: 4px; max-width: 100%; }
+        .viewer-markdown pre code { background: none; padding: 0; }
+        .viewer-markdown blockquote { border-left: 3px solid var(--accent); padding-left: 1rem; margin: 0.875rem 0; color: var(--text-secondary); font-style: italic; }
+        .viewer-markdown a { color: var(--accent); text-decoration: none; }
+        .viewer-markdown a:hover { text-decoration: underline; }
+        .viewer-markdown img { max-width: 100%; height: auto; border-radius: 4px; margin: 0.5rem 0; }
+
+        .viewer-text {
+            margin: 0;
+            white-space: pre-wrap;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .viewer-empty {
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .viewer-loading {
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .viewer-error {
+            padding: 2rem;
+        }
+
+        /* Image viewer layout */
+        .viewer-image-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .viewer-thumbnail {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--border) 100%);
+            border-radius: 8px;
+        }
+
+        .viewer-thumbnail img {
+            max-width: 80%;
+            max-height: 300px;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+
+        .viewer-thumbnail .placeholder {
+            font-size: 4rem;
+            color: var(--text-muted);
+            opacity: 0.3;
+        }
+
+        .viewer-url {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .viewer-url a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .viewer-url a:hover {
+            text-decoration: underline;
+        }
+
+        .viewer-description {
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        /* Split pane viewer layout */
+        .viewer-split-pane {
+            display: flex;
+            min-height: 300px;
+            width: 100%;
+        }
+
+        .viewer-split-left {
+            flex: 0 0 60%;
+            padding: 2rem;
+            overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid var(--border);
+        }
+
+        .viewer-split-right {
+            flex: 1;
+            padding: 1.5rem;
+            overflow: auto;
+            background: var(--code-bg);
+        }
+
+        .viewer-split-right pre {
+            margin: 0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.75rem;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: var(--code-text);
+        }
+
+        .viewer-split-right code {
+            background: transparent !important;
+            color: var(--code-text);
+            font-family: inherit;
+        }
+
+        .viewer-output-content {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .viewer-output-content img {
+            max-width: 100%;
+            max-height: 300px;
+            display: block;
+            border-radius: 4px;
+        }
+
+        /* Code-only viewer - dark background */
+        .viewer-code-only {
+            padding: 2rem;
+            background: var(--code-bg);
+        }
+
+        .viewer-code-only pre {
+            margin: 0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: var(--code-text);
+        }
+
+        .viewer-code-only code {
+            background: transparent !important;
+            color: var(--code-text);
+        }
+
+        /* Sections viewer layout */
+        .viewer-section {
+            margin-bottom: 1.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .viewer-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .viewer-section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0 0 0.75rem 0;
+            color: var(--text-primary);
+        }
+
+        .viewer-section-content {
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        /* Template-specific viewer styles */
+        .modal.viewer[data-template="note"] {
+            background: #f0ebe0;
+            border: 1px solid var(--note-border);
+        }
+
+        .modal.viewer[data-template="code"] {
+            background: #f8faf8;
+            border: 1px solid #d0dcd0;
+        }
+
+        .modal.viewer[data-template="code"] .viewer-split-left {
+            background: #eef4ee;
+        }
+
+        .modal.viewer[data-template="code"] .viewer-split-right {
+            background: var(--code-bg);
+        }
+
+        .modal.viewer[data-template="bookmark"] {
+            background: var(--bg-secondary);
+        }
+
+        /* Override highlight.js in generic viewer */
+        .viewer-split-right .hljs,
+        .viewer-code-only .hljs {
+            background: transparent !important;
+            color: var(--code-text) !important;
+        }
+
         /* Internal Links */
         .internal-link {
             color: var(--link-color);
@@ -1177,6 +1711,7 @@
         .modal-overlay.active {
             opacity: 1;
             visibility: visible;
+            overflow: hidden;
         }
 
         .modal {
@@ -1990,6 +2525,22 @@ print('Hello, World!')" spellcheck="false"></textarea>
         </div>
     </div>
 
+    <!-- Generic Viewer Modal (Phase 2 Template System) -->
+    <div class="modal-overlay" id="viewerModal">
+        <div class="modal viewer" data-template="">
+            <div class="modal-header">
+                <h2 id="viewerTitle">Title</h2>
+                <button class="modal-close" onclick="closeViewer()">×</button>
+            </div>
+            <div class="viewer-content" id="viewerContent"></div>
+            <div id="viewerBacklinks" class="viewer-backlinks"></div>
+            <div class="viewer-footer">
+                <span id="viewerMeta" class="viewer-meta"></span>
+                <div id="viewerActions" class="viewer-actions"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Settings Modal -->
     <div class="modal-overlay" id="settingsModal">
         <div class="modal">
@@ -2128,9 +2679,15 @@ print('Hello, World!')" spellcheck="false"></textarea>
 
         // ========== SECTION: TEMPLATE_SYSTEM ==========
         // Template and extension registry infrastructure for unified card handling
-        // Functions: loadExtensionRegistry, loadTemplates, getDefaultExtensionRegistry,
+        // Phase 1 (Loading): loadExtensionRegistry, loadTemplates, getDefaultExtensionRegistry,
         //            getDefaultTemplates, getTemplateFileContent, getExtensionRegistryContent,
-        //            ensureTemplateFiles, parsers, serializers, loadCard, saveCard
+        //            ensureTemplateFiles, parsers, serializers, loadCard, serializeCard
+        // Phase 2 (Rendering): renderCard, renderCardPreview, renderCardTitle, renderCardMeta,
+        //            renderDocumentPreview, renderImagePreview, renderSplitPanePreview, renderFieldsPreview,
+        //            openViewer, renderViewerContent, renderViewerDocument, renderViewerImage,
+        //            renderViewerSplitPane, renderViewerSections, renderViewerActions,
+        //            closeViewer, editViewerCard, deleteViewerCard, runViewerCode,
+        //            loadThemeCss, injectTemplateStyles
 
         // Extension registry - maps file extensions to parsing behavior
         // Loaded from extensions.yaml or uses defaults
@@ -2242,8 +2799,7 @@ print('Hello, World!')" spellcheck="false"></textarea>
                     },
                     style: {
                         variables: {
-                            '--preview-bg': '#f8faf8',
-                            '--code-bg': '#f5f5f5'
+                            '--card-bg': '#f8faf8'
                         }
                     },
                     ui: {
@@ -2383,6 +2939,69 @@ print('Hello, World!')" spellcheck="false"></textarea>
             }
 
             return templateRegistry;
+        }
+
+        // Load theme.css from notebook directory (user CSS overrides)
+        async function loadThemeCss(dirHandle) {
+            if (!dirHandle) return;
+
+            // Remove any existing theme style element
+            const existingTheme = document.getElementById('theme-css');
+            if (existingTheme) {
+                existingTheme.remove();
+            }
+
+            try {
+                const themeFile = await dirHandle.getFileHandle('theme.css');
+                const file = await themeFile.getFile();
+                const content = await file.text();
+
+                // Create and inject style element
+                const style = document.createElement('style');
+                style.id = 'theme-css';
+                style.textContent = content;
+                document.head.appendChild(style);
+                console.log('[Theme] Loaded theme.css');
+            } catch (e) {
+                // File doesn't exist, that's fine
+                console.log('[Theme] No theme.css found (optional)');
+            }
+        }
+
+        // Inject CSS variables from template style definitions
+        function injectTemplateStyles() {
+            // Remove any existing template styles
+            const existing = document.getElementById('template-styles');
+            if (existing) {
+                existing.remove();
+            }
+
+            // Core variables that templates should not override
+            const protectedVars = ['--code-bg', '--code-text', '--bg-primary', '--bg-secondary',
+                                   '--text-primary', '--text-secondary', '--text-muted', '--accent',
+                                   '--border', '--shadow', '--link-color', '--link-hover', '--note-border'];
+
+            const rules = Object.values(templateRegistry).map(t => {
+                if (!t.style?.variables) return '';
+
+                const vars = Object.entries(t.style.variables)
+                    .filter(([k]) => !protectedVars.includes(k))
+                    .map(([k, v]) => `${k}: ${v};`)
+                    .join('\n  ');
+
+                return `.card[data-template="${t.name}"],
+.modal.viewer[data-template="${t.name}"] {
+  ${vars}
+}`;
+            }).filter(r => r);
+
+            if (rules.length > 0) {
+                const style = document.createElement('style');
+                style.id = 'template-styles';
+                style.textContent = rules.join('\n\n');
+                document.head.appendChild(style);
+                console.log('[Templates] Injected template CSS variables');
+            }
         }
 
         // Ensure template files exist in notebook (called on save if missing)
@@ -2701,6 +3320,544 @@ print('Hello, World!')" spellcheck="false"></textarea>
             const content = serializer.serialize(frontmatter, body);
 
             return { content, extension, format, bodyField };
+        }
+
+        // ===== Generic Card Rendering =====
+        // Template-driven card rendering that replaces type-specific renderers
+
+        // Render a card using its template definition
+        function renderCard(sectionId, card) {
+            const template = templateRegistry[card.template || card.type];
+            if (!template) {
+                console.warn(`[Render] Unknown template: ${card.template || card.type}`);
+                return '';
+            }
+
+            const preview = renderCardPreview(card, template);
+            const title = renderCardTitle(card, template);
+            const meta = renderCardMeta(card, template);
+
+            return `
+                <div class="card"
+                     data-template="${template.name}"
+                     data-item-id="${card.id}"
+                     data-section-id="${sectionId}"
+                     onclick="openViewer('${sectionId}', '${card.id}')">
+                    <div class="card-preview">${preview}</div>
+                    <div class="card-content">
+                        <h3 class="card-title">${escapeHtml(title)}</h3>
+                    </div>
+                    <div class="card-meta">
+                        ${meta}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render card preview based on template layout
+        function renderCardPreview(card, template) {
+            const layout = template.card?.layout || 'document';
+            const placeholder = template.card?.placeholder || '';
+
+            switch (layout) {
+                case 'document':
+                    return renderDocumentPreview(card, template);
+                case 'image':
+                    return renderImagePreview(card, template);
+                case 'split-pane':
+                    return renderSplitPanePreview(card, template);
+                case 'fields':
+                    return renderFieldsPreview(card, template);
+                default:
+                    return `<div class="preview-placeholder">${placeholder}</div>`;
+            }
+        }
+
+        // Document layout: rendered markdown content
+        function renderDocumentPreview(card, template) {
+            const field = template.card?.preview_field || 'content';
+            const content = card[field];
+            const placeholder = template.card?.placeholder || '📄';
+
+            if (!content) {
+                return `<div class="preview-placeholder">${placeholder}</div>`;
+            }
+
+            // Check field type for rendering
+            const fieldDef = template.schema?.[field];
+            const fieldType = fieldDef?.type || 'text';
+            const format = card.format || 'markdown';
+
+            if (fieldType === 'markdown' || field === 'content') {
+                // Use existing renderNotePreview for markdown
+                const previewHtml = renderNotePreview(content, format);
+                if (!previewHtml) {
+                    return `<div class="preview-placeholder">${placeholder}</div>`;
+                }
+                return `<div class="preview-page"><div class="preview-scaler"><div class="preview-content">${previewHtml}</div></div></div>`;
+            } else if (fieldType === 'code') {
+                const codePreview = escapeHtml(content.substring(0, 400));
+                return `<pre class="preview-code"><code class="language-${fieldDef?.language || 'python'}">${codePreview || 'No code'}</code></pre>`;
+            } else {
+                return `<div class="preview-text">${escapeHtml(content.substring(0, 300))}</div>`;
+            }
+        }
+
+        // Image layout: thumbnail/image preview
+        function renderImagePreview(card, template) {
+            const field = template.card?.preview_field || 'thumbnail';
+            const src = card[field];
+            const placeholder = template.card?.placeholder || '🔗';
+
+            if (!src) {
+                return `<div class="preview-placeholder">${placeholder}</div>`;
+            }
+            return `<img src="${escapeHtml(src)}" alt="" loading="lazy" class="preview-image" onerror="this.parentElement.innerHTML='<div class=\\'preview-placeholder\\'>${placeholder}</div>'">`;
+        }
+
+        // Split-pane layout: left/right split
+        function renderSplitPanePreview(card, template) {
+            const slots = template.card?.slots;
+            const placeholder = template.card?.placeholder || '';
+
+            if (!slots) {
+                return renderDocumentPreview(card, template);
+            }
+
+            const leftField = slots.left?.field;
+            const rightField = slots.right?.field;
+            const leftContent = card[leftField];
+            const rightContent = card[rightField];
+
+            // If no left content (e.g., no output), fall back to simpler layout
+            if (!leftContent && template.card?.fallback_layout) {
+                const fallbackField = template.card?.fallback_field || rightField;
+                const fallbackContent = card[fallbackField];
+                if (!fallbackContent) {
+                    return `<div class="preview-placeholder">${placeholder}</div>`;
+                }
+                // Render as code preview for code template
+                const leftFieldDef = template.schema?.[fallbackField];
+                if (leftFieldDef?.type === 'code') {
+                    const codePreview = escapeHtml(fallbackContent.substring(0, 400));
+                    return `<pre class="preview-code"><code class="language-${leftFieldDef?.language || 'python'}">${codePreview}</code></pre>`;
+                }
+                return `<div class="preview-text">${escapeHtml(fallbackContent.substring(0, 300))}</div>`;
+            }
+
+            // Render split pane
+            const leftWidth = slots.left?.width || '60%';
+            const rightWidth = slots.right?.width || '40%';
+
+            // Determine how to render each side based on field type
+            const leftFieldDef = template.schema?.[leftField];
+            const rightFieldDef = template.schema?.[rightField];
+
+            let leftHtml = '';
+            if (leftFieldDef?.type === 'html') {
+                leftHtml = `<div class="split-output-content">${leftContent || ''}</div>`;
+            } else {
+                leftHtml = `<div class="split-content">${escapeHtml(leftContent || '')}</div>`;
+            }
+
+            let rightHtml = '';
+            if (rightFieldDef?.type === 'code') {
+                const codePreview = escapeHtml((rightContent || '').substring(0, 400));
+                rightHtml = `<pre class="split-code"><code class="language-${rightFieldDef?.language || 'python'}">${codePreview}</code></pre>`;
+            } else {
+                rightHtml = `<div class="split-content">${escapeHtml((rightContent || '').substring(0, 300))}</div>`;
+            }
+
+            return `
+                <div class="preview-split">
+                    <div class="preview-split-left" style="flex: 0 0 ${leftWidth}">
+                        ${leftHtml}
+                    </div>
+                    <div class="preview-split-right" style="flex: 1">
+                        ${rightHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Fields layout: key-value display
+        function renderFieldsPreview(card, template) {
+            const fields = template.card?.preview_fields || Object.keys(template.schema || {}).slice(0, 3);
+            const placeholder = template.card?.placeholder || '';
+
+            if (fields.length === 0) {
+                return `<div class="preview-placeholder">${placeholder}</div>`;
+            }
+
+            return `<div class="preview-fields">
+                ${fields.map(f => `
+                    <div class="preview-field">
+                        <span class="preview-field-label">${f}:</span>
+                        <span class="preview-field-value">${escapeHtml(card[f] || '')}</span>
+                    </div>
+                `).join('')}
+            </div>`;
+        }
+
+        // Render card title (may use template formatting)
+        function renderCardTitle(card, template) {
+            if (template.card?.title_template) {
+                // Simple template replacement: {{field}}
+                return template.card.title_template.replace(/\{\{(\w+)\}\}/g, (match, field) => {
+                    return card[field] || '';
+                });
+            }
+            return card.title || 'Untitled';
+        }
+
+        // Render card metadata
+        function renderCardMeta(card, template) {
+            const created = card.created || card.modified;
+            const modified = card.modified;
+
+            let meta = `<span>${formatDate(created)}</span>`;
+            if (modified && created && modified !== created) {
+                meta += `<span>Updated ${formatDate(modified)}</span>`;
+            }
+            return meta;
+        }
+
+        // ===== Generic Viewer =====
+        // Template-driven viewer that replaces type-specific viewers
+
+        let currentViewingCard = null;
+
+        function openViewer(sectionId, itemId) {
+            let card;
+            const isSystemNote = sectionId === '_system';
+
+            if (isSystemNote) {
+                card = data.systemNotes?.find(n => n.id === itemId);
+            } else {
+                const section = data.sections.find(s => s.id === sectionId);
+                if (section) {
+                    card = section.items.find(i => i.id === itemId);
+                }
+            }
+
+            if (!card) {
+                console.warn(`[Viewer] Card not found: ${sectionId}/${itemId}`);
+                return;
+            }
+
+            const template = templateRegistry[card.template || card.type];
+            if (!template) {
+                console.warn(`[Viewer] Unknown template: ${card.template || card.type}`);
+                return;
+            }
+
+            currentViewingCard = { ...card, sectionId };
+
+            // Set title
+            document.getElementById('viewerTitle').textContent = card.title || 'Untitled';
+
+            // Render content based on viewer layout
+            const contentEl = document.getElementById('viewerContent');
+            contentEl.innerHTML = renderViewerContent(card, template);
+
+            // Apply syntax highlighting if needed
+            contentEl.querySelectorAll('pre code').forEach(el => {
+                if (!el.getAttribute('data-highlighted')) {
+                    hljs.highlightElement(el);
+                }
+            });
+
+            // Add backlinks
+            const backlinks = findBacklinks(itemId);
+            const backlinksEl = document.getElementById('viewerBacklinks');
+            if (backlinks.length > 0) {
+                backlinksEl.innerHTML = `
+                    <div class="backlinks">
+                        <div class="backlinks-title">Linked from</div>
+                        <div class="backlinks-list">
+                            ${backlinks.map(bl => `
+                                <span class="backlink-item internal-link" data-link-section="${bl.sectionId}" data-link-item="${bl.id}">${escapeHtml(bl.title)}</span>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                backlinksEl.innerHTML = '';
+            }
+
+            // Set meta info
+            let metaText;
+            if (isSystemNote) {
+                metaText = card.modified ? `Modified ${formatDate(card.modified)}` : '';
+            } else {
+                metaText = formatDate(card.created || card.modified);
+                if (card.modified && card.created && card.modified !== card.created) {
+                    metaText += ` · Updated ${formatDate(card.modified)}`;
+                }
+            }
+            document.getElementById('viewerMeta').textContent = metaText;
+
+            // Configure action buttons based on template
+            const actionsEl = document.getElementById('viewerActions');
+            actionsEl.innerHTML = renderViewerActions(card, template, isSystemNote);
+
+            // Set template attribute on modal for CSS styling
+            const modal = document.getElementById('viewerModal');
+            modal.querySelector('.modal').setAttribute('data-template', template.name);
+            modal.classList.add('active');
+        }
+
+        function renderViewerContent(card, template) {
+            const layout = template.viewer?.layout || 'document';
+
+            switch (layout) {
+                case 'document':
+                    return renderViewerDocument(card, template);
+                case 'image':
+                    return renderViewerImage(card, template);
+                case 'split-pane':
+                    return renderViewerSplitPane(card, template);
+                case 'sections':
+                    return renderViewerSections(card, template);
+                default:
+                    return renderViewerDocument(card, template);
+            }
+        }
+
+        // Document viewer: single content area
+        function renderViewerDocument(card, template) {
+            const field = template.viewer?.content_field || 'content';
+            const content = card[field];
+            const format = card.format || 'markdown';
+
+            if (!content) {
+                return '<div class="viewer-empty">No content</div>';
+            }
+
+            // Check field type
+            const fieldDef = template.schema?.[field];
+            const fieldType = fieldDef?.type || 'text';
+
+            if (format === 'text' || format === 'yaml' || fieldType === 'text') {
+                return `<pre class="viewer-text">${escapeHtml(content)}</pre>`;
+            } else if (fieldType === 'code') {
+                return `<div class="viewer-code"><pre><code class="language-${fieldDef?.language || 'python'}">${escapeHtml(content)}</code></pre></div>`;
+            } else {
+                return `<div class="viewer-markdown">${renderMarkdownWithLinks(content)}</div>`;
+            }
+        }
+
+        // Image viewer: large image with description
+        function renderViewerImage(card, template) {
+            const imageField = template.viewer?.image_field || 'thumbnail';
+            const contentField = template.viewer?.content_field || 'description';
+            const src = card[imageField];
+            const content = card[contentField];
+            const url = card.url;
+
+            let html = '<div class="viewer-image-container">';
+
+            if (src) {
+                html += `<div class="viewer-thumbnail"><img src="${escapeHtml(src)}" alt="" onerror="this.parentElement.innerHTML='<div class=\\'placeholder\\'>🔗</div>'"></div>`;
+            } else {
+                html += '<div class="viewer-thumbnail"><div class="placeholder">🔗</div></div>';
+            }
+
+            if (url) {
+                html += `<div class="viewer-url"><a href="${escapeHtml(url)}" target="_blank">${escapeHtml(url)}</a></div>`;
+            }
+
+            if (content) {
+                html += `<div class="viewer-description">${renderMarkdownWithLinks(content)}</div>`;
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        // Split-pane viewer: side-by-side
+        function renderViewerSplitPane(card, template) {
+            const slots = template.viewer?.slots;
+            if (!slots) {
+                return renderViewerDocument(card, template);
+            }
+
+            const leftField = slots.left?.field;
+            const rightField = slots.right?.field;
+            const leftContent = card[leftField];
+            const rightContent = card[rightField];
+            const leftWidth = slots.left?.width || '60%';
+
+            // If no left content, show code-only view
+            if (!leftContent) {
+                const rightFieldDef = template.schema?.[rightField];
+                if (rightFieldDef?.type === 'code') {
+                    return `<div class="viewer-code-only"><pre><code class="language-${rightFieldDef?.language || 'python'}">${escapeHtml(rightContent || '')}</code></pre></div>`;
+                }
+                return `<div class="viewer-text-only">${escapeHtml(rightContent || '')}</div>`;
+            }
+
+            // Render split pane
+            const leftFieldDef = template.schema?.[leftField];
+            const rightFieldDef = template.schema?.[rightField];
+
+            let leftHtml = '';
+            if (leftFieldDef?.type === 'html') {
+                leftHtml = `<div class="viewer-output-content">${leftContent}</div>`;
+            } else {
+                leftHtml = `<div class="viewer-content">${escapeHtml(leftContent)}</div>`;
+            }
+
+            let rightHtml = '';
+            if (rightFieldDef?.type === 'code') {
+                rightHtml = `<pre><code class="language-${rightFieldDef?.language || 'python'}">${escapeHtml(rightContent || '')}</code></pre>`;
+            } else {
+                rightHtml = `<div class="viewer-content">${escapeHtml(rightContent || '')}</div>`;
+            }
+
+            return `
+                <div class="viewer-split-pane">
+                    <div class="viewer-split-left" style="flex: 0 0 ${leftWidth}">
+                        ${leftHtml}
+                    </div>
+                    <div class="viewer-split-right">
+                        ${rightHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Sections viewer: labeled sections
+        function renderViewerSections(card, template) {
+            const sections = template.viewer?.sections || [];
+            if (sections.length === 0) {
+                return renderViewerDocument(card, template);
+            }
+
+            return sections.map(section => {
+                const content = card[section.field];
+                if (!content) return '';
+
+                const fieldDef = template.schema?.[section.field];
+                let html = '';
+
+                if (fieldDef?.type === 'markdown') {
+                    html = renderMarkdownWithLinks(content);
+                } else {
+                    html = `<p>${escapeHtml(content)}</p>`;
+                }
+
+                return `
+                    <div class="viewer-section">
+                        <h3 class="viewer-section-title">${escapeHtml(section.label)}</h3>
+                        <div class="viewer-section-content">${html}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render viewer action buttons based on template
+        function renderViewerActions(card, template, isSystemNote) {
+            const templateName = template.name;
+            let actions = '';
+
+            // Template-specific actions
+            if (templateName === 'bookmark' && card.url) {
+                actions += `<a href="${escapeHtml(card.url)}" target="_blank" class="btn btn-primary btn-small">Open ↗</a>`;
+            }
+            if (templateName === 'code') {
+                actions += `<button class="btn btn-run btn-small" onclick="runViewerCode()">▶ Run</button>`;
+            }
+
+            // Common actions
+            actions += `<button class="btn btn-secondary btn-small" onclick="editViewerCard()">✎ Edit</button>`;
+            actions += `<button class="btn btn-secondary btn-small" onclick="deleteViewerCard()">× Delete</button>`;
+
+            return actions;
+        }
+
+        function closeViewer() {
+            document.getElementById('viewerModal').classList.remove('active');
+            currentViewingCard = null;
+        }
+
+        function editViewerCard() {
+            if (!currentViewingCard) return;
+            const sectionId = currentViewingCard.sectionId;
+            const card = { ...currentViewingCard };
+            const templateName = card.template || card.type;
+            closeViewer();
+
+            // Route to appropriate editor based on template
+            // (Phase 3 will add generic editor; for now use existing modals)
+            if (templateName === 'note') {
+                openNoteModal(sectionId, card);
+            } else if (templateName === 'code') {
+                openCodeModal(sectionId, card);
+            } else if (templateName === 'bookmark') {
+                openBookmarkModal(sectionId, card);
+            }
+        }
+
+        async function deleteViewerCard() {
+            if (!currentViewingCard) return;
+            const sectionId = currentViewingCard.sectionId;
+            const cardId = currentViewingCard.id;
+            const isSystemNote = sectionId === '_system';
+            const templateName = currentViewingCard.template || currentViewingCard.type;
+            closeViewer();
+
+            if (isSystemNote) {
+                if (!confirm('Delete this system note? The file will be removed from your notebook folder.')) return;
+
+                const note = data.systemNotes?.find(n => n.id === cardId);
+                if (note && notebookDirHandle) {
+                    try {
+                        await notebookDirHandle.removeEntry(note.filename);
+                    } catch (e) {
+                        console.warn('[Filesystem] Could not delete system note file:', e);
+                    }
+                }
+
+                data.systemNotes = data.systemNotes?.filter(n => n.id !== cardId) || [];
+                await saveData();
+                render();
+                showToast('System note deleted');
+            } else {
+                await confirmDeleteItem(sectionId, cardId, templateName);
+            }
+        }
+
+        async function runViewerCode() {
+            if (!currentViewingCard) return;
+
+            // Show running status
+            const contentEl = document.getElementById('viewerContent');
+            contentEl.innerHTML = '<div class="viewer-loading">Running...</div>';
+
+            try {
+                const py = await initPyodide();
+                const result = await executePythonCode(py, currentViewingCard.code);
+
+                // Update stored output
+                const section = data.sections.find(s => s.id === currentViewingCard.sectionId);
+                if (section) {
+                    const codeNote = section.items.find(c => c.id === currentViewingCard.id);
+                    if (codeNote) {
+                        codeNote.output = result;
+                        codeNote.modified = new Date().toISOString();
+                        currentViewingCard.output = result;
+                        await saveData();
+                        await saveCardFile(currentViewingCard.sectionId, codeNote);
+                        render();
+
+                        // Re-render the viewer with new output
+                        openViewer(currentViewingCard.sectionId, currentViewingCard.id);
+                    }
+                }
+            } catch (error) {
+                contentEl.innerHTML = `<div class="viewer-error"><pre class="error">${escapeHtml(error.toString())}</pre></div>`;
+            }
         }
 
         // ========== SECTION: DATA_PERSISTENCE ==========
@@ -3075,6 +4232,10 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             // Load extension registry and templates first
             await loadExtensionRegistry(dirHandle);
             await loadTemplates(dirHandle);
+
+            // Inject template CSS variables and load user theme
+            injectTemplateStyles();
+            await loadThemeCss(dirHandle);
 
             const loadedData = {
                 title: 'Research Notebook',
@@ -5304,23 +6465,14 @@ sys.stderr = sys.__stderr__
         }
 
         function navigateToItem(sectionId, itemId) {
+            // Close all viewers (generic and legacy)
+            closeViewer();
             closeNoteViewer();
             closeBookmarkViewer();
             closeCodeViewer();
-            
-            const section = data.sections.find(s => s.id === sectionId);
-            if (!section) return;
-            
-            const item = section.items.find(i => i.id === itemId);
-            if (!item) return;
-            
-            if (item.type === 'note') {
-                openNoteViewer(sectionId, itemId);
-            } else if (item.type === 'code') {
-                openCodeViewer(sectionId, itemId);
-            } else {
-                openBookmarkViewer(sectionId, itemId);
-            }
+
+            // Use generic viewer
+            openViewer(sectionId, itemId);
         }
 
         // ========== SECTION: THUMBNAIL_GENERATION ==========
@@ -5615,7 +6767,8 @@ sys.stderr = sys.__stderr__
         }
 
         // ========== SECTION: RENDER_FUNCTIONS ==========
-        // Main render and card templates: render, renderBookmarkCard, renderNoteCard, renderCodeCard, findNote, findCode, escapeHtml
+        // Main render and template buttons: render, renderTemplateButtons, findNote, findCode, escapeHtml
+        // Note: Generic renderCard() and openViewer() are in TEMPLATE_SYSTEM section; legacy renderers below for reference
 
         // Generate template-driven "New X" buttons for a section
         function renderTemplateButtons(sectionId) {
@@ -5699,15 +6852,7 @@ sys.stderr = sys.__stderr__
                                 const aTime = a.modified ? new Date(a.modified).getTime() : 0;
                                 const bTime = b.modified ? new Date(b.modified).getTime() : 0;
                                 return bTime - aTime;
-                            }).map(item => {
-                                if (item.type === 'note') {
-                                    return renderNoteCard(section.id, item);
-                                } else if (item.type === 'code') {
-                                    return renderCodeCard(section.id, item);
-                                } else {
-                                    return renderBookmarkCard(section.id, item);
-                                }
-                            }).join('')
+                            }).map(item => renderCard(section.id, item)).join('')
                         }
                     </div>
                 </div>
@@ -5737,7 +6882,7 @@ sys.stderr = sys.__stderr__
                             const aTime = a.modified ? new Date(a.modified).getTime() : 0;
                             const bTime = b.modified ? new Date(b.modified).getTime() : 0;
                             return bTime - aTime;
-                        }).map(note => renderNoteCard('_system', note)).join('')}
+                        }).map(note => renderCard('_system', note)).join('')}
                     </div>
                 </div>
                 `;
@@ -5912,7 +7057,7 @@ sys.stderr = sys.__stderr__
             const link = e.target.closest('.internal-link[data-link-section][data-link-item]');
             if (link) {
                 // Only handle clicks if the link is inside a viewer modal
-                const isInViewer = link.closest('#noteViewerModal, #bookmarkViewerModal, #codeViewerModal');
+                const isInViewer = link.closest('#viewerModal, #noteViewerModal, #bookmarkViewerModal, #codeViewerModal');
                 if (isInViewer) {
                     e.preventDefault();
                     e.stopPropagation();
