@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Run `/start` or `python3 generate_index.py --sections` to see section layout with line numbers.
 
 Key sections: HTML_HEAD (CSS), HTML_BODY_AND_MODALS, STATE_AND_CONFIG, TEMPLATE_SYSTEM, GENERIC_EDITOR,
-DATA_PERSISTENCE, FILESYSTEM_STORAGE, NOTE_MODAL, PYODIDE_RUNTIME, CODE_MODAL, RENDER_FUNCTIONS, EVENT_HANDLERS_AND_INIT
+DATA_PERSISTENCE, FILESYSTEM_STORAGE, PYODIDE_RUNTIME, INTERNAL_LINKING, RENDER_FUNCTIONS, EVENT_HANDLERS_AND_INIT
 
 Section markers: `// ========== SECTION: NAME ==========` (JS) or `<!-- ========== SECTION: NAME ========== -->` (HTML)
 
@@ -110,10 +110,9 @@ data = {
 - Global `data` object holds all sections and items (including `data.systemNotes[]`)
 - `collapsedSections` Set tracks UI state (not persisted)
 - `showSystemNotes` - Toggle for System section visibility (persisted in localStorage)
-- Modal editing states: `editingBookmark`, `editingNote`, `editingCode`
-- Current viewing states: `currentViewingNote`, `currentViewingCode`
-- `manualThumbnail`: Tracks manually uploaded thumbnail (data URL) during bookmark creation/editing
 - Pyodide runtime state: `pyodide`, `pyodideLoading`, `pyodideReady`
+- Filesystem state: `notebookDirHandle`, `filesystemLinked`
+- Generic editor state: `editingCard` (in GENERIC_EDITOR section)
 
 **System Notes** (loaded from notebook root):
 - Text files at notebook root are loaded as "system notes" in a special System section

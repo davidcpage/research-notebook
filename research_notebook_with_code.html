@@ -1472,130 +1472,6 @@
         </div>
     </div>
 
-    <!-- Bookmark Modal -->
-    <div class="modal-overlay" id="bookmarkModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2 id="bookmarkModalTitle">Add Bookmark</h2>
-                <button class="modal-close" onclick="closeBookmarkModal()">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="bookmarkSection">Section</label>
-                    <select id="bookmarkSection"></select>
-                </div>
-                <div class="form-group">
-                    <label for="bookmarkThumbnailPreview">Thumbnail (optional)</label>
-                    <div class="thumbnail-upload" id="bookmarkThumbnailPreview">
-                        <div class="thumbnail-placeholder">
-                            <span class="thumbnail-icon">🖼️</span>
-                            <p class="thumbnail-hint">Drag & drop screenshot here<br>or click to upload</p>
-                        </div>
-                        <input type="file" id="bookmarkThumbnailFile" accept="image/*" style="display: none">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="bookmarkUrl">URL</label>
-                    <input type="url" id="bookmarkUrl" placeholder="https://example.com">
-                </div>
-                <div class="form-group">
-                    <label for="bookmarkTitle">Title (optional)</label>
-                    <input type="text" id="bookmarkTitle" placeholder="Page title">
-                </div>
-                <div class="form-group">
-                    <label for="bookmarkDescription">Description (optional)</label>
-                    <textarea id="bookmarkDescription" placeholder="A brief description of this bookmark..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeBookmarkModal()">Cancel</button>
-                <button class="btn btn-primary" id="bookmarkSubmitBtn" onclick="saveBookmark()">
-                    Add Bookmark
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Note Modal (Editor) -->
-    <div class="modal-overlay" id="noteModal">
-        <div class="modal modal-large">
-            <div class="modal-header">
-                <h2 id="noteModalTitle">New Note</h2>
-                <button class="modal-close" onclick="closeNoteModal()">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group" id="noteSectionGroup">
-                    <label for="noteSection">Section</label>
-                    <select id="noteSection"></select>
-                </div>
-                <div class="form-group">
-                    <label for="noteTitle">Title</label>
-                    <input type="text" id="noteTitle" placeholder="Note title">
-                </div>
-                <div class="form-group">
-                    <label>Content</label>
-                    <div class="editor-tabs">
-                        <button class="editor-tab active" onclick="switchEditorTab('write')">Write</button>
-                        <button class="editor-tab" onclick="switchEditorTab('preview')">Preview</button>
-                    </div>
-                    <textarea id="noteContent" class="markdown-editor" placeholder="Write your note in Markdown...
-
-Use [[Title]] to link to other notes or bookmarks.
-Use $x^2$ for inline math, $$E=mc^2$$ for display math."></textarea>
-                    <div id="notePreview" class="editor-preview"></div>
-                    <p class="form-hint">Supports Markdown and LaTeX ($inline$, $$display$$). Link with [[Title]] or [[id:xyz]]</p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeNoteModal()">Cancel</button>
-                <button class="btn btn-primary" id="noteSubmitBtn" onclick="saveNote()">Save Note</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Code Editor Modal -->
-    <div class="modal-overlay" id="codeModal">
-        <div class="modal modal-large">
-            <div class="modal-header">
-                <h2 id="codeModalTitle">New Code Note</h2>
-                <button class="modal-close" onclick="closeCodeModal()">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="codeSection">Section</label>
-                    <select id="codeSection"></select>
-                </div>
-                <div class="form-group">
-                    <label for="codeTitle">Title</label>
-                    <input type="text" id="codeTitle" placeholder="Code note title">
-                </div>
-                <div class="form-group">
-                    <label>Python Code</label>
-                    <div class="code-toolbar">
-                        <button class="btn btn-run btn-small" id="runCodeBtn" onclick="runCode()">
-                            ▶ Run
-                        </button>
-                        <span class="pyodide-status" id="pyodideStatus"></span>
-                    </div>
-                    <textarea id="codeContent" class="code-editor" placeholder="# Write Python code here
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
-print('Hello, World!')" spellcheck="false"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Output</label>
-                    <div class="code-output" id="codeOutput"></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeCodeModal()">Cancel</button>
-                <button class="btn btn-primary" id="codeSubmitBtn" onclick="saveCode()">Save Code Note</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Generic Viewer Modal (Phase 2 Template System) -->
     <div class="modal-overlay" id="viewerModal">
         <div class="modal viewer" data-template="">
@@ -1744,11 +1620,6 @@ print('Hello, World!')" spellcheck="false"></textarea>
 
         // Show/hide system notes section (persisted in localStorage)
         let showSystemNotes = localStorage.getItem('showSystemNotes') === 'true';
-
-        let editingBookmark = null;
-        let editingNote = null;
-        let editingCode = null;
-        let manualThumbnail = null; // Track manually uploaded thumbnail
 
         // Pyodide state
         let pyodide = null;
@@ -4919,403 +4790,6 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             }
         }
 
-        // ========== SECTION: THUMBNAIL_DRAG_DROP ==========
-        // Manual thumbnail upload via drag-drop or file picker
-        // Functions: initThumbnailDragDrop, handleDrop, handleFiles, displayThumbnailPreview, clearThumbnailPreview
-
-        // Initialize thumbnail drag-and-drop handlers
-        function initThumbnailDragDrop() {
-            const preview = document.getElementById('bookmarkThumbnailPreview');
-            const fileInput = document.getElementById('bookmarkThumbnailFile');
-
-            // Prevent default drag behaviors on the entire document
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                preview.addEventListener(eventName, preventDefaults, false);
-            });
-
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-
-            // Highlight drop area when dragging over it
-            ['dragenter', 'dragover'].forEach(eventName => {
-                preview.addEventListener(eventName, () => {
-                    preview.classList.add('drag-over');
-                }, false);
-            });
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                preview.addEventListener(eventName, () => {
-                    preview.classList.remove('drag-over');
-                }, false);
-            });
-
-            // Handle dropped files
-            preview.addEventListener('drop', handleDrop, false);
-
-            // Handle click to upload
-            preview.addEventListener('click', () => {
-                fileInput.click();
-            });
-
-            // Handle file selection from file input
-            fileInput.addEventListener('change', (e) => {
-                const files = e.target.files;
-                if (files.length > 0) {
-                    handleFiles(files);
-                }
-            });
-        }
-
-        function handleDrop(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            handleFiles(files);
-        }
-
-        function handleFiles(files) {
-            if (files.length === 0) return;
-
-            const file = files[0];
-
-            // Validate file type
-            if (!file.type.startsWith('image/')) {
-                showToast('Please upload an image file');
-                return;
-            }
-
-            // Validate file size (max 5MB)
-            if (file.size > 5 * 1024 * 1024) {
-                showToast('Image file too large (max 5MB)');
-                return;
-            }
-
-            // Read the file, resize it, and display it
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const dataUrl = e.target.result;
-                // Resize and compress the manually uploaded thumbnail
-                const resizedDataUrl = await resizeAndCompressThumbnail(dataUrl);
-                if (resizedDataUrl) {
-                    displayThumbnailPreview(resizedDataUrl);
-                    manualThumbnail = resizedDataUrl;
-                } else {
-                    showToast('Failed to process thumbnail image');
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function displayThumbnailPreview(dataUrl) {
-            const preview = document.getElementById('bookmarkThumbnailPreview');
-            preview.classList.add('has-image');
-
-            // Remove existing image if any
-            const existingImg = preview.querySelector('img');
-            if (existingImg) {
-                existingImg.remove();
-            }
-
-            // Add new image
-            const img = document.createElement('img');
-            img.src = dataUrl;
-            preview.appendChild(img);
-        }
-
-        function clearThumbnailPreview() {
-            const preview = document.getElementById('bookmarkThumbnailPreview');
-            preview.classList.remove('has-image');
-
-            const existingImg = preview.querySelector('img');
-            if (existingImg) {
-                existingImg.remove();
-            }
-
-            manualThumbnail = null;
-        }
-
-        // ========== SECTION: BOOKMARK_MODAL ==========
-        // Bookmark creation/editing modal: open, close, save
-
-        function openBookmarkModal(sectionId = null, bookmark = null) {
-            editingBookmark = bookmark ? { ...bookmark, sectionId } : null;
-            
-            const select = document.getElementById('bookmarkSection');
-            select.innerHTML = data.sections.map(s => 
-                `<option value="${s.id}" ${s.id === sectionId ? 'selected' : ''}>${s.name}</option>`
-            ).join('');
-
-            if (data.sections.length === 0) {
-                showToast('Create a section first');
-                return;
-            }
-
-            document.getElementById('bookmarkModalTitle').textContent = bookmark ? 'Edit Bookmark' : 'Add Bookmark';
-            document.getElementById('bookmarkSubmitBtn').textContent = bookmark ? 'Save Changes' : 'Add Bookmark';
-
-            document.getElementById('bookmarkUrl').value = bookmark?.url || '';
-            document.getElementById('bookmarkTitle').value = bookmark?.title || '';
-            document.getElementById('bookmarkDescription').value = bookmark?.description || '';
-
-            // Display existing thumbnail or clear preview
-            if (bookmark?.thumbnail) {
-                displayThumbnailPreview(bookmark.thumbnail);
-                manualThumbnail = bookmark.thumbnail; // Preserve existing thumbnail
-            } else {
-                clearThumbnailPreview();
-            }
-
-            document.getElementById('bookmarkModal').classList.add('active');
-            document.getElementById('bookmarkUrl').focus();
-        }
-
-        function closeBookmarkModal() {
-            document.getElementById('bookmarkModal').classList.remove('active');
-            document.getElementById('bookmarkUrl').value = '';
-            document.getElementById('bookmarkTitle').value = '';
-            document.getElementById('bookmarkDescription').value = '';
-            clearThumbnailPreview();
-            editingBookmark = null;
-        }
-
-        async function saveBookmark() {
-            const sectionId = document.getElementById('bookmarkSection').value;
-            const url = document.getElementById('bookmarkUrl').value.trim();
-            const title = document.getElementById('bookmarkTitle').value.trim();
-            const description = document.getElementById('bookmarkDescription').value.trim();
-
-            if (!url) {
-                showToast('Please enter a URL');
-                return;
-            }
-
-            // Validate URL
-            try {
-                new URL(url);
-            } catch {
-                showToast('Please enter a valid URL');
-                return;
-            }
-
-            const section = data.sections.find(s => s.id === sectionId);
-            if (!section) return;
-
-            const btn = document.getElementById('bookmarkSubmitBtn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<span class="loading-spinner"></span> Saving...';
-            btn.disabled = true;
-
-            // Use manual thumbnail if provided, otherwise auto-generate
-            let thumbnail;
-            if (manualThumbnail) {
-                thumbnail = manualThumbnail;
-            } else {
-                thumbnail = await generateThumbnail(url);
-            }
-
-            const bookmarkData = {
-                id: editingBookmark?.id || Date.now().toString(),
-                type: 'bookmark',
-                url,
-                title: title || extractDomain(url),
-                description,
-                thumbnail,
-                created: editingBookmark?.created || new Date().toISOString(),
-                modified: new Date().toISOString()
-            };
-
-            if (editingBookmark) {
-                // If section changed, move bookmark
-                if (editingBookmark.sectionId !== sectionId) {
-                    const oldSection = data.sections.find(s => s.id === editingBookmark.sectionId);
-                    if (oldSection) {
-                        // Delete from old section's filesystem
-                        await deleteItemFile(editingBookmark.sectionId, editingBookmark);
-                        oldSection.items = oldSection.items.filter(b => b.id !== editingBookmark.id);
-                    }
-                    section.items.push(bookmarkData);
-                } else {
-                    // Same section - check if title changed (need to delete old file)
-                    if (editingBookmark.title !== title) {
-                        await deleteItemFile(sectionId, editingBookmark);
-                    }
-                    const index = section.items.findIndex(b => b.id === editingBookmark.id);
-                    if (index !== -1) {
-                        section.items[index] = bookmarkData;
-                    }
-                }
-            } else {
-                section.items.push(bookmarkData);
-            }
-
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-
-            await saveData();
-            await saveCardFile(sectionId, bookmarkData);  // Only writes this bookmark
-            render();
-            closeBookmarkModal();
-            showToast(editingBookmark ? 'Bookmark updated' : 'Bookmark added');
-        }
-
-        // ========== SECTION: NOTE_MODAL ==========
-        // Note creation/editing modal: open, close, switchEditorTab, save
-
-        function openNoteModal(sectionId = null, note = null) {
-            const isSystemNote = sectionId === '_system';
-            editingNote = note ? { ...note, sectionId } : null;
-
-            const select = document.getElementById('noteSection');
-            const sectionGroup = document.getElementById('noteSectionGroup');
-
-            if (isSystemNote) {
-                // Hide section selector for system notes
-                sectionGroup.style.display = 'none';
-                select.innerHTML = '<option value="_system">System</option>';
-            } else {
-                sectionGroup.style.display = '';
-                select.innerHTML = data.sections.map(s =>
-                    `<option value="${s.id}" ${s.id === sectionId ? 'selected' : ''}>${s.name}</option>`
-                ).join('');
-
-                if (data.sections.length === 0) {
-                    showToast('Create a section first');
-                    return;
-                }
-            }
-
-            document.getElementById('noteModalTitle').textContent = note ? 'Edit Note' : (isSystemNote ? 'New System Note' : 'New Note');
-            document.getElementById('noteSubmitBtn').textContent = note ? 'Save Changes' : 'Save Note';
-
-            document.getElementById('noteTitle').value = note?.title || '';
-            document.getElementById('noteContent').value = note?.content || '';
-
-            // Reset to write tab
-            switchEditorTab('write');
-
-            document.getElementById('noteModal').classList.add('active');
-            document.getElementById('noteTitle').focus();
-        }
-
-        function closeNoteModal() {
-            document.getElementById('noteModal').classList.remove('active');
-            document.getElementById('noteTitle').value = '';
-            document.getElementById('noteContent').value = '';
-            editingNote = null;
-        }
-
-        function switchEditorTab(tab) {
-            const writeTab = document.querySelector('.editor-tab:first-child');
-            const previewTab = document.querySelector('.editor-tab:last-child');
-            const textarea = document.getElementById('noteContent');
-            const preview = document.getElementById('notePreview');
-
-            if (tab === 'write') {
-                writeTab.classList.add('active');
-                previewTab.classList.remove('active');
-                textarea.style.display = 'block';
-                preview.classList.remove('active');
-            } else {
-                writeTab.classList.remove('active');
-                previewTab.classList.add('active');
-                textarea.style.display = 'none';
-                preview.classList.add('active');
-                // Use format from editingNote if available (raw text/yaml for non-.md system notes)
-                if (editingNote?.format === 'text' || editingNote?.format === 'yaml') {
-                    preview.innerHTML = `<pre style="margin: 0; white-space: pre-wrap; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; font-size: 0.9rem; line-height: 1.5;">${escapeHtml(textarea.value)}</pre>`;
-                } else {
-                    preview.innerHTML = renderMarkdownWithLinks(textarea.value);
-                }
-            }
-        }
-
-        async function saveNote() {
-            const sectionId = document.getElementById('noteSection').value;
-            const title = document.getElementById('noteTitle').value.trim();
-            const content = document.getElementById('noteContent').value.trim();
-
-            if (!title) {
-                showToast('Please enter a title');
-                return;
-            }
-
-            const isSystemNote = sectionId === '_system';
-
-            let noteData;
-            if (isSystemNote) {
-                // Handle system note (text file at notebook root)
-                // Preserve format and filename for existing notes, default to .md for new
-                const format = editingNote?.format || 'markdown';
-                const filename = editingNote?.filename || title + '.md';
-                noteData = {
-                    type: 'note',
-                    system: true,
-                    id: editingNote?.id || 'system-' + filename,
-                    filename: filename,
-                    title,
-                    content,
-                    format: format,
-                    modified: new Date().toISOString()
-                };
-
-                if (editingNote) {
-                    // Update existing system note
-                    const index = data.systemNotes.findIndex(n => n.id === editingNote.id);
-                    if (index !== -1) {
-                        data.systemNotes[index] = noteData;
-                    }
-                } else {
-                    // Add new system note
-                    if (!data.systemNotes) data.systemNotes = [];
-                    data.systemNotes.push(noteData);
-                }
-            } else {
-                // Handle regular note
-                const section = data.sections.find(s => s.id === sectionId);
-                if (!section) return;
-
-                noteData = {
-                    id: editingNote?.id || Date.now().toString(),
-                    type: 'note',
-                    title,
-                    content,
-                    created: editingNote?.created || new Date().toISOString(),
-                    modified: new Date().toISOString()
-                };
-
-                if (editingNote) {
-                    // If section changed, move note
-                    if (editingNote.sectionId !== sectionId) {
-                        const oldSection = data.sections.find(s => s.id === editingNote.sectionId);
-                        if (oldSection) {
-                            // Delete from old section's filesystem
-                            await deleteItemFile(editingNote.sectionId, editingNote);
-                            oldSection.items = oldSection.items.filter(n => n.id !== editingNote.id);
-                        }
-                        section.items.push(noteData);
-                    } else {
-                        // Same section - check if title changed (need to delete old file)
-                        if (editingNote.title !== title) {
-                            await deleteItemFile(sectionId, editingNote);
-                        }
-                        const index = section.items.findIndex(n => n.id === editingNote.id);
-                        if (index !== -1) {
-                            section.items[index] = noteData;
-                        }
-                    }
-                } else {
-                    section.items.push(noteData);
-                }
-            }
-
-            await saveData();
-            await saveCardFile(sectionId, noteData);  // Only writes this note
-            render();
-            closeNoteModal();
-            showToast(editingNote ? 'Note updated' : 'Note created');
-        }
-
         // ========== SECTION: PYODIDE_RUNTIME ==========
         // Python execution via Pyodide: initPyodide, updatePyodideStatus, runCode, executePythonCode
         // Config: Pyodide v0.28.2 from jsDelivr CDN, pre-loads numpy/pandas/matplotlib, 120s timeout
@@ -5544,121 +5018,6 @@ sys.stderr = sys.__stderr__
             return output;
         }
 
-        // ========== SECTION: CODE_MODAL ==========
-        // Code note creation/editing modal: open, close, save (auto-executes on save)
-
-        function openCodeModal(sectionId = null, codeNote = null) {
-            editingCode = codeNote ? { ...codeNote, sectionId } : null;
-            
-            const select = document.getElementById('codeSection');
-            select.innerHTML = data.sections.map(s => 
-                `<option value="${s.id}" ${s.id === sectionId ? 'selected' : ''}>${s.name}</option>`
-            ).join('');
-
-            if (data.sections.length === 0) {
-                showToast('Create a section first');
-                return;
-            }
-
-            document.getElementById('codeModalTitle').textContent = codeNote ? 'Edit Code Note' : 'New Code Note';
-            document.getElementById('codeSubmitBtn').textContent = codeNote ? 'Save Changes' : 'Save Code Note';
-            
-            document.getElementById('codeTitle').value = codeNote?.title || '';
-            document.getElementById('codeContent').value = codeNote?.code || '';
-            document.getElementById('codeOutput').innerHTML = codeNote?.output || '';
-
-            // Update Pyodide status
-            if (pyodideReady) {
-                updatePyodideStatus('ready', 'Python ready');
-            } else if (pyodideLoading) {
-                updatePyodideStatus('loading', 'Loading Python...');
-            } else {
-                updatePyodideStatus('', 'Python will load on first run');
-            }
-
-            document.getElementById('codeModal').classList.add('active');
-            document.getElementById('codeTitle').focus();
-        }
-
-        function closeCodeModal() {
-            document.getElementById('codeModal').classList.remove('active');
-            document.getElementById('codeTitle').value = '';
-            document.getElementById('codeContent').value = '';
-            document.getElementById('codeOutput').innerHTML = '';
-            editingCode = null;
-        }
-
-        async function saveCode() {
-            const sectionId = document.getElementById('codeSection').value;
-            const title = document.getElementById('codeTitle').value.trim();
-            const code = document.getElementById('codeContent').value;
-
-            if (!title) {
-                showToast('Please enter a title');
-                return;
-            }
-
-            if (!code.trim()) {
-                showToast('Please enter some code');
-                return;
-            }
-
-            // Automatically run code before saving to generate output
-            const submitBtn = document.getElementById('codeSubmitBtn');
-            submitBtn.disabled = true;
-            submitBtn.textContent = '⏳ Running & Saving...';
-
-            await runCode();
-
-            // Get the output after running
-            const output = document.getElementById('codeOutput').innerHTML;
-
-            const section = data.sections.find(s => s.id === sectionId);
-            if (!section) return;
-
-            const codeData = {
-                id: editingCode?.id || Date.now().toString(),
-                type: 'code',
-                title,
-                code,
-                output,
-                showOutput: editingCode?.showOutput !== undefined ? editingCode.showOutput : (output.trim() ? true : false),
-                created: editingCode?.created || new Date().toISOString(),
-                modified: new Date().toISOString()
-            };
-
-            if (editingCode) {
-                if (editingCode.sectionId !== sectionId) {
-                    const oldSection = data.sections.find(s => s.id === editingCode.sectionId);
-                    if (oldSection) {
-                        // Delete from old section's filesystem
-                        await deleteItemFile(editingCode.sectionId, editingCode);
-                        oldSection.items = oldSection.items.filter(c => c.id !== editingCode.id);
-                    }
-                    section.items.push(codeData);
-                } else {
-                    // Same section - check if title changed (need to delete old file)
-                    if (editingCode.title !== title) {
-                        await deleteItemFile(sectionId, editingCode);
-                    }
-                    const index = section.items.findIndex(c => c.id === editingCode.id);
-                    if (index !== -1) {
-                        section.items[index] = codeData;
-                    }
-                }
-            } else {
-                section.items.push(codeData);
-            }
-
-            await saveData();
-            await saveCardFile(sectionId, codeData);  // Only writes this code file
-            render();
-            closeCodeModal();
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Save Code Note';
-            showToast(editingCode ? 'Code note updated' : 'Code note created');
-        }
-
         // ========== SECTION: INTERNAL_LINKING ==========
         // Wiki-style [[links]]: renderMarkdownWithLinks, renderNotePreview, resolveLink, findBacklinks, navigateToItem
 
@@ -5843,13 +5202,8 @@ sys.stderr = sys.__stderr__
         }
 
         function navigateToItem(sectionId, itemId) {
-            // Close all viewers (generic and legacy)
+            // Close current viewer and open target
             closeViewer();
-            closeNoteViewer();
-            closeBookmarkViewer();
-            closeCodeViewer();
-
-            // Use generic viewer
             openViewer(sectionId, itemId);
         }
 
@@ -6038,7 +5392,7 @@ sys.stderr = sys.__stderr__
         }
 
         // ========== SECTION: DATA_OPERATIONS ==========
-        // Section/item actions: toggleSection, toggleCodeOutput, editBookmark, confirmDeleteItem, deleteSection, deleteItem, updateSectionName
+        // Section/item actions: toggleSection, toggleCodeOutput, confirmDeleteItem, deleteSection, deleteItem, updateSectionName
 
         // Toggle section collapsed state
         function toggleSection(sectionId) {
@@ -6060,15 +5414,6 @@ sys.stderr = sys.__stderr__
             await saveData();
             await saveCardFile(sectionId, codeNote);  // Save code file with updated showOutput
             render();
-        }
-
-        // Edit bookmark - find bookmark and open modal
-        function editBookmark(sectionId, bookmarkId) {
-            const section = data.sections.find(s => s.id === sectionId);
-            if (!section) return;
-            const bookmark = section.items.find(b => b.id === bookmarkId);
-            if (!bookmark) return;
-            openBookmarkModal(sectionId, bookmark);
         }
 
         // Confirm before deleting item
@@ -6244,7 +5589,7 @@ sys.stderr = sys.__stderr__
                             ${isCollapsed && itemCount > 0 ? `<span class="section-count">(${itemCount})</span>` : ''}
                         </h2>
                         <div class="section-actions">
-                            <button class="btn btn-note btn-small" onclick="openNoteModal('_system')">
+                            <button class="btn btn-note btn-small" onclick="openEditor('note', '_system')">
                                 + Note
                             </button>
                         </div>
@@ -6296,29 +5641,6 @@ sys.stderr = sys.__stderr__
             if (e.key === 'Enter') createSection();
         });
 
-        document.getElementById('bookmarkUrl').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') saveBookmark();
-        });
-
-        document.getElementById('noteTitle').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') document.getElementById('noteContent').focus();
-        });
-
-        document.getElementById('codeTitle').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') document.getElementById('codeContent').focus();
-        });
-
-        // Allow Tab key in code editor
-        document.getElementById('codeContent').addEventListener('keydown', (e) => {
-            if (e.key === 'Tab') {
-                e.preventDefault();
-                const start = e.target.selectionStart;
-                const end = e.target.selectionEnd;
-                e.target.value = e.target.value.substring(0, start) + '    ' + e.target.value.substring(end);
-                e.target.selectionStart = e.target.selectionEnd = start + 4;
-            }
-        });
-
         // Generic editor keyboard handling (Phase 3)
         document.getElementById('editorModal').addEventListener('keydown', (e) => {
             // Tab in code editors
@@ -6349,14 +5671,8 @@ sys.stderr = sys.__stderr__
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closeSectionModal();
-                closeBookmarkModal();
-                closeNoteModal();
-                closeCodeModal();
-                closeEditor();  // Generic editor (Phase 3)
-                closeNoteViewer();
-                closeBookmarkViewer();
-                closeCodeViewer();
-                closeViewer();  // Generic viewer (Phase 2)
+                closeEditor();
+                closeViewer();
             }
         });
 
@@ -6388,8 +5704,6 @@ sys.stderr = sys.__stderr__
                 // No folder linked - show onboarding
                 showOnboarding();
             }
-
-            initThumbnailDragDrop();
         }
         init();
     </script>

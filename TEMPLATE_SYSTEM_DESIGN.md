@@ -1440,7 +1440,7 @@ function renderCardPreview(card, template) {
 | Phase 1: Template Infrastructure | ✅ Complete | Generic loading/saving, template files created on new notebook |
 | Phase 2: Generic Rendering | ✅ Complete | Generic card renderer and viewer, CSS with data-template selectors |
 | Phase 3: Generic Editor | ✅ Complete | Generic editor modal, template-driven forms, all card types supported |
-| Phase 4: Polish | ⏳ Not started | |
+| Phase 4: Polish | 🔄 In progress | Step 1 (legacy cleanup) complete; Steps 2-4 remaining |
 
 **Phase 1 Implementation Details:**
 
@@ -1568,34 +1568,16 @@ function renderCardPreview(card, template) {
 
 ### Phase 4: Polish and Documentation
 
-1. **Remove legacy editor modals** (no longer used after Phase 3)
+1. **Remove legacy editor modals** ✅ Complete
 
-   **HTML to remove** (in HTML_BODY_AND_MODALS section):
-   - `#bookmarkModal` - lines ~1442-1484
-   - `#noteModal` - lines ~1486-1521
-   - `#codeModal` - lines ~1523-1564
+   Removed in Phase 4 cleanup:
+   - HTML modals: `#bookmarkModal`, `#noteModal`, `#codeModal`
+   - JS sections: `BOOKMARK_MODAL`, `NOTE_MODAL`, `CODE_MODAL`, `THUMBNAIL_DRAG_DROP`
+   - State variables: `editingBookmark`, `editingNote`, `editingCode`, `manualThumbnail`
+   - Event handlers: Legacy Enter/Tab key handlers, `initThumbnailDragDrop()`
+   - Fixed: Escape handler, `navigateToItem()`, system notes button
 
-   **JavaScript sections to remove:**
-   - `BOOKMARK_MODAL` section (~lines 5040-5163): `openBookmarkModal()`, `closeBookmarkModal()`, `saveBookmark()`
-   - `NOTE_MODAL` section (~lines 5164-5320): `openNoteModal()`, `closeNoteModal()`, `saveNote()`, `switchEditorTab()` (old version)
-   - `CODE_MODAL` section (~lines 5549-5663): `openCodeModal()`, `closeCodeModal()`, `saveCode()`, `runCode()` (old version)
-
-   **State variables to remove** (in STATE_AND_CONFIG):
-   - `editingBookmark`
-   - `editingNote`
-   - `editingCode`
-   - `manualThumbnail` (replaced by `editorManualThumbnail`)
-
-   **Event handlers to remove** (in EVENT_HANDLERS_AND_INIT):
-   - Enter key handlers for `#bookmarkUrl`, `#noteTitle`, `#codeTitle`
-   - Tab key handler for `#codeContent`
-   - `initThumbnailDragDrop()` call and function
-
-   **Escape handler cleanup:**
-   - Remove calls to `closeBookmarkModal()`, `closeNoteModal()`, `closeCodeModal()`
-   - Remove calls to legacy viewers: `closeNoteViewer()`, `closeBookmarkViewer()`, `closeCodeViewer()`
-
-   **CSS:** No CSS to remove - all classes (`.code-editor`, `.markdown-editor`, `.thumbnail-upload`, `.editor-tabs`, `.code-output`, etc.) are reused by the generic editor.
+   **Result:** ~686 lines removed, file reduced from 6397 to 5711 lines.
 
 2. **Settings UI**
    - Show loaded templates
