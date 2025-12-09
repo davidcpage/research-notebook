@@ -4722,6 +4722,44 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 return;
             }
 
+            // Template cards are handled specially (serialized to YAML)
+            if (card.template === 'template' || (card.filename && card.filename.endsWith('.template.yaml'))) {
+                const filename = card.filename || (card.name + '.template.yaml');
+                // Reconstruct the template object from card fields
+                const templateObj = {
+                    name: card.name,
+                    description: card.description
+                };
+                if (card.schema && Object.keys(card.schema).length > 0) templateObj.schema = card.schema;
+                if (card.card && Object.keys(card.card).length > 0) templateObj.card = card.card;
+                if (card.viewer && Object.keys(card.viewer).length > 0) templateObj.viewer = card.viewer;
+                if (card.editor && Object.keys(card.editor).length > 0) templateObj.editor = card.editor;
+                if (card.style && Object.keys(card.style).length > 0) templateObj.style = card.style;
+                if (card.ui && Object.keys(card.ui).length > 0) templateObj.ui = card.ui;
+
+                const yamlContent = jsyaml.dump(templateObj, {
+                    indent: 2,
+                    lineWidth: -1,
+                    quotingType: '"',
+                    forceQuotes: false
+                });
+
+                const fileHandle = await notebookDirHandle.getFileHandle(filename, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(yamlContent);
+                await writable.close();
+                card.filename = filename;
+                card.id = 'system-' + filename;
+
+                // Reload the template into the registry
+                const templateName = filename.replace(/\.template\.yaml$/, '');
+                templateRegistry[templateName] = templateObj;
+
+                recordSave(filename);
+                console.log('[Filesystem] Saved template:', filename);
+                return;
+            }
+
             // System notes are handled specially (saved at root with raw content)
             if (sectionId === '_system' && card.system) {
                 const filename = card.filename || (card.title + '.md');
