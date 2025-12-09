@@ -1789,6 +1789,50 @@
                         show_create_button: false,
                         sort_order: 99
                     }
+                },
+                template: {
+                    name: 'template',
+                    description: 'Template definition file',
+                    schema: {
+                        name: { type: 'text', required: true },
+                        description: { type: 'text' },
+                        schema: { type: 'yaml' },
+                        card: { type: 'yaml' },
+                        viewer: { type: 'yaml' },
+                        editor: { type: 'yaml' },
+                        style: { type: 'yaml' },
+                        ui: { type: 'yaml' }
+                    },
+                    card: {
+                        layout: 'yaml',
+                        placeholder: '📋'
+                    },
+                    viewer: {
+                        layout: 'yaml'
+                    },
+                    editor: {
+                        fields: [
+                            { field: 'name', label: 'Template Name' },
+                            { field: 'description', label: 'Description' },
+                            { field: 'schema', label: 'Schema', rows: 10 },
+                            { field: 'card', label: 'Card Layout', rows: 6 },
+                            { field: 'viewer', label: 'Viewer Layout', rows: 4 },
+                            { field: 'editor', label: 'Editor Config', rows: 6 },
+                            { field: 'style', label: 'Style', rows: 4 },
+                            { field: 'ui', label: 'UI Config', rows: 4 }
+                        ]
+                    },
+                    style: {
+                        variables: {
+                            '--preview-bg': '#f0f4f8'
+                        }
+                    },
+                    ui: {
+                        button_label: 'Template',
+                        icon: '📋',
+                        show_create_button: false,
+                        sort_order: 98
+                    }
                 }
             };
         }
@@ -4053,6 +4097,35 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                                 modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
                             });
                             console.log(`[Filesystem] Loaded settings card: ${filename}`);
+                            continue;
+                        }
+
+                        // Special handling for *.template.yaml - use template template
+                        if (filename.endsWith('.template.yaml')) {
+                            try {
+                                const parsed = jsyaml.load(content);
+                                const templateName = filename.replace(/\.template\.yaml$/, '');
+                                loadedData.systemNotes.push({
+                                    template: 'template',
+                                    system: true,
+                                    id: 'system-' + filename,
+                                    filename: filename,
+                                    title: templateName + ' (template)',
+                                    // Store parsed template fields
+                                    name: parsed.name || templateName,
+                                    description: parsed.description || '',
+                                    schema: parsed.schema || {},
+                                    card: parsed.card || {},
+                                    viewer: parsed.viewer || {},
+                                    editor: parsed.editor || {},
+                                    style: parsed.style || {},
+                                    ui: parsed.ui || {},
+                                    modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
+                                });
+                                console.log(`[Filesystem] Loaded template card: ${filename}`);
+                            } catch (e) {
+                                console.error(`[Filesystem] Error parsing template ${filename}:`, e);
+                            }
                             continue;
                         }
 
