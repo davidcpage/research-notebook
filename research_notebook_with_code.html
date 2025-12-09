@@ -1226,6 +1226,203 @@
             margin-top: 0.5rem;
         }
 
+        /* List editor styles */
+        .list-editor {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .list-editor-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .list-editor-input {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .list-editor-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .list-editor-input[readonly] {
+            background: var(--bg-secondary);
+            cursor: default;
+        }
+
+        .list-editor-buttons {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .list-editor-btn {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            cursor: pointer;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            transition: all 0.15s;
+        }
+
+        .list-editor-btn:hover {
+            background: var(--bg-primary);
+            border-color: var(--accent);
+            color: var(--text-primary);
+        }
+
+        .list-editor-btn-delete:hover {
+            background: #fee;
+            border-color: #c00;
+            color: #c00;
+        }
+
+        .list-editor-add {
+            align-self: flex-start;
+            margin-top: 0.5rem;
+            padding: 0.4rem 0.8rem;
+            border: 1px dashed var(--border);
+            border-radius: 4px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+
+        .list-editor-add:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--bg-secondary);
+        }
+
+        /* Records editor styles */
+        .records-editor {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .records-editor-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            transition: opacity 0.15s;
+        }
+
+        .records-editor-item.is-hidden {
+            opacity: 0.5;
+        }
+
+        .records-editor-fields {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex: 1;
+        }
+
+        .records-editor-input {
+            flex: 1;
+            padding: 0.4rem 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            background: white;
+        }
+
+        .records-editor-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .records-editor-input[readonly] {
+            background: var(--bg-primary);
+            cursor: default;
+        }
+
+        .records-editor-toggle {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.15s;
+        }
+
+        .records-editor-toggle:hover {
+            background: var(--bg-primary);
+            border-color: var(--accent);
+        }
+
+        .records-editor-toggle.is-hidden {
+            opacity: 0.6;
+        }
+
+        .records-editor-buttons {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .records-editor-btn {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            transition: all 0.15s;
+        }
+
+        .records-editor-btn:hover {
+            background: var(--bg-primary);
+            border-color: var(--accent);
+            color: var(--text-primary);
+        }
+
+        .records-editor-btn-delete:hover {
+            background: #fee;
+            border-color: #c00;
+            color: #c00;
+        }
+
+        .records-editor-add {
+            align-self: flex-start;
+            margin-top: 0.5rem;
+            padding: 0.4rem 0.8rem;
+            border: 1px dashed var(--border);
+            border-radius: 4px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+
+        .records-editor-add:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--bg-secondary);
+        }
+
         .thumbnail-upload {
             width: 100%;
             height: 180px;
@@ -1682,9 +1879,6 @@
         // Track collapsed sections (not persisted)
         let collapsedSections = new Set();
 
-        // Show/hide system notes section (persisted in localStorage)
-        let showSystemNotes = localStorage.getItem('showSystemNotes') === 'true';
-
         // Pyodide state
         let pyodide = null;
         let pyodideLoading = false;
@@ -1883,7 +2077,15 @@
                     schema: {
                         notebook_title: { type: 'text', required: true },
                         notebook_subtitle: { type: 'text' },
-                        sections: { type: 'list', item_type: 'text' },
+                        sections: {
+                            type: 'records',
+                            allowDelete: false,
+                            allowAdd: false,
+                            schema: {
+                                name: { type: 'text', readOnly: true },
+                                visible: { type: 'boolean', default: true, label: 'Visible' }
+                            }
+                        },
                         extensions: { type: 'yaml' },
                         theme: { type: 'text' }
                     },
@@ -1898,6 +2100,7 @@
                         fields: [
                             { field: 'notebook_title', label: 'Notebook Title' },
                             { field: 'notebook_subtitle', label: 'Subtitle' },
+                            { field: 'sections', label: 'Sections' },
                             { field: 'extensions', label: 'Extension Registry', multiline: true, rows: 20, monospace: true },
                             { field: 'theme', label: 'Theme CSS file (optional)' }
                         ]
@@ -2014,7 +2217,7 @@
                 notebookSettings = {
                     notebook_title: 'Research Notebook',
                     notebook_subtitle: 'Bookmarks, notes, and connections',
-                    sections: ['research'],
+                    sections: [{ name: 'research', visible: true }],
                     extensions: getDefaultExtensionRegistry(),
                     theme: null
                 };
@@ -2030,7 +2233,7 @@
                 notebookSettings = {
                     notebook_title: parsed.notebook_title || 'Research Notebook',
                     notebook_subtitle: parsed.notebook_subtitle || 'Bookmarks, notes, and connections',
-                    sections: parsed.sections || [],
+                    sections: normalizeSectionsFormat(parsed.sections || []),
                     extensions: parsed.extensions || getDefaultExtensionRegistry(),
                     theme: parsed.theme || null
                 };
@@ -2078,7 +2281,7 @@
             notebookSettings = {
                 notebook_title: title,
                 notebook_subtitle: subtitle,
-                sections: sections,
+                sections: normalizeSectionsFormat(sections),
                 extensions: extensions,
                 theme: null
             };
@@ -2104,6 +2307,35 @@
             }
 
             return notebookSettings;
+        }
+
+        // Normalize sections format: convert string array to records format
+        // Old format: ['research', 'projects']
+        // New format: [{name: 'research', visible: true}, {name: 'projects', visible: true}]
+        function normalizeSectionsFormat(sections) {
+            if (!Array.isArray(sections)) return [];
+            return sections.map(s => {
+                if (typeof s === 'string') {
+                    return { name: s, visible: true };
+                }
+                // Already an object, ensure visible has a default
+                return { name: s.name || '', visible: s.visible !== false };
+            });
+        }
+
+        // Convert sections records to simple names array for filesystem operations
+        function getSectionNames(sections) {
+            return normalizeSectionsFormat(sections).map(s => s.name);
+        }
+
+        // Check if the _system section is visible in settings
+        function getSystemSectionVisible() {
+            if (!notebookSettings?.sections) return false;
+            const systemSection = notebookSettings.sections.find(s =>
+                (typeof s === 'string' ? s : s.name) === '_system'
+            );
+            if (!systemSection) return false;
+            return typeof systemSection === 'string' ? true : systemSection.visible !== false;
         }
 
         // Save settings to settings.yaml
@@ -3341,10 +3573,6 @@
                         </span>
                         <button class="btn btn-secondary btn-small" onclick="refreshFromFilesystem()" title="Reload from filesystem">🔄 Refresh</button>
                         <button class="btn btn-secondary btn-small" onclick="changeNotebookFolder()" title="Switch notebook folder">📁 Change</button>
-                        <label class="checkbox-label" style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); margin-left: auto;">
-                            <input type="checkbox" id="editorShowSystemNotes" ${showSystemNotes ? 'checked' : ''} onchange="toggleSystemNotesFromEditor(this.checked)">
-                            Show system cards
-                        </label>
                     </div>
                 `;
             }
@@ -3521,6 +3749,84 @@
                     inputEl.appendChild(option);
                 });
                 div.appendChild(inputEl);
+            } else if (type === 'list') {
+                // List editor with reorderable items
+                const listContainer = document.createElement('div');
+                listContainer.className = 'list-editor';
+                listContainer.id = `editor-${field}`;
+                listContainer.setAttribute('data-item-type', fieldDef?.item_type || 'text');
+                const allowDelete = fieldDef?.allowDelete !== false;
+                const allowAdd = fieldDef?.allowAdd !== false;
+                listContainer.setAttribute('data-allow-delete', allowDelete);
+
+                const itemsArray = Array.isArray(value) ? value : [];
+                itemsArray.forEach((item, idx) => {
+                    const itemRow = createListEditorItem(field, item, idx, allowDelete);
+                    listContainer.appendChild(itemRow);
+                });
+
+                div.appendChild(listContainer);
+
+                // Add button (only if allowAdd is true)
+                if (allowAdd) {
+                    const addBtn = document.createElement('button');
+                    addBtn.type = 'button';
+                    addBtn.className = 'list-editor-add';
+                    addBtn.textContent = '+ Add item';
+                    addBtn.onclick = () => {
+                        const container = document.getElementById(`editor-${field}`);
+                        const newIdx = container.children.length;
+                        const canDelete = container.getAttribute('data-allow-delete') === 'true';
+                        const newRow = createListEditorItem(field, '', newIdx, canDelete);
+                        container.appendChild(newRow);
+                        // Focus the new input
+                        const input = newRow.querySelector('input');
+                        if (input) input.focus();
+                    };
+                    div.appendChild(addBtn);
+                }
+            } else if (type === 'records') {
+                // Records editor - list of objects with defined schema
+                const recordsContainer = document.createElement('div');
+                recordsContainer.className = 'records-editor';
+                recordsContainer.id = `editor-${field}`;
+                const schema = fieldDef?.schema || {};
+                const allowDelete = fieldDef?.allowDelete !== false;
+                const allowAdd = fieldDef?.allowAdd !== false;
+                recordsContainer.setAttribute('data-schema', JSON.stringify(schema));
+                recordsContainer.setAttribute('data-allow-delete', allowDelete);
+                recordsContainer.setAttribute('data-allow-add', allowAdd);
+
+                const recordsArray = Array.isArray(value) ? value : [];
+                recordsArray.forEach((record, idx) => {
+                    const recordRow = createRecordsEditorItem(field, schema, record, idx, allowDelete);
+                    recordsContainer.appendChild(recordRow);
+                });
+
+                div.appendChild(recordsContainer);
+
+                // Add button (only if allowAdd is true)
+                if (allowAdd) {
+                    const addBtn = document.createElement('button');
+                    addBtn.type = 'button';
+                    addBtn.className = 'records-editor-add';
+                    addBtn.textContent = '+ Add item';
+                    addBtn.onclick = () => {
+                        const container = document.getElementById(`editor-${field}`);
+                        const schemaStr = container.getAttribute('data-schema');
+                        const schema = JSON.parse(schemaStr);
+                        const canDelete = container.getAttribute('data-allow-delete') === 'true';
+                        const newIdx = container.children.length;
+                        // Create default record from schema
+                        const defaultRecord = {};
+                        for (const [key, def] of Object.entries(schema)) {
+                            defaultRecord[key] = def.default !== undefined ? def.default : (def.type === 'boolean' ? true : '');
+                        }
+                        const newRow = createRecordsEditorItem(field, schema, defaultRecord, newIdx, canDelete);
+                        container.appendChild(newRow);
+                    };
+                    div.appendChild(addBtn);
+                }
             } else {
                 // Default text input
                 inputEl = document.createElement('input');
@@ -3532,6 +3838,217 @@
             }
 
             return div;
+        }
+
+        // Create a single list editor item row with up/down/delete buttons
+        function createListEditorItem(field, value, index, allowDelete = true) {
+            const row = document.createElement('div');
+            row.className = 'list-editor-item';
+            row.setAttribute('data-index', index);
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'list-editor-input';
+            input.value = value || '';
+            input.placeholder = 'Item value';
+            input.readOnly = !allowDelete; // If can't delete, also can't edit (for sections)
+            row.appendChild(input);
+
+            const buttons = document.createElement('div');
+            buttons.className = 'list-editor-buttons';
+
+            // Move up button
+            const upBtn = document.createElement('button');
+            upBtn.type = 'button';
+            upBtn.className = 'list-editor-btn';
+            upBtn.textContent = '▲';
+            upBtn.title = 'Move up';
+            upBtn.onclick = () => moveListItem(field, row, -1);
+            buttons.appendChild(upBtn);
+
+            // Move down button
+            const downBtn = document.createElement('button');
+            downBtn.type = 'button';
+            downBtn.className = 'list-editor-btn';
+            downBtn.textContent = '▼';
+            downBtn.title = 'Move down';
+            downBtn.onclick = () => moveListItem(field, row, 1);
+            buttons.appendChild(downBtn);
+
+            // Delete button (only if allowed)
+            if (allowDelete) {
+                const delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.className = 'list-editor-btn list-editor-btn-delete';
+                delBtn.textContent = '×';
+                delBtn.title = 'Remove';
+                delBtn.onclick = () => {
+                    row.remove();
+                    updateListEditorIndices(field);
+                };
+                buttons.appendChild(delBtn);
+            }
+
+            row.appendChild(buttons);
+            return row;
+        }
+
+        // Move a list item up or down
+        function moveListItem(field, row, direction) {
+            const container = document.getElementById(`editor-${field}`);
+            const items = Array.from(container.children);
+            const currentIndex = items.indexOf(row);
+            const newIndex = currentIndex + direction;
+
+            if (newIndex < 0 || newIndex >= items.length) return;
+
+            if (direction < 0) {
+                container.insertBefore(row, items[newIndex]);
+            } else {
+                container.insertBefore(items[newIndex], row);
+            }
+            updateListEditorIndices(field);
+        }
+
+        // Update data-index attributes after reordering
+        function updateListEditorIndices(field) {
+            const container = document.getElementById(`editor-${field}`);
+            Array.from(container.children).forEach((row, idx) => {
+                row.setAttribute('data-index', idx);
+            });
+        }
+
+        // Create a single records editor item row
+        function createRecordsEditorItem(field, schema, record, index, allowDelete) {
+            const row = document.createElement('div');
+            row.className = 'records-editor-item';
+            row.setAttribute('data-index', index);
+
+            // Create fields based on schema
+            const fieldsContainer = document.createElement('div');
+            fieldsContainer.className = 'records-editor-fields';
+
+            for (const [key, def] of Object.entries(schema)) {
+                const value = record[key];
+                const fieldType = def.type || 'text';
+                const readOnly = def.readOnly === true;
+
+                if (fieldType === 'boolean') {
+                    // Render as clickable icon toggle
+                    const toggle = document.createElement('button');
+                    toggle.type = 'button';
+                    toggle.className = 'records-editor-toggle';
+                    toggle.setAttribute('data-field', key);
+                    toggle.setAttribute('data-value', value !== false ? 'true' : 'false');
+                    toggle.title = def.label || key;
+                    // Use eye icon for visibility
+                    if (key === 'visible') {
+                        toggle.textContent = value !== false ? '👁' : '👁‍🗨';
+                        toggle.classList.toggle('is-hidden', value === false);
+                    } else {
+                        toggle.textContent = value ? '✓' : '✗';
+                    }
+                    toggle.onclick = () => {
+                        const current = toggle.getAttribute('data-value') === 'true';
+                        const newVal = !current;
+                        toggle.setAttribute('data-value', newVal ? 'true' : 'false');
+                        if (key === 'visible') {
+                            toggle.textContent = newVal ? '👁' : '👁‍🗨';
+                            toggle.classList.toggle('is-hidden', !newVal);
+                            // Grey out the row when hidden
+                            row.classList.toggle('is-hidden', !newVal);
+                        } else {
+                            toggle.textContent = newVal ? '✓' : '✗';
+                        }
+                    };
+                    fieldsContainer.appendChild(toggle);
+                } else {
+                    // Text input
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'records-editor-input';
+                    input.setAttribute('data-field', key);
+                    input.value = value || '';
+                    input.placeholder = def.label || key;
+                    input.readOnly = readOnly;
+                    if (readOnly) {
+                        input.title = def.label || key;
+                    }
+                    fieldsContainer.appendChild(input);
+                }
+            }
+
+            row.appendChild(fieldsContainer);
+
+            // Buttons container
+            const buttons = document.createElement('div');
+            buttons.className = 'records-editor-buttons';
+
+            // Move up button
+            const upBtn = document.createElement('button');
+            upBtn.type = 'button';
+            upBtn.className = 'records-editor-btn';
+            upBtn.textContent = '▲';
+            upBtn.title = 'Move up';
+            upBtn.onclick = () => moveRecordsItem(field, row, -1);
+            buttons.appendChild(upBtn);
+
+            // Move down button
+            const downBtn = document.createElement('button');
+            downBtn.type = 'button';
+            downBtn.className = 'records-editor-btn';
+            downBtn.textContent = '▼';
+            downBtn.title = 'Move down';
+            downBtn.onclick = () => moveRecordsItem(field, row, 1);
+            buttons.appendChild(downBtn);
+
+            // Delete button (only if allowed)
+            if (allowDelete) {
+                const delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.className = 'records-editor-btn records-editor-btn-delete';
+                delBtn.textContent = '×';
+                delBtn.title = 'Remove';
+                delBtn.onclick = () => {
+                    row.remove();
+                    updateRecordsEditorIndices(field);
+                };
+                buttons.appendChild(delBtn);
+            }
+
+            row.appendChild(buttons);
+
+            // Set initial hidden state based on visible field
+            if (record.visible === false) {
+                row.classList.add('is-hidden');
+            }
+
+            return row;
+        }
+
+        // Move a records item up or down
+        function moveRecordsItem(field, row, direction) {
+            const container = document.getElementById(`editor-${field}`);
+            const items = Array.from(container.children);
+            const currentIndex = items.indexOf(row);
+            const newIndex = currentIndex + direction;
+
+            if (newIndex < 0 || newIndex >= items.length) return;
+
+            if (direction < 0) {
+                container.insertBefore(row, items[newIndex]);
+            } else {
+                container.insertBefore(items[newIndex], row);
+            }
+            updateRecordsEditorIndices(field);
+        }
+
+        // Update data-index attributes after reordering records
+        function updateRecordsEditorIndices(field) {
+            const container = document.getElementById(`editor-${field}`);
+            Array.from(container.children).forEach((row, idx) => {
+                row.setAttribute('data-index', idx);
+            });
         }
 
         // Get value from an editor field
@@ -3563,6 +4080,38 @@
                     showToast('Invalid YAML: ' + e.message, true);
                     return null;
                 }
+            } else if (type === 'list') {
+                // Collect values from list editor items in order
+                const values = [];
+                const rows = el.querySelectorAll('.list-editor-item');
+                rows.forEach(row => {
+                    const input = row.querySelector('.list-editor-input');
+                    if (input && input.value.trim()) {
+                        values.push(input.value.trim());
+                    }
+                });
+                return values;
+            } else if (type === 'records') {
+                // Collect record objects from records editor items in order
+                const schemaStr = el.getAttribute('data-schema');
+                const schema = JSON.parse(schemaStr || '{}');
+                const records = [];
+                const rows = el.querySelectorAll('.records-editor-item');
+                rows.forEach(row => {
+                    const record = {};
+                    for (const key of Object.keys(schema)) {
+                        const fieldType = schema[key].type || 'text';
+                        if (fieldType === 'boolean') {
+                            const toggle = row.querySelector(`[data-field="${key}"]`);
+                            record[key] = toggle ? toggle.getAttribute('data-value') === 'true' : true;
+                        } else {
+                            const input = row.querySelector(`[data-field="${key}"]`);
+                            record[key] = input ? input.value : '';
+                        }
+                    }
+                    records.push(record);
+                });
+                return records;
             }
 
             return el.value;
@@ -4488,6 +5037,19 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 
                 console.log(`[Filesystem] Loaded ${loadedData.sections.length} sections`);
 
+                // Ensure _system section exists in settings if there are system notes
+                if (loadedData.systemNotes && loadedData.systemNotes.length > 0) {
+                    if (!notebookSettings.sections.some(s => (typeof s === 'string' ? s : s.name) === '_system')) {
+                        // Add _system section (hidden by default)
+                        notebookSettings.sections.push({ name: '_system', visible: false });
+                        // Update settings card if it exists
+                        const settingsCard = loadedData.systemNotes.find(n => n.template === 'settings');
+                        if (settingsCard) {
+                            settingsCard.sections = notebookSettings.sections;
+                        }
+                    }
+                }
+
                 // Create template files for card types that exist but don't have template files
                 // This supports customization without auto-creating templates for empty types
                 await ensureTemplatesForExistingCards(dirHandle, loadedData);
@@ -4509,7 +5071,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 notebookSettings = {
                     notebook_title: data.title,
                     notebook_subtitle: data.subtitle,
-                    sections: data.sections.map(s => slugify(s.name)),
+                    sections: data.sections.map(s => ({ name: slugify(s.name), visible: s.visible !== false })),
                     extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
                     theme: notebookSettings?.theme || null
                 };
@@ -4686,7 +5248,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             notebookSettings = {
                 notebook_title: data.title,
                 notebook_subtitle: data.subtitle,
-                sections: data.sections.map(s => slugify(s.name)),
+                sections: data.sections.map(s => ({ name: slugify(s.name), visible: s.visible !== false })),
                 extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
                 theme: notebookSettings?.theme || null
             };
@@ -4713,6 +5275,31 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 data.subtitle = notebookSettings.notebook_subtitle;
                 // Update extension registry
                 extensionRegistry = notebookSettings.extensions;
+
+                // Reorder data.sections to match the new order from settings
+                // card.sections is now an array of {name, visible} records
+                if (card.sections && Array.isArray(card.sections)) {
+                    const newOrder = [];
+                    for (const sectionRecord of card.sections) {
+                        const sectionName = typeof sectionRecord === 'string' ? sectionRecord : sectionRecord.name;
+                        // Find section by matching slug
+                        const section = data.sections.find(s => slugify(s.name) === sectionName);
+                        if (section) {
+                            // Apply visibility from settings record
+                            if (typeof sectionRecord === 'object') {
+                                section.visible = sectionRecord.visible !== false;
+                            }
+                            newOrder.push(section);
+                        }
+                    }
+                    // Add any sections not in the list (shouldn't happen, but safety)
+                    for (const section of data.sections) {
+                        if (!newOrder.includes(section)) {
+                            newOrder.push(section);
+                        }
+                    }
+                    data.sections = newOrder;
+                }
 
                 await saveSettings(notebookDirHandle);
                 card.filename = 'settings.yaml';
@@ -5290,7 +5877,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                     title: 'Settings',
                     notebook_title: data.title || 'Research Notebook',
                     notebook_subtitle: data.subtitle || '',
-                    sections: data.sections.map(s => slugify(s.name)),
+                    sections: data.sections.map(s => ({ name: slugify(s.name), visible: s.visible !== false })),
                     extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
                     theme: notebookSettings?.theme || null,
                     modified: new Date().toISOString()
@@ -5302,14 +5889,6 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 
             // Open the generic editor with the settings card
             openEditor('settings', '_system', settingsCard);
-        }
-
-        // Toggle system notes from settings editor (saves immediately to localStorage)
-        function toggleSystemNotesFromEditor(enabled) {
-            showSystemNotes = enabled;
-            localStorage.setItem('showSystemNotes', showSystemNotes);
-            // Immediately re-render to show/hide system notes section
-            render();
         }
 
         // Change to a different notebook folder
@@ -6108,9 +6687,14 @@ sys.stderr = sys.__stderr__
 
             const content = document.getElementById('content');
 
-            const hasSystemNotes = showSystemNotes && data.systemNotes && data.systemNotes.length > 0;
+            // Filter sections by visibility
+            const visibleSections = data.sections.filter(s => s.visible !== false);
 
-            if (data.sections.length === 0 && !hasSystemNotes) {
+            // Check if _system section is visible (from settings)
+            const systemSectionVisible = getSystemSectionVisible();
+            const hasSystemNotes = systemSectionVisible && data.systemNotes && data.systemNotes.length > 0;
+
+            if (visibleSections.length === 0 && !hasSystemNotes) {
                 content.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-state-icon">📚</div>
@@ -6121,7 +6705,7 @@ sys.stderr = sys.__stderr__
                 return;
             }
 
-            let sectionsHtml = data.sections.map(section => {
+            let sectionsHtml = visibleSections.map(section => {
                 const isCollapsed = collapsedSections.has(section.id);
                 const itemCount = section.items.length;
 
