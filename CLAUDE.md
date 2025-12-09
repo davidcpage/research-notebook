@@ -153,8 +153,8 @@ data = {
 **System Notes** (loaded from notebook root):
 - Text files at notebook root are loaded as "system notes" in a special `_system` section
 - Visibility controlled via the sections list in Settings (toggle eye icon)
-- **File types loaded**: `.md`, `.txt`, and specific dotfiles (`.gitignore`, `.env.example`, `.editorconfig`, `.prettierrc`, `.eslintrc`)
-- **Excluded**: `.json`, `.html`, `.js`, `.css`, images, and most hidden files
+- **File types loaded**: `.md`, `.txt`, `.yaml`, and `.css` files (non-hidden)
+- **Excluded**: `.json`, `.html`, `.js`, images, and all dotfiles (hidden files)
 - **Format field**: `format: 'markdown' | 'text'` based on file extension
   - `.md` files → `format: 'markdown'` (rendered with markdown/LaTeX)
   - Other files → `format: 'text'` (rendered as `<pre>` monospace)

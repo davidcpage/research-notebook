@@ -4965,19 +4965,18 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             try {
 
                 // Read system notes (text files at root)
-                // Include: .md, .txt, .yaml (including templates), dotfiles like .gitignore
-                // Exclude: .json, .html, .js, binary files
-                const excludedExtensions = ['.json', '.html', '.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico'];
-                const includedDotfiles = ['.gitignore', '.env.example', '.editorconfig', '.prettierrc', '.eslintrc'];
+                // Include: .md, .txt, .yaml (including templates), .css
+                // Exclude: .json, .html, .js, binary files, dotfiles
+                const excludedExtensions = ['.json', '.html', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico'];
 
                 for await (const [filename, fileHandle] of dirHandle.entries()) {
                     if (fileHandle.kind !== 'file') continue;
 
-                    // Skip files with excluded extensions (but allow theme.css specifically)
-                    if (filename !== 'theme.css' && excludedExtensions.some(ext => filename.endsWith(ext))) continue;
+                    // Skip files with excluded extensions
+                    if (excludedExtensions.some(ext => filename.endsWith(ext))) continue;
 
-                    // Skip hidden files unless they're in the allowed list
-                    if (filename.startsWith('.') && !includedDotfiles.includes(filename)) continue;
+                    // Skip all dotfiles (hidden files)
+                    if (filename.startsWith('.')) continue;
 
                     // Skip legacy config files
                     if (filename === 'notebook.json') continue;
