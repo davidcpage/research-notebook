@@ -42,7 +42,7 @@ The app uses a template system defined in TEMPLATE_SYSTEM and GENERIC_EDITOR sec
 - `openViewer()`: Generic viewer modal that adapts to any template
 - `openEditor()`: Generic editor modal that builds form from template definition
 - Templates are stored as `*.template.yaml` files in notebook root
-- Extension mappings are in `extensions.yaml`
+- Settings and extension mappings are in `settings.yaml` (consolidated config)
 - Optional `theme.css` for custom styling
 
 To add a new card type (fully automatic with template system):
@@ -116,7 +116,7 @@ data = {
 
 **System Notes** (loaded from notebook root):
 - Text files at notebook root are loaded as "system notes" in a special System section
-- Toggle visibility in Settings modal via checkbox
+- Toggle visibility via ⚙ Settings editor checkbox
 - **File types loaded**: `.md`, `.txt`, and specific dotfiles (`.gitignore`, `.env.example`, `.editorconfig`, `.prettierrc`, `.eslintrc`)
 - **Excluded**: `.json`, `.html`, `.js`, `.css`, images, and most hidden files
 - **Format field**: `format: 'markdown' | 'text'` based on file extension
@@ -169,12 +169,12 @@ data = {
 - Matplotlib integration: plots rendered as base64 PNG images in output
 - Console logging enabled for debugging: `[Pyodide] ...` messages track initialization progress
 
-**Settings** (SETTINGS_MODAL section):
-- **Settings Modal**: Accessible via ⚙ icon in toolbar (far right, grey/muted color)
-- Allows customization of notebook title and subtitle
-- `openSettingsModal()`: Opens modal with current title/subtitle values
-- `saveSettings()`: Saves changes to data model, updates header and browser tab title
-- Backwards compatible: loads default values if title/subtitle missing from saved data
+**Settings** (GENERIC_EDITOR section):
+- **Settings Editor**: Accessible via ⚙ icon in toolbar (far right, grey/muted color)
+- Uses the generic editor with the `settings` template
+- Edits `settings.yaml` containing notebook_title, notebook_subtitle, sections, extensions
+- `openSettingsEditor()`: Opens generic editor for settings card
+- Footer includes folder info, Refresh/Change buttons, and system notes toggle
 
 **Onboarding** (ONBOARDING section):
 - First-time setup flow shown when no folder is linked
@@ -216,7 +216,7 @@ The app uses **filesystem-based storage** via the File System Access API (Chrome
 **Directory Structure**:
 ```
 notebook-folder/
-├── notebook.json           # Title, subtitle, section order
+├── settings.yaml           # Title, subtitle, sections, extensions config
 ├── sections/
 │   ├── section-name/
 │   │   ├── _section.json   # Section metadata
@@ -246,7 +246,8 @@ notebook-folder/
 - Database: `ResearchNotebookDB`, Store: `notebook`
 
 **Settings**:
-- Settings modal shows current folder and provides Refresh/Change Folder buttons
+- Settings editor (⚙ button) shows current folder and provides Refresh/Change Folder buttons
+- Settings stored in `settings.yaml` with notebook_title, notebook_subtitle, sections, extensions
 - Refresh reloads from filesystem (picks up external edits)
 - Change Folder switches to different notebook
 

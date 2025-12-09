@@ -68,7 +68,7 @@ Create `sections/{section-name}/{slug}.code.py`:
   "id": "unique-section-id"
 }
 ```
-3. Add section slug to `notebook.json` sections array
+3. Add section slug to `settings.yaml` sections array
 
 ## Editing Items
 

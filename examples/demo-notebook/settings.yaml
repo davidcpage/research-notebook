@@ -1,3 +1,7 @@
+notebook_title: Research Notebook
+notebook_subtitle: Bookmarks, notes, and connections
+sections:
+  - research
 extensions:
   .md:
     parser: yaml-frontmatter
@@ -16,3 +20,4 @@ extensions:
   .card.yaml:
     parser: yaml
     defaultTemplate: null
+theme: null

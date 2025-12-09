@@ -604,6 +604,22 @@
             pointer-events: none;
         }
 
+        /* YAML preview - light background for config files */
+        .preview-yaml {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.7rem;
+            color: #333;
+            line-height: 1.4;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin: 0;
+            padding: 1rem;
+            background: #f8f8f8;
+        }
+
         /* Split pane preview */
         .preview-split {
             display: flex;
@@ -812,6 +828,17 @@
             font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
             font-size: 0.9rem;
             line-height: 1.5;
+        }
+
+        .viewer-yaml {
+            margin: 0;
+            padding: 1.5rem;
+            white-space: pre-wrap;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            background: #f8f8f8;
+            border-radius: 4px;
         }
 
         .viewer-empty {
@@ -1409,7 +1436,7 @@
             </button>
         </div>
         <div class="toolbar-group" style="margin-left: auto;">
-            <button class="btn btn-secondary" onclick="openSettingsModal()" title="Settings" style="color: var(--text-muted);">
+            <button class="btn btn-secondary" onclick="openSettingsEditor()" title="Settings" style="color: var(--text-muted);">
                 <span class="btn-icon">⚙</span>
             </button>
         </div>
@@ -1480,64 +1507,6 @@
                     <button class="btn btn-secondary" onclick="closeEditor()">Cancel</button>
                     <button class="btn btn-primary" id="editorSubmitBtn" onclick="saveEditor()">Save</button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Settings Modal -->
-    <div class="modal-overlay" id="settingsModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Settings</h2>
-                <button class="modal-close" onclick="closeSettingsModal()">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="settingsTitle">Notebook Title</label>
-                    <input type="text" id="settingsTitle" placeholder="Research Notebook">
-                </div>
-                <div class="form-group">
-                    <label for="settingsSubtitle">Subtitle</label>
-                    <input type="text" id="settingsSubtitle" placeholder="Bookmarks, notes, and connections">
-                </div>
-
-                <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
-
-                <div class="form-group">
-                    <label>Storage</label>
-                    <div id="storageSettings" style="margin-top: 8px;">
-                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 8px;">
-                            Notebook folder:
-                        </p>
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                            <code id="linkedFolderName" style="flex: 1; padding: 8px 12px; background: var(--bg-secondary); border-radius: 4px; font-size: 0.85rem;"></code>
-                        </div>
-                        <div style="display: flex; gap: 8px;">
-                            <button class="btn btn-secondary" onclick="refreshFromFilesystem()" style="flex: 1;">
-                                🔄 Refresh
-                            </button>
-                            <button class="btn btn-secondary" onclick="changeNotebookFolder()" style="flex: 1;">
-                                📁 Change Folder
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
-
-                <div class="form-group">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" id="showSystemNotesCheckbox" onchange="toggleSystemNotes(this.checked)" style="width: 18px; height: 18px;">
-                        <span>Show System notes</span>
-                    </label>
-                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 6px; margin-left: 28px;">
-                        Display markdown files from the notebook root (README.md, CLAUDE.md, etc.)
-                    </p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeSettingsModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
             </div>
         </div>
     </div>
@@ -1783,6 +1752,43 @@
                         icon: '🔗',
                         sort_order: 3
                     }
+                },
+                settings: {
+                    name: 'settings',
+                    description: 'Notebook configuration',
+                    schema: {
+                        notebook_title: { type: 'text', required: true },
+                        notebook_subtitle: { type: 'text' },
+                        sections: { type: 'list', item_type: 'text' },
+                        extensions: { type: 'yaml' },
+                        theme: { type: 'text' }
+                    },
+                    card: {
+                        layout: 'yaml',
+                        placeholder: '⚙'
+                    },
+                    viewer: {
+                        layout: 'yaml'
+                    },
+                    editor: {
+                        fields: [
+                            { field: 'notebook_title', label: 'Notebook Title' },
+                            { field: 'notebook_subtitle', label: 'Subtitle' },
+                            { field: 'extensions', label: 'Extension Registry', multiline: true, rows: 20, monospace: true },
+                            { field: 'theme', label: 'Theme CSS file (optional)' }
+                        ]
+                    },
+                    style: {
+                        variables: {
+                            '--preview-bg': '#f5f5f5'
+                        }
+                    },
+                    ui: {
+                        button_label: 'Settings',
+                        icon: '⚙',
+                        show_create_button: false,
+                        sort_order: 99
+                    }
                 }
             };
         }
@@ -1802,7 +1808,7 @@
             });
         }
 
-        // Generate YAML content for extensions.yaml
+        // Generate YAML content for extensions.yaml (legacy, for migration)
         function getExtensionRegistryContent() {
             const registry = getDefaultExtensionRegistry();
             return jsyaml.dump({ extensions: registry }, {
@@ -1813,8 +1819,153 @@
             });
         }
 
-        // Load extension registry from filesystem (or use defaults)
+        // Generate default settings.yaml content
+        function getDefaultSettingsContent(title = 'Research Notebook', subtitle = 'Bookmarks, notes, and connections', sections = ['research']) {
+            const registry = getDefaultExtensionRegistry();
+            const settings = {
+                notebook_title: title,
+                notebook_subtitle: subtitle,
+                sections: sections,
+                extensions: registry,
+                theme: null
+            };
+            return jsyaml.dump(settings, {
+                indent: 2,
+                lineWidth: -1,
+                quotingType: '"',
+                forceQuotes: false
+            });
+        }
+
+        // Global settings object (loaded from settings.yaml)
+        let notebookSettings = null;
+
+        // Load settings from settings.yaml (with migration from legacy format)
+        async function loadSettings(dirHandle) {
+            if (!dirHandle) {
+                notebookSettings = {
+                    notebook_title: 'Research Notebook',
+                    notebook_subtitle: 'Bookmarks, notes, and connections',
+                    sections: ['research'],
+                    extensions: getDefaultExtensionRegistry(),
+                    theme: null
+                };
+                return notebookSettings;
+            }
+
+            // Try to load settings.yaml first (new format)
+            try {
+                const settingsFile = await dirHandle.getFileHandle('settings.yaml');
+                const file = await settingsFile.getFile();
+                const content = await file.text();
+                const parsed = jsyaml.load(content);
+                notebookSettings = {
+                    notebook_title: parsed.notebook_title || 'Research Notebook',
+                    notebook_subtitle: parsed.notebook_subtitle || 'Bookmarks, notes, and connections',
+                    sections: parsed.sections || [],
+                    extensions: parsed.extensions || getDefaultExtensionRegistry(),
+                    theme: parsed.theme || null
+                };
+                console.log('[Settings] Loaded settings.yaml');
+                return notebookSettings;
+            } catch (e) {
+                // settings.yaml doesn't exist, try to migrate from legacy format
+                console.log('[Settings] No settings.yaml found, checking for legacy files...');
+            }
+
+            // Try to migrate from notebook.json + extensions.yaml
+            let title = 'Research Notebook';
+            let subtitle = 'Bookmarks, notes, and connections';
+            let sections = [];
+            let extensions = getDefaultExtensionRegistry();
+            let needsMigration = false;
+
+            // Try to read notebook.json
+            try {
+                const metaFile = await dirHandle.getFileHandle('notebook.json');
+                const file = await metaFile.getFile();
+                const meta = JSON.parse(await file.text());
+                title = meta.title || title;
+                subtitle = meta.subtitle || subtitle;
+                sections = meta.sections || [];
+                needsMigration = true;
+                console.log('[Settings] Found legacy notebook.json');
+            } catch (e) {
+                // No notebook.json
+            }
+
+            // Try to read extensions.yaml
+            try {
+                const extFile = await dirHandle.getFileHandle('extensions.yaml');
+                const file = await extFile.getFile();
+                const content = await file.text();
+                const parsed = jsyaml.load(content);
+                extensions = parsed.extensions || extensions;
+                needsMigration = true;
+                console.log('[Settings] Found legacy extensions.yaml');
+            } catch (e) {
+                // No extensions.yaml
+            }
+
+            notebookSettings = {
+                notebook_title: title,
+                notebook_subtitle: subtitle,
+                sections: sections,
+                extensions: extensions,
+                theme: null
+            };
+
+            // Perform migration if legacy files were found
+            if (needsMigration) {
+                console.log('[Settings] Migrating to settings.yaml...');
+                try {
+                    await saveSettings(dirHandle);
+                    // Delete legacy files after successful migration
+                    try {
+                        await dirHandle.removeEntry('notebook.json');
+                        console.log('[Settings] Deleted legacy notebook.json');
+                    } catch (e) { /* file might not exist */ }
+                    try {
+                        await dirHandle.removeEntry('extensions.yaml');
+                        console.log('[Settings] Deleted legacy extensions.yaml');
+                    } catch (e) { /* file might not exist */ }
+                    showToast('Migrated notebook settings to settings.yaml');
+                } catch (e) {
+                    console.error('[Settings] Migration failed:', e);
+                }
+            }
+
+            return notebookSettings;
+        }
+
+        // Save settings to settings.yaml
+        async function saveSettings(dirHandle) {
+            if (!dirHandle || !notebookSettings) return;
+
+            const content = jsyaml.dump(notebookSettings, {
+                indent: 2,
+                lineWidth: -1,
+                quotingType: '"',
+                forceQuotes: false
+            });
+
+            const settingsFile = await dirHandle.getFileHandle('settings.yaml', { create: true });
+            const writable = await settingsFile.createWritable();
+            await writable.write(content);
+            await writable.close();
+            console.log('[Settings] Saved settings.yaml');
+        }
+
+        // Load extension registry from settings (or use defaults)
         async function loadExtensionRegistry(dirHandle) {
+            // If settings already loaded, use extensions from there
+            if (notebookSettings && notebookSettings.extensions) {
+                extensionRegistry = notebookSettings.extensions;
+                console.log('[Templates] Using extensions from settings');
+                return extensionRegistry;
+            }
+
+            // Fallback: load from filesystem or defaults (legacy path)
             if (!dirHandle) {
                 extensionRegistry = getDefaultExtensionRegistry();
                 return extensionRegistry;
@@ -1826,7 +1977,7 @@
                 const content = await file.text();
                 const parsed = jsyaml.load(content);
                 extensionRegistry = parsed.extensions || getDefaultExtensionRegistry();
-                console.log('[Templates] Loaded extensions.yaml');
+                console.log('[Templates] Loaded extensions.yaml (legacy)');
             } catch (e) {
                 // File doesn't exist, use defaults
                 extensionRegistry = getDefaultExtensionRegistry();
@@ -1835,17 +1986,16 @@
             return extensionRegistry;
         }
 
-        // Load templates from filesystem (or use defaults)
+        // Load templates from filesystem (merged with defaults)
         async function loadTemplates(dirHandle) {
-            templateRegistry = {};
+            // Start with default templates (ensures settings is always available)
+            templateRegistry = getDefaultTemplates();
 
             if (!dirHandle) {
-                templateRegistry = getDefaultTemplates();
                 return templateRegistry;
             }
 
-            // Scan root directory for .template.yaml files
-            let foundTemplates = false;
+            // Scan root directory for .template.yaml files and override defaults
             try {
                 for await (const [name, handle] of dirHandle.entries()) {
                     if (handle.kind === 'file' && name.endsWith('.template.yaml')) {
@@ -1855,7 +2005,6 @@
                             const template = jsyaml.load(content);
                             if (template && template.name) {
                                 templateRegistry[template.name] = template;
-                                foundTemplates = true;
                                 console.log(`[Templates] Loaded ${name}`);
                             }
                         } catch (e) {
@@ -1865,12 +2014,6 @@
                 }
             } catch (e) {
                 console.error('[Templates] Error scanning for templates:', e);
-            }
-
-            // If no templates found, use defaults
-            if (!foundTemplates) {
-                templateRegistry = getDefaultTemplates();
-                console.log('[Templates] Using default templates');
             }
 
             return templateRegistry;
@@ -1944,7 +2087,7 @@
             if (!dirHandle) return;
 
             const filesToCreate = [
-                { name: 'extensions.yaml', getContent: getExtensionRegistryContent },
+                { name: 'settings.yaml', getContent: getDefaultSettingsContent },
                 { name: 'note.template.yaml', getContent: () => getTemplateFileContent('note') },
                 { name: 'code.template.yaml', getContent: () => getTemplateFileContent('code') },
                 { name: 'bookmark.template.yaml', getContent: () => getTemplateFileContent('bookmark') }
@@ -2303,6 +2446,8 @@
                     return renderSplitPanePreview(card, template);
                 case 'fields':
                     return renderFieldsPreview(card, template);
+                case 'yaml':
+                    return renderYamlPreview(card, template);
                 default:
                     return `<div class="preview-placeholder">${placeholder}</div>`;
             }
@@ -2323,7 +2468,11 @@
             const fieldType = fieldDef?.type || 'text';
             const format = card.format || 'markdown';
 
-            if (fieldType === 'markdown' || field === 'content') {
+            if (fieldType === 'yaml') {
+                // YAML fields: convert object to string for preview
+                const yamlStr = typeof content === 'object' ? jsyaml.dump(content, { indent: 2, lineWidth: -1 }) : String(content);
+                return `<pre class="preview-code">${escapeHtml(yamlStr.substring(0, 400))}</pre>`;
+            } else if (fieldType === 'markdown' || field === 'content') {
                 // Use existing renderNotePreview for markdown
                 const previewHtml = renderNotePreview(content, format);
                 if (!previewHtml) {
@@ -2333,8 +2482,12 @@
             } else if (fieldType === 'code') {
                 const codePreview = escapeHtml(content.substring(0, 400));
                 return `<pre class="preview-code"><code class="language-${fieldDef?.language || 'python'}">${codePreview || 'No code'}</code></pre>`;
+            } else if (typeof content === 'object') {
+                // Handle any object that slipped through
+                const str = JSON.stringify(content, null, 2);
+                return `<pre class="preview-code">${escapeHtml(str.substring(0, 400))}</pre>`;
             } else {
-                return `<div class="preview-text">${escapeHtml(content.substring(0, 300))}</div>`;
+                return `<div class="preview-text">${escapeHtml(String(content).substring(0, 300))}</div>`;
             }
         }
 
@@ -2432,6 +2585,27 @@
                     </div>
                 `).join('')}
             </div>`;
+        }
+
+        // YAML layout: show all schema fields as YAML
+        function renderYamlPreview(card, template) {
+            const placeholder = template.card?.placeholder || '📄';
+            const schema = template.schema || {};
+
+            // Build object from schema fields (excluding internal fields)
+            const previewObj = {};
+            for (const field of Object.keys(schema)) {
+                if (card[field] !== undefined && card[field] !== null) {
+                    previewObj[field] = card[field];
+                }
+            }
+
+            if (Object.keys(previewObj).length === 0) {
+                return `<div class="preview-placeholder">${placeholder}</div>`;
+            }
+
+            const yamlStr = jsyaml.dump(previewObj, { indent: 2, lineWidth: -1 });
+            return `<pre class="preview-yaml">${escapeHtml(yamlStr)}</pre>`;
         }
 
         // Render card title (may use template formatting)
@@ -2554,6 +2728,8 @@
                     return renderViewerSplitPane(card, template);
                 case 'sections':
                     return renderViewerSections(card, template);
+                case 'yaml':
+                    return renderViewerYaml(card, template);
                 default:
                     return renderViewerDocument(card, template);
             }
@@ -2573,13 +2749,37 @@
             const fieldDef = template.schema?.[field];
             const fieldType = fieldDef?.type || 'text';
 
-            if (format === 'text' || format === 'yaml' || fieldType === 'text') {
+            if (fieldType === 'yaml') {
+                // YAML fields: convert object to YAML string for display
+                const yamlStr = typeof content === 'object' ? jsyaml.dump(content, { indent: 2, lineWidth: -1 }) : content;
+                return `<pre class="viewer-text">${escapeHtml(yamlStr)}</pre>`;
+            } else if (format === 'text' || format === 'yaml' || fieldType === 'text') {
                 return `<pre class="viewer-text">${escapeHtml(content)}</pre>`;
             } else if (fieldType === 'code') {
                 return `<div class="viewer-code"><pre><code class="language-${fieldDef?.language || 'python'}">${escapeHtml(content)}</code></pre></div>`;
             } else {
                 return `<div class="viewer-markdown">${renderMarkdownWithLinks(content)}</div>`;
             }
+        }
+
+        // YAML viewer: show all schema fields as YAML
+        function renderViewerYaml(card, template) {
+            const schema = template.schema || {};
+
+            // Build object from schema fields
+            const viewObj = {};
+            for (const field of Object.keys(schema)) {
+                if (card[field] !== undefined && card[field] !== null) {
+                    viewObj[field] = card[field];
+                }
+            }
+
+            if (Object.keys(viewObj).length === 0) {
+                return '<div class="viewer-empty">No content</div>';
+            }
+
+            const yamlStr = jsyaml.dump(viewObj, { indent: 2, lineWidth: -1 });
+            return `<pre class="viewer-yaml">${escapeHtml(yamlStr)}</pre>`;
         }
 
         // Image viewer: large image with description
@@ -2861,11 +3061,14 @@
                 outputContentEl.innerHTML = '';
             }
 
-            // Render action buttons (Run, etc.)
+            // Render action buttons (Run, etc.) and special controls
             const actionsEl = document.getElementById('editorActions');
             const actions = template.editor?.actions || [];
+            let actionsHtml = '';
+
+            // Standard action buttons
             if (actions.length > 0) {
-                actionsEl.innerHTML = actions.map(action => {
+                actionsHtml = actions.map(action => {
                     if (action.action === 'execute') {
                         return `
                             <button class="btn btn-run btn-small" id="editorRunBtn" onclick="runEditorCode()">
@@ -2876,13 +3079,31 @@
                     }
                     return `<button class="btn btn-secondary btn-small" onclick="handleEditorAction('${action.action}')">${action.icon || ''} ${action.label}</button>`;
                 }).join('');
+            }
 
-                // Update Pyodide status if this is a code template
-                if (templateName === 'code') {
-                    updateEditorPyodideStatus();
-                }
-            } else {
-                actionsEl.innerHTML = '';
+            // Settings-specific: add storage info and system notes toggle
+            if (templateName === 'settings') {
+                const folderName = notebookDirHandle ? notebookDirHandle.name : 'Not linked';
+                actionsHtml += `
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <span style="font-size: 12px; color: var(--text-muted);">
+                            📁 <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 3px;">${escapeHtml(folderName)}</code>
+                        </span>
+                        <button class="btn btn-secondary btn-small" onclick="refreshFromFilesystem()" title="Reload from filesystem">🔄 Refresh</button>
+                        <button class="btn btn-secondary btn-small" onclick="changeNotebookFolder()" title="Switch notebook folder">📁 Change</button>
+                        <label class="checkbox-label" style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); margin-left: auto;">
+                            <input type="checkbox" id="editorShowSystemNotes" ${showSystemNotes ? 'checked' : ''} onchange="toggleSystemNotesFromEditor(this.checked)">
+                            Show system cards
+                        </label>
+                    </div>
+                `;
+            }
+
+            actionsEl.innerHTML = actionsHtml;
+
+            // Update Pyodide status if this is a code template
+            if (templateName === 'code') {
+                updateEditorPyodideStatus();
             }
 
             // Set submit button text
@@ -2965,6 +3186,27 @@
                 hint.className = 'form-hint';
                 hint.textContent = 'Supports Markdown and LaTeX ($inline$, $$display$$). Link with [[Title]] or [[id:xyz]]';
                 div.appendChild(hint);
+            } else if (type === 'yaml') {
+                // YAML textarea - value is an object, display as YAML string
+                inputEl = document.createElement('textarea');
+                inputEl.id = `editor-${field}`;
+                inputEl.className = 'code-editor';
+                inputEl.rows = rows || 15;
+                inputEl.spellcheck = false;
+                // Convert object to YAML string for editing
+                if (value && typeof value === 'object') {
+                    inputEl.value = jsyaml.dump(value, { indent: 2, lineWidth: -1 });
+                } else if (typeof value === 'string') {
+                    inputEl.value = value;
+                } else {
+                    inputEl.value = '';
+                }
+                div.appendChild(inputEl);
+
+                const yamlHint = document.createElement('p');
+                yamlHint.className = 'form-hint';
+                yamlHint.textContent = 'Edit YAML configuration. Invalid YAML will show an error on save.';
+                div.appendChild(yamlHint);
             } else if (type === 'code' || (multiline && monospace)) {
                 // Code textarea
                 inputEl = document.createElement('textarea');
@@ -3062,6 +3304,15 @@
                 return new Date(el.value).toISOString();
             } else if (type === 'date' && el.value) {
                 return el.value;
+            } else if (type === 'yaml') {
+                // Parse YAML string back to object
+                try {
+                    return el.value ? jsyaml.load(el.value) : null;
+                } catch (e) {
+                    console.error('[Editor] Invalid YAML:', e.message);
+                    showToast('Invalid YAML: ' + e.message, true);
+                    return null;
+                }
             }
 
             return el.value;
@@ -3743,7 +3994,10 @@ Create \`sections/{section-name}/{slug}.code.py\`:
         async function loadFromFilesystem(dirHandle) {
             console.log('[Filesystem] Loading from directory...');
 
-            // Load extension registry and templates first
+            // Load settings first (handles migration from legacy format)
+            await loadSettings(dirHandle);
+
+            // Load extension registry (uses settings.extensions) and templates
             await loadExtensionRegistry(dirHandle);
             await loadTemplates(dirHandle);
 
@@ -3752,24 +4006,13 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             await loadThemeCss(dirHandle);
 
             const loadedData = {
-                title: 'Research Notebook',
-                subtitle: 'Bookmarks, notes, and connections',
+                title: notebookSettings?.notebook_title || 'Research Notebook',
+                subtitle: notebookSettings?.notebook_subtitle || 'Bookmarks, notes, and connections',
                 sections: [],
                 systemNotes: []
             };
 
             try {
-                // Try to read notebook.json for metadata
-                try {
-                    const metaFile = await dirHandle.getFileHandle('notebook.json');
-                    const file = await metaFile.getFile();
-                    const metaContent = await file.text();
-                    const meta = JSON.parse(metaContent);
-                    loadedData.title = meta.title || loadedData.title;
-                    loadedData.subtitle = meta.subtitle || loadedData.subtitle;
-                } catch (e) {
-                    console.log('[Filesystem] No notebook.json found, using defaults');
-                }
 
                 // Read system notes (text files at root)
                 // Include: .md, .txt, .yaml (including templates), dotfiles like .gitignore
@@ -3786,12 +4029,32 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                     // Skip hidden files unless they're in the allowed list
                     if (filename.startsWith('.') && !includedDotfiles.includes(filename)) continue;
 
-                    // Skip notebook.json (our metadata file)
+                    // Skip legacy config files
                     if (filename === 'notebook.json') continue;
 
                     try {
                         const file = await fileHandle.getFile();
                         const content = await file.text();
+
+                        // Special handling for settings.yaml - use settings template
+                        if (filename === 'settings.yaml') {
+                            loadedData.systemNotes.push({
+                                template: 'settings',
+                                system: true,
+                                id: 'system-settings.yaml',
+                                filename: filename,
+                                title: 'Settings',
+                                // Store parsed settings fields
+                                notebook_title: notebookSettings?.notebook_title || 'Research Notebook',
+                                notebook_subtitle: notebookSettings?.notebook_subtitle || '',
+                                sections: notebookSettings?.sections || [],
+                                extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
+                                theme: notebookSettings?.theme || null,
+                                modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
+                            });
+                            console.log(`[Filesystem] Loaded settings card: ${filename}`);
+                            continue;
+                        }
 
                         // Determine format based on extension
                         const isMarkdown = filename.endsWith('.md');
@@ -3958,15 +4221,15 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             console.log('[Filesystem] Saving to directory...');
 
             try {
-                // Write notebook.json
-                const metaFile = await dirHandle.getFileHandle('notebook.json', { create: true });
-                const metaWritable = await metaFile.createWritable();
-                await metaWritable.write(JSON.stringify({
-                    title: data.title,
-                    subtitle: data.subtitle,
-                    sections: data.sections.map(s => slugify(s.name))
-                }, null, 2));
-                await metaWritable.close();
+                // Update and save settings.yaml
+                notebookSettings = {
+                    notebook_title: data.title,
+                    notebook_subtitle: data.subtitle,
+                    sections: data.sections.map(s => slugify(s.name)),
+                    extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
+                    theme: notebookSettings?.theme || null
+                };
+                await saveSettings(dirHandle);
 
                 // Write README.md (only if it doesn't exist)
                 try {
@@ -4131,24 +4394,49 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             return saveTime && (Date.now() - saveTime < 1000);
         }
 
-        // Save only notebook.json (for settings, section order changes)
+        // Save only settings.yaml (for settings, section order changes)
         async function saveNotebookMeta() {
             if (!filesystemLinked || !notebookDirHandle) return;
 
-            const metaFile = await notebookDirHandle.getFileHandle('notebook.json', { create: true });
-            const metaWritable = await metaFile.createWritable();
-            await metaWritable.write(JSON.stringify({
-                title: data.title,
-                subtitle: data.subtitle,
-                sections: data.sections.map(s => slugify(s.name))
-            }, null, 2));
-            await metaWritable.close();
-            recordSave('notebook.json');
+            // Update notebookSettings with current data
+            notebookSettings = {
+                notebook_title: data.title,
+                notebook_subtitle: data.subtitle,
+                sections: data.sections.map(s => slugify(s.name)),
+                extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
+                theme: notebookSettings?.theme || null
+            };
+            await saveSettings(notebookDirHandle);
+            recordSave('settings.yaml');
         }
 
         // Generic card save function using template system
         async function saveCardFile(sectionId, card) {
             if (!filesystemLinked || !notebookDirHandle) return;
+
+            // Settings card is handled specially
+            if (card.template === 'settings' || card.filename === 'settings.yaml') {
+                // Update notebookSettings and data from the card fields
+                notebookSettings = {
+                    notebook_title: card.notebook_title || 'Research Notebook',
+                    notebook_subtitle: card.notebook_subtitle || '',
+                    sections: card.sections || notebookSettings?.sections || [],
+                    extensions: card.extensions || notebookSettings?.extensions || getDefaultExtensionRegistry(),
+                    theme: card.theme || null
+                };
+                // Also update data.title/subtitle so UI reflects changes
+                data.title = notebookSettings.notebook_title;
+                data.subtitle = notebookSettings.notebook_subtitle;
+                // Update extension registry
+                extensionRegistry = notebookSettings.extensions;
+
+                await saveSettings(notebookDirHandle);
+                card.filename = 'settings.yaml';
+                card.id = 'system-settings.yaml';
+                recordSave('settings.yaml');
+                console.log('[Filesystem] Saved settings.yaml');
+                return;
+            }
 
             // System notes are handled specially (saved at root with raw content)
             if (sectionId === '_system' && card.system) {
@@ -4554,14 +4842,15 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                     return false;
                 }
 
-                // Relevant: .md, .code.py, .bookmark.json, notebook.json, _section.json, .output.html
+                // Relevant: .md, .code.py, .bookmark.json, settings.yaml, _section.json, .output.html
                 // Also include directory changes (for new sections)
                 if (record.changedHandle?.kind === 'directory') return true;
                 if (filename.endsWith('.md')) return true;
                 if (filename.endsWith('.code.py')) return true;
                 if (filename.endsWith('.output.html')) return true;
                 if (filename.endsWith('.bookmark.json')) return true;
-                if (filename === 'notebook.json') return true;
+                if (filename === 'settings.yaml') return true;
+                if (filename === 'notebook.json') return true;  // Legacy
                 if (filename === '_section.json') return true;
                 return false;
             });
@@ -4652,7 +4941,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             data.sections.push(section);
 
             await saveData();
-            await saveNotebookMeta();  // Update notebook.json with new section list
+            await saveNotebookMeta();  // Update settings.yaml with new section list
             await createSectionDir(section);  // Create section directory
             render();
             closeSectionModal();
@@ -4660,60 +4949,52 @@ Create \`sections/{section-name}/{slug}.code.py\`:
         }
 
         // ========== SECTION: SETTINGS_MODAL ==========
-        // Notebook settings (title/subtitle): open, close, save
+        // Settings are now handled via the settings.yaml system card
         // Storage settings: refreshFromFilesystem, changeNotebookFolder
 
-        // Track original value to revert on cancel
-        let showSystemNotesBeforeEdit = showSystemNotes;
+        // Open settings editor (template-based approach)
+        // This opens the generic editor for the settings.yaml system card
+        function openSettingsEditor() {
+            // Find the settings card in systemNotes
+            let settingsCard = data.systemNotes?.find(n => n.template === 'settings' || n.filename === 'settings.yaml');
 
-        // Settings Modal
-        function openSettingsModal() {
-            document.getElementById('settingsTitle').value = data.title || 'Research Notebook';
-            document.getElementById('settingsSubtitle').value = data.subtitle || 'Bookmarks, notes, and connections';
-            document.getElementById('linkedFolderName').textContent = notebookDirHandle ? notebookDirHandle.name : 'Not linked';
-            document.getElementById('showSystemNotesCheckbox').checked = showSystemNotes;
-            showSystemNotesBeforeEdit = showSystemNotes;  // Capture state when modal opens
-            document.getElementById('settingsModal').classList.add('active');
-            document.getElementById('settingsTitle').focus();
-        }
-
-        function toggleSystemNotes(enabled) {
-            // Just update state, don't render - saveSettings will render on save
-            showSystemNotes = enabled;
-        }
-
-        function closeSettingsModal() {
-            // Revert showSystemNotes if changed but not saved
-            if (showSystemNotes !== showSystemNotesBeforeEdit) {
-                showSystemNotes = showSystemNotesBeforeEdit;
-                document.getElementById('showSystemNotesCheckbox').checked = showSystemNotes;
+            // If no settings card exists, create one with current values
+            if (!settingsCard) {
+                settingsCard = {
+                    template: 'settings',
+                    system: true,
+                    id: 'system-settings.yaml',
+                    filename: 'settings.yaml',
+                    title: 'Settings',
+                    notebook_title: data.title || 'Research Notebook',
+                    notebook_subtitle: data.subtitle || '',
+                    sections: data.sections.map(s => slugify(s.name)),
+                    extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
+                    theme: notebookSettings?.theme || null,
+                    modified: new Date().toISOString()
+                };
+                // Add to systemNotes so it appears in the list
+                if (!data.systemNotes) data.systemNotes = [];
+                data.systemNotes.unshift(settingsCard);
             }
-            document.getElementById('settingsModal').classList.remove('active');
+
+            // Open the generic editor with the settings card
+            openEditor('settings', '_system', settingsCard);
         }
 
-        async function saveSettings() {
-            const title = document.getElementById('settingsTitle').value.trim();
-            const subtitle = document.getElementById('settingsSubtitle').value.trim();
-
-            data.title = title || 'Research Notebook';
-            data.subtitle = subtitle || 'Bookmarks, notes, and connections';
-
-            // Persist showSystemNotes on save
+        // Toggle system notes from settings editor (saves immediately to localStorage)
+        function toggleSystemNotesFromEditor(enabled) {
+            showSystemNotes = enabled;
             localStorage.setItem('showSystemNotes', showSystemNotes);
-            showSystemNotesBeforeEdit = showSystemNotes;
-
-            await saveData();
-            await saveNotebookMeta();  // Only writes notebook.json
-            closeSettingsModal();
+            // Immediately re-render to show/hide system notes section
             render();
-            showToast('Settings saved');
         }
 
         // Change to a different notebook folder
         async function changeNotebookFolder() {
             const success = await linkNotebookFolder();
             if (success) {
-                document.getElementById('linkedFolderName').textContent = notebookDirHandle.name;
+                closeEditor();  // Close settings editor if open
                 render();
             }
         }
@@ -5401,7 +5682,7 @@ sys.stderr = sys.__stderr__
             const sectionName = section?.name;
             data.sections = data.sections.filter(s => s.id !== sectionId);
             await saveData();
-            await saveNotebookMeta();  // Update notebook.json
+            await saveNotebookMeta();  // Update settings.yaml
             if (sectionName) await deleteSectionDir(sectionName);  // Delete section directory
             render();
             showToast('Section deleted');
@@ -5426,7 +5707,7 @@ sys.stderr = sys.__stderr__
                 const oldName = section.name;
                 section.name = newName.trim();
                 await saveData();
-                await saveNotebookMeta();  // Update notebook.json with new section list
+                await saveNotebookMeta();  // Update settings.yaml with new section list
                 await renameSectionDir(oldName, newName.trim(), section);  // Rename directory
             }
         }

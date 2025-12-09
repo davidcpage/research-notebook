@@ -1579,22 +1579,128 @@ function renderCardPreview(card, template) {
 
    **Result:** ~686 lines removed, file reduced from 6397 to 5711 lines.
 
-2. **Settings UI**
-   - Show loaded templates
-   - Edit template files (or link to them)
-   - Manage `theme.css`
+2. **Settings as System Card** 🔲 Planned
 
-3. **Error handling**
-   - Graceful handling of malformed templates
-   - Validation warnings for unknown fields
-   - Migration helpers for old notebooks
+   Consolidate `notebook.json` and `extensions.yaml` into `settings.yaml` - a system card that uses the generic editor.
 
-4. **Documentation**
-   - Template authoring guide
-   - Field type reference
-   - CSS customization guide
+   **2a. New `settings.yaml` format:**
+   ```yaml
+   # settings.yaml - Notebook configuration
+   notebook_title: "Research Notebook"
+   notebook_subtitle: "Bookmarks, notes, and connections"
+   sections:
+     - research
+     - papers
 
-**Deliverable:** Production-ready template system with good UX for customization.
+   extensions:
+     .md:
+       parser: yaml-frontmatter
+       defaultTemplate: note
+       bodyField: content
+     .code.py:
+       parser: comment-frontmatter
+       defaultTemplate: code
+       bodyField: code
+       companionFiles:
+         - suffix: .output.html
+           field: output
+     .bookmark.json:
+       parser: json
+       defaultTemplate: bookmark
+     .card.yaml:
+       parser: yaml
+       defaultTemplate: null
+
+   theme: null  # or "theme.css"
+   ```
+
+   **2b. Settings template** (built-in, in `getDefaultTemplates()`):
+   ```yaml
+   name: settings
+   description: "Notebook configuration"
+   schema:
+     notebook_title:
+       type: text
+       required: true
+     notebook_subtitle:
+       type: text
+     sections:
+       type: list
+       item_type: text
+     extensions:
+       type: yaml
+     theme:
+       type: text
+   card:
+     layout: document
+     preview_field: notebook_title
+     placeholder: "⚙"
+   viewer:
+     layout: sections
+     sections:
+       - label: "Notebook"
+         fields: [notebook_title, notebook_subtitle]
+       - label: "Extensions"
+         field: extensions
+   editor:
+     fields:
+       - field: notebook_title
+         label: "Notebook Title"
+       - field: notebook_subtitle
+         label: "Subtitle"
+       - field: extensions
+         label: "Extension Registry"
+         multiline: true
+         rows: 20
+         monospace: true
+       - field: theme
+         label: "Theme CSS file"
+   ui:
+     button_label: "Settings"
+     icon: "⚙"
+     show_create_button: false  # Can't create new settings
+   ```
+
+   **2c. Settings button behavior:**
+   - ⚙ button calls `openSettingsEditor()` which opens generic editor for `settings.yaml`
+   - Works even when system cards are hidden (direct access)
+   - Card title is fixed to "Settings" (from filename), not editable
+   - `notebook_title` field controls header display and browser tab
+
+   **2d. System notes toggle:**
+   - Stays in localStorage (user preference, not notebook config)
+   - Add checkbox to settings editor footer: "☐ Show system cards"
+   - Different users sharing notebook can have different visibility settings
+
+   **2e. Migration:**
+   - On load: if `settings.yaml` missing but `notebook.json`/`extensions.yaml` exist → migrate
+   - Delete old files after successful migration
+   - New notebooks create `settings.yaml` directly (no `notebook.json` or `extensions.yaml`)
+
+   **2f. Code changes:**
+   - Remove: `#settingsModal` HTML, `openSettingsModal()`, `closeSettingsModal()`, `saveSettings()`
+   - Remove: `saveNotebookMeta()` (replaced by saving settings card)
+   - Add: `settings` template to `getDefaultTemplates()`
+   - Add: `openSettingsEditor()` function (thin wrapper around `openEditor`)
+   - Add: `loadSettings()` / `saveSettings()` for settings.yaml specifically
+   - Update: `loadFromFilesystem()` to handle settings.yaml
+   - Update: Header rendering to use `settings.notebook_title`
+   - Update: `ensureTemplateFiles()` to create `settings.yaml` instead of `notebook.json` + `extensions.yaml`
+
+   **Files removed:** `notebook.json`, `extensions.yaml` (consolidated into `settings.yaml`)
+   **Files added:** `settings.yaml`
+
+3. **Error handling** 🔲 Planned
+   - Graceful fallback if `settings.yaml` is malformed (use defaults, show warning toast)
+   - Validation warnings in editor for unknown/invalid fields
+   - Try/catch around template parsing with helpful error messages
+
+4. **Documentation** 🔲 Planned
+   - Update CLAUDE.md with `settings.yaml` format
+   - Template authoring guide (field types, layouts, styling)
+   - Brief "creating custom templates" section
+
+**Deliverable:** Production-ready template system with settings as an editable system card.
 
 ---
 
@@ -1605,25 +1711,36 @@ function renderCardPreview(card, template) {
 Notebooks created before the template system will lack system files. The migration approach:
 
 1. **On first open after upgrade:**
-   - Detect missing `extensions.yaml` and `*.template.yaml` files
+   - Detect missing `settings.yaml` and `*.template.yaml` files
+   - If `notebook.json` and/or `extensions.yaml` exist → migrate to `settings.yaml`
    - Show a one-time message: "Upgrading notebook to template system..."
    - Automatically create all missing system files with defaults
    - Existing cards continue to work unchanged
 
-2. **No data migration needed:**
+2. **Settings migration (Phase 4):**
+   - If `settings.yaml` exists → use it (new format)
+   - If `notebook.json` + `extensions.yaml` exist → migrate:
+     - Read title/subtitle/sections from `notebook.json`
+     - Read extensions from `extensions.yaml`
+     - Write combined `settings.yaml`
+     - Delete old files
+   - If only `notebook.json` exists → migrate with default extensions
+   - If nothing exists → create default `settings.yaml`
+
+3. **No card data migration needed:**
    - Card file formats are unchanged (`.md`, `.code.py`, `.bookmark.json`)
    - Templates and extension registry are purely additive
    - Old notebooks work immediately after system files are created
 
-3. **User experience:**
+4. **User experience:**
    - Migration is automatic and non-destructive
-   - User sees new system files appear in notebook root
+   - User sees `settings.yaml` appear (replacing `notebook.json` + `extensions.yaml`)
    - All existing functionality preserved
-   - New template customization capabilities immediately available
+   - Settings now editable via system card
 
 ### Backwards Compatibility
 
-- During Phase 1: if system files are missing, use hardcoded fallbacks
+- If system files are missing, use hardcoded fallbacks
 - Extension defaults (`.md` → note) match current behavior exactly
 - Existing frontmatter fields are preserved even if not in template schema
 - Cards with unknown `template:` values fall back to extension default
@@ -1631,10 +1748,12 @@ Notebooks created before the template system will lack system files. The migrati
 ### Testing Migration
 
 Before releasing template system:
-1. Test with notebooks created before upgrade
-2. Verify all existing cards load and display correctly
-3. Verify save/edit preserves original file format
-4. Verify new cards created post-upgrade work correctly
+1. Test with notebooks created before upgrade (has `notebook.json` + `extensions.yaml`)
+2. Verify migration creates correct `settings.yaml`
+3. Verify all existing cards load and display correctly
+4. Verify save/edit preserves original file format
+5. Verify new cards created post-upgrade work correctly
+6. Verify ⚙ button opens settings editor correctly
 
 ---
 
