@@ -49,7 +49,7 @@ To add a new card type (fully automatic with template system):
 1. Add template to `getDefaultTemplates()` in TEMPLATE_SYSTEM (or create `.template.yaml` file)
 2. Add extension mapping to `getDefaultExtensionRegistry()` if using new file format
 3. Define in template:
-   - `schema`: Field definitions with types (text, markdown, code, url, thumbnail, yaml, etc.)
+   - `schema`: Field definitions with types (text, markdown, code, url, thumbnail, yaml, list, records, etc.)
    - `card.layout`: Preview layout (document, image, split-pane, fields, yaml)
    - `viewer.layout`: Viewer layout and field mappings
    - `editor.fields`: Field order and widget configuration for the edit form
@@ -67,6 +67,28 @@ Note: Card rendering, viewer display, and editing all work automatically via tem
 
 **Adding new field types:**
 When adding field type handling in `renderEditorField()`, check type-specific conditions BEFORE generic ones like `multiline && monospace`. The yaml type must be checked early or it falls through to code textarea handling.
+
+**Reusable field types for lists:**
+- `type: 'list'` - Simple list of strings with up/down/delete buttons
+  - Schema options: `item_type`, `allowDelete`, `allowAdd`
+  - Example: `{ type: 'list', item_type: 'text', allowDelete: false }`
+- `type: 'records'` - List of objects with defined schema (like a table/dataframe)
+  - Schema options: `schema` (defines columns), `allowDelete`, `allowAdd`
+  - Each column can be `type: 'text'` (with optional `readOnly: true`) or `type: 'boolean'`
+  - Boolean fields render as toggle buttons (eye icon for `visible` field)
+  - Example for sections:
+    ```javascript
+    sections: {
+      type: 'records',
+      allowDelete: false,
+      allowAdd: false,
+      schema: {
+        name: { type: 'text', readOnly: true },
+        visible: { type: 'boolean', default: true, label: 'Visible' }
+      }
+    }
+    ```
+- Helper functions: `normalizeSectionsFormat()`, `getSectionNames()`, `getSystemSectionVisible()`
 
 **Debugging JavaScript errors:**
 **IMPORTANT FOR BUG REPORTS**: When reporting bugs, ALWAYS check the browser DevTools Console (F12 or Cmd+Option+I) for the full error message and stack trace. The console shows the exact line number and function call chain - this is ESSENTIAL for debugging. Toast messages alone are not sufficient for diagnosing issues.
@@ -103,6 +125,7 @@ data = {
     {
       id: string,
       name: string,
+      visible: boolean,   // Whether section is shown in main UI (default: true)
       items: [
         // Each item has type: 'bookmark' | 'note' | 'code'
         { type: 'bookmark', url, title, description, ... },
@@ -119,14 +142,13 @@ data = {
 **State Management** (STATE_AND_CONFIG section):
 - Global `data` object holds all sections and items (including `data.systemNotes[]`)
 - `collapsedSections` Set tracks UI state (not persisted)
-- `showSystemNotes` - Toggle for System section visibility (persisted in localStorage)
 - Pyodide runtime state: `pyodide`, `pyodideLoading`, `pyodideReady`
 - Filesystem state: `notebookDirHandle`, `filesystemLinked`
 - Generic editor state: `editingCard` (in GENERIC_EDITOR section)
 
 **System Notes** (loaded from notebook root):
-- Text files at notebook root are loaded as "system notes" in a special System section
-- Toggle visibility via ⚙ Settings editor checkbox
+- Text files at notebook root are loaded as "system notes" in a special `_system` section
+- Visibility controlled via the sections list in Settings (toggle eye icon)
 - **File types loaded**: `.md`, `.txt`, and specific dotfiles (`.gitignore`, `.env.example`, `.editorconfig`, `.prettierrc`, `.eslintrc`)
 - **Excluded**: `.json`, `.html`, `.js`, `.css`, images, and most hidden files
 - **Format field**: `format: 'markdown' | 'text'` based on file extension
@@ -182,9 +204,11 @@ data = {
 **Settings** (GENERIC_EDITOR section):
 - **Settings Editor**: Accessible via ⚙ icon in toolbar (far right, grey/muted color)
 - Uses the generic editor with the `settings` template
-- Edits `settings.yaml` containing notebook_title, notebook_subtitle, sections, extensions
+- Edits `settings.yaml` containing notebook_title, notebook_subtitle, sections (with visibility), extensions
 - `openSettingsEditor()`: Opens generic editor for settings card
-- Footer includes folder info, Refresh/Change buttons, and system notes toggle
+- Footer includes folder info and Refresh/Change buttons
+- **Sections list**: Uses `records` field type with name (readonly) and visible (eye toggle)
+- Hidden sections (visible: false) are greyed out in settings, not shown in main UI
 
 **Onboarding** (ONBOARDING section):
 - First-time setup flow shown when no folder is linked
@@ -257,7 +281,18 @@ notebook-folder/
 
 **Settings**:
 - Settings editor (⚙ button) shows current folder and provides Refresh/Change Folder buttons
-- Settings stored in `settings.yaml` with notebook_title, notebook_subtitle, sections, extensions
+- Settings stored in `settings.yaml` with notebook_title, notebook_subtitle, sections (records), extensions
+- Sections format in settings.yaml:
+  ```yaml
+  sections:
+    - name: research
+      visible: true
+    - name: archive
+      visible: false
+    - name: _system
+      visible: false
+  ```
+- Backward compatible: old format `sections: [research, projects]` auto-converts to records format
 - Refresh reloads from filesystem (picks up external edits)
 - Change Folder switches to different notebook
 
