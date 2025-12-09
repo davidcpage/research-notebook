@@ -49,14 +49,23 @@ To add a new card type (fully automatic with template system):
 1. Add template to `getDefaultTemplates()` in TEMPLATE_SYSTEM (or create `.template.yaml` file)
 2. Add extension mapping to `getDefaultExtensionRegistry()` if using new file format
 3. Define in template:
-   - `schema`: Field definitions with types (text, markdown, code, url, thumbnail, etc.)
-   - `card.layout`: Preview layout (document, image, split-pane, fields)
+   - `schema`: Field definitions with types (text, markdown, code, url, thumbnail, yaml, etc.)
+   - `card.layout`: Preview layout (document, image, split-pane, fields, yaml)
    - `viewer.layout`: Viewer layout and field mappings
    - `editor.fields`: Field order and widget configuration for the edit form
    - `editor.actions`: Optional action buttons (e.g., Run for code)
    - `ui`: Button label, icon, sort order for toolbar
 
 Note: Card rendering, viewer display, and editing all work automatically via templates.
+
+**System cards (settings, templates):**
+- `settings.yaml` and `*.template.yaml` files are loaded as system cards with special templates
+- Both use `yaml` layout to display all schema fields as formatted YAML
+- Settings has 3 special cases: editor footer (folder info), save handler (updates globals), entry point (⚙ button)
+- Templates loaded in `loadFromFilesystem()` with parsed fields for yaml layout rendering
+
+**Adding new field types:**
+When adding field type handling in `renderEditorField()`, check type-specific conditions BEFORE generic ones like `multiline && monospace`. The yaml type must be checked early or it falls through to code textarea handling.
 
 **Debugging JavaScript errors:**
 **IMPORTANT FOR BUG REPORTS**: When reporting bugs, ALWAYS check the browser DevTools Console (F12 or Cmd+Option+I) for the full error message and stack trace. The console shows the exact line number and function call chain - this is ESSENTIAL for debugging. Toast messages alone are not sufficient for diagnosing issues.
