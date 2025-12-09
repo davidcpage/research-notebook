@@ -22,7 +22,9 @@ Key architectural decisions made during the design process:
 
 ### 1. Templates Written at Notebook Creation (Not Virtual)
 
-**Decision:** Write `extensions.yaml` and `*.template.yaml` files when creating a new notebook, rather than using "virtual" built-in defaults.
+**Decision:** Write `settings.yaml` and `*.template.yaml` files when creating a new notebook, rather than using "virtual" built-in defaults.
+
+*Updated: Extensions are now part of `settings.yaml`, not a separate file.*
 
 **Rationale:**
 - Enables template-driven UI (buttons generated from template files)
@@ -35,15 +37,17 @@ Key architectural decisions made during the design process:
 
 ### 2. Extension Registry Separate from Templates
 
-**Decision:** File extension mappings live in `extensions.yaml`, completely separate from template definitions.
+**Decision:** File extension mappings live in `settings.yaml` (under `extensions:`), separate from template definitions.
+
+*Updated: Originally a separate `extensions.yaml` file, now consolidated into `settings.yaml` for simplicity while maintaining separation of concerns.*
 
 **Rationale:**
 - Clean separation of concerns: parsing mechanics vs. presentation/schema
 - Extensions can serve multiple templates (`.md` works for `note`, `paper`, etc.)
 - Adding new sugar formats is independent from adding new templates
-- Each registry is single-purpose and easier to understand
+- Single settings file is easier to manage than multiple config files
 
-**Trade-off:** Two files to understand instead of one, but each is simpler.
+**Trade-off:** Extensions and notebook metadata share a file, but are clearly separated sections.
 
 ### 3. bodyField Owned by Extension, Not Template
 
@@ -71,7 +75,9 @@ Key architectural decisions made during the design process:
 
 ### 5. Notebook Creation Writes All System Files
 
-**Decision:** New notebook creation writes: `notebook.json`, `CLAUDE.md`, `README.md`, `.gitignore`, `extensions.yaml`, `note.template.yaml`, `code.template.yaml`, `bookmark.template.yaml`.
+**Decision:** New notebook creation writes: `settings.yaml`, `CLAUDE.md`, `README.md`, `.gitignore`, `note.template.yaml`, `code.template.yaml`, `bookmark.template.yaml`.
+
+*Updated: `notebook.json` and `extensions.yaml` consolidated into `settings.yaml`.*
 
 **Rationale:**
 - Complete, working notebook from the start
@@ -89,12 +95,11 @@ Key architectural decisions made during the design process:
 
 ```
 notebook/
-├── notebook.json              # Notebook metadata (title, subtitle, section order)
+├── settings.yaml              # Notebook config (title, subtitle, sections, extensions)
 ├── CLAUDE.md                  # AI assistant instructions
 ├── README.md                  # Human-readable description
 ├── .gitignore                 # Git ignore patterns
 │
-├── extensions.yaml            # Extension registry (parser mappings)
 ├── note.template.yaml         # Note card template
 ├── code.template.yaml         # Code card template
 ├── bookmark.template.yaml     # Bookmark card template
@@ -118,11 +123,10 @@ notebook/
 
 | Pattern | Purpose |
 |---------|---------|
+| `settings.yaml` | Notebook config (title, subtitle, sections, extensions) |
 | `*.template.yaml` | Card type definitions |
-| `extensions.yaml` | Extension registry (parser mappings) |
 | `*.css` | Styling overrides |
 | `*.md` (CLAUDE.md, README.md) | Documentation / system notes |
-| `notebook.json` | Notebook metadata |
 | `.gitignore` | Git configuration |
 
 ---
@@ -256,6 +260,7 @@ ui:
 | `boolean` | True/false | `<input type="checkbox">` | Yes/No or custom |
 | `enum` | Fixed choices | `<select>` | Selected value |
 | `list` | Array of values | Multi-input widget | Comma-separated or list |
+| `yaml` | Nested YAML object | `<textarea>` with monospace | Formatted YAML |
 
 ### Layout Presets
 
@@ -267,6 +272,7 @@ ui:
 | `image` | Image/thumbnail in preview frame | Bookmarks, media cards |
 | `split-pane` | Left/right split (configurable ratio) | Code with output |
 | `fields` | Key-value field display | Metadata-heavy cards |
+| `yaml` | All schema fields as formatted YAML | Settings, templates, config cards |
 
 **Viewer Layouts:**
 
@@ -276,6 +282,7 @@ ui:
 | `sections` | Labeled sections for different fields | Papers, structured content |
 | `split-pane` | Side-by-side display | Code with output |
 | `image` | Large image with metadata below | Bookmarks |
+| `yaml` | All schema fields as formatted YAML | Settings, templates, config cards |
 
 ---
 
@@ -283,11 +290,12 @@ ui:
 
 The extension registry defines how file extensions map to parsers, default templates, and field assignments. This is a **separate concern from templates** - extensions define parsing mechanics, templates define schema and presentation.
 
-### Extension Registry File (extensions.yaml)
+**Note:** The extension registry is now part of `settings.yaml` (in the `extensions:` field), not a separate file.
+
+### Extension Registry Format (in settings.yaml)
 
 ```yaml
-# extensions.yaml - Maps file extensions to parsing behavior
-
+# settings.yaml - extensions section
 extensions:
   .md:
     parser: yaml-frontmatter
@@ -1440,7 +1448,7 @@ function renderCardPreview(card, template) {
 | Phase 1: Template Infrastructure | ✅ Complete | Generic loading/saving, template files created on new notebook |
 | Phase 2: Generic Rendering | ✅ Complete | Generic card renderer and viewer, CSS with data-template selectors |
 | Phase 3: Generic Editor | ✅ Complete | Generic editor modal, template-driven forms, all card types supported |
-| Phase 4: Polish | 🔄 In progress | Step 1 (legacy cleanup) complete; Steps 2-4 remaining |
+| Phase 4: Polish | ✅ Complete | Legacy cleanup, settings as system card, yaml layout, template template |
 
 **Phase 1 Implementation Details:**
 
@@ -1457,9 +1465,9 @@ function renderCardPreview(card, template) {
 **Phase 2 Implementation Details:**
 
 - ✅ `renderCard()` - Generic card renderer using template definitions
-- ✅ Layout renderers: `renderDocumentPreview()`, `renderImagePreview()`, `renderSplitPanePreview()`, `renderFieldsPreview()`
+- ✅ Layout renderers: `renderDocumentPreview()`, `renderImagePreview()`, `renderSplitPanePreview()`, `renderFieldsPreview()`, `renderYamlPreview()`
 - ✅ `openViewer()` - Generic viewer modal that adapts to any template
-- ✅ Viewer layouts: `renderViewerDocument()`, `renderViewerImage()`, `renderViewerSplitPane()`, `renderViewerSections()`
+- ✅ Viewer layouts: `renderViewerDocument()`, `renderViewerImage()`, `renderViewerSplitPane()`, `renderViewerSections()`, `renderViewerYaml()`
 - ✅ `renderViewerActions()` - Template-driven action buttons (Run for code, Open for bookmarks)
 - ✅ CSS refactored to use `.card[data-template="..."]` and `.modal.viewer[data-template="..."]` selectors
 - ✅ `loadThemeCss()` - Loads optional `theme.css` from notebook directory
@@ -1476,7 +1484,7 @@ function renderCardPreview(card, template) {
 - ✅ `saveEditor()` - Validates fields, handles thumbnail generation, code execution, file operations
 - ✅ `renderEditorField(fieldConfig, fieldDef, value)` - Renders appropriate input widget for field type
 - ✅ `getEditorFieldValue(fieldName, fieldDef)` - Extracts values from dynamic form
-- ✅ Field types supported: text, markdown (with preview), code (with monospace), url, thumbnail (drag-drop upload), number, boolean, date, datetime, enum
+- ✅ Field types supported: text, markdown (with preview), code (with monospace), url, thumbnail (drag-drop upload), number, boolean, date, datetime, enum, yaml (object ↔ YAML string)
 - ✅ Template-driven actions: Run button for code templates with Pyodide status
 - ✅ `editViewerCard()` updated to use `openEditor()` instead of type-specific modals
 - ✅ `renderTemplateButtons()` updated to call `openEditor()` for toolbar buttons
@@ -1579,9 +1587,9 @@ function renderCardPreview(card, template) {
 
    **Result:** ~686 lines removed, file reduced from 6397 to 5711 lines.
 
-2. **Settings as System Card** 🔲 Planned
+2. **Settings as System Card** ✅ Complete
 
-   Consolidate `notebook.json` and `extensions.yaml` into `settings.yaml` - a system card that uses the generic editor.
+   Consolidated `notebook.json` and `extensions.yaml` into `settings.yaml` - a system card that uses the generic editor.
 
    **2a. New `settings.yaml` format:**
    ```yaml
@@ -1690,17 +1698,31 @@ function renderCardPreview(card, template) {
    **Files removed:** `notebook.json`, `extensions.yaml` (consolidated into `settings.yaml`)
    **Files added:** `settings.yaml`
 
-3. **Error handling** 🔲 Planned
+3. **Template Template** ✅ Complete
+
+   Added a `template` template for displaying `*.template.yaml` files as system cards:
+   - Uses `yaml` layout for card and viewer (shows all schema fields as YAML)
+   - Editor includes all template fields: name, description, schema, card, viewer, editor, style, ui
+   - Templates loaded with parsed fields in `loadFromFilesystem()`
+   - Light blue background (#f0f4f8) to distinguish from settings
+
+4. **YAML Layout Type** ✅ Complete
+
+   Added new `yaml` layout for cards and viewers:
+   - `renderYamlPreview()` - Collects all schema fields and renders as formatted YAML
+   - `renderViewerYaml()` - Full YAML display in viewer
+   - `yaml` field type in editor with object ↔ YAML string conversion
+   - CSS styling: `.preview-yaml`, `.viewer-yaml`
+
+5. **Documentation** ✅ Complete
+   - Updated CLAUDE.md with yaml layout, system cards pattern, field type ordering gotcha
+
+6. **Error handling** 🔲 Future
    - Graceful fallback if `settings.yaml` is malformed (use defaults, show warning toast)
    - Validation warnings in editor for unknown/invalid fields
    - Try/catch around template parsing with helpful error messages
 
-4. **Documentation** 🔲 Planned
-   - Update CLAUDE.md with `settings.yaml` format
-   - Template authoring guide (field types, layouts, styling)
-   - Brief "creating custom templates" section
-
-**Deliverable:** Production-ready template system with settings as an editable system card.
+**Deliverable:** Production-ready template system with settings and templates as editable system cards.
 
 ---
 
