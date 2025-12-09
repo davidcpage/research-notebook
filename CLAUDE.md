@@ -63,6 +63,7 @@ Note: Card rendering, viewer display, and editing all work automatically via tem
 - Both use `yaml` layout to display all schema fields as formatted YAML
 - Settings has 3 special cases: editor footer (folder info), save handler (updates globals), entry point (⚙ button)
 - Templates loaded in `loadFromFilesystem()` with parsed fields for yaml layout rendering
+- **Auto-creation of templates**: When loading an existing notebook, `ensureTemplatesForExistingCards()` creates template files only for card types that already have cards but are missing template files. This supports customization of existing cards without auto-creating templates the user may have intentionally removed.
 
 **Adding new field types:**
 When adding field type handling in `renderEditorField()`, check type-specific conditions BEFORE generic ones like `multiline && monospace`. The yaml type must be checked early or it falls through to code textarea handling.

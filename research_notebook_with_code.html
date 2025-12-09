@@ -2289,6 +2289,88 @@
             return createdFiles;
         }
 
+        // Ensure template files exist for card types that are already in use
+        // This supports customization of existing cards without auto-creating
+        // templates the user may have intentionally removed
+        async function ensureTemplatesForExistingCards(dirHandle, loadedData) {
+            if (!dirHandle) return [];
+
+            // Collect all template types in use across all sections
+            const templateTypesInUse = new Set();
+            for (const section of loadedData.sections || []) {
+                for (const item of section.items || []) {
+                    const templateName = item.template || item.type;
+                    if (templateName) {
+                        templateTypesInUse.add(templateName);
+                    }
+                }
+            }
+
+            if (templateTypesInUse.size === 0) {
+                return [];
+            }
+
+            // Map template names to their file names
+            const templateToFile = {
+                'note': 'note.template.yaml',
+                'code': 'code.template.yaml',
+                'bookmark': 'bookmark.template.yaml'
+            };
+
+            let createdFiles = [];
+
+            for (const templateName of templateTypesInUse) {
+                const filename = templateToFile[templateName];
+                if (!filename) continue;  // Skip unknown/custom templates
+
+                // Check if template file exists
+                try {
+                    await dirHandle.getFileHandle(filename);
+                    // File exists, don't create
+                } catch (e) {
+                    // File doesn't exist but cards of this type exist, create it
+                    try {
+                        const content = getTemplateFileContent(templateName);
+                        const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(content);
+                        await writable.close();
+                        createdFiles.push(filename);
+                        console.log(`[Templates] Created ${filename} for existing ${templateName} cards`);
+
+                        // Add to systemNotes so it appears in System section
+                        const parsed = jsyaml.load(content);
+                        loadedData.systemNotes.push({
+                            template: 'template',
+                            system: true,
+                            id: 'system-' + filename,
+                            filename: filename,
+                            title: templateName + ' (template)',
+                            name: parsed.name || templateName,
+                            description: parsed.description || '',
+                            schema: parsed.schema || {},
+                            card: parsed.card || {},
+                            viewer: parsed.viewer || {},
+                            editor: parsed.editor || {},
+                            style: parsed.style || {},
+                            ui: parsed.ui || {},
+                            modified: new Date().toISOString()
+                        });
+                    } catch (writeError) {
+                        console.error(`[Templates] Error creating ${filename}:`, writeError);
+                    }
+                }
+            }
+
+            if (createdFiles.length > 0) {
+                showToast(`📋 Created templates for existing cards: ${createdFiles.join(', ')}`);
+                // Reload templates so the registry has the newly created templates
+                await loadTemplates(dirHandle);
+            }
+
+            return createdFiles;
+        }
+
         // ===== Parsers =====
         // Parse file content based on parser type from extension registry
 
@@ -4405,6 +4487,11 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 }
 
                 console.log(`[Filesystem] Loaded ${loadedData.sections.length} sections`);
+
+                // Create template files for card types that exist but don't have template files
+                // This supports customization without auto-creating templates for empty types
+                await ensureTemplatesForExistingCards(dirHandle, loadedData);
+
                 return loadedData;
 
             } catch (error) {
