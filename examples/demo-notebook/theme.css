@@ -1,0 +1,244 @@
+/*
+ * Research Notebook Theme: "Manuscript"
+ *
+ * A warm, scholarly theme with textured parchment backgrounds
+ * and hand-drawn-inspired styling for notes.
+ *
+ * This file demonstrates theme.css customization:
+ * - Override CSS variables for colors
+ * - Style specific card types with [data-template="..."] selectors
+ * - Add decorative effects and textures
+ */
+
+/* ========================================
+   Global Color Overrides (optional)
+   ======================================== */
+
+:root {
+    /* Warm sepia-toned palette */
+    --bg-primary: #faf8f3;
+    --bg-secondary: #f5f2ea;
+    --text-primary: #3d3733;
+    --text-secondary: #5a544c;
+    --text-muted: #8a8279;
+    --accent: #8b6914;
+    --border: #ddd5c5;
+    --link-color: #7a5d12;
+    --link-hover: #a67c1a;
+
+    /* Code card colors (One Dark inspired) */
+    --code-bg: #282c34;
+    --code-text: #abb2bf;
+}
+
+/* ========================================
+   Notebook Header Styling
+   ======================================== */
+
+header h1 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-weight: normal;
+    letter-spacing: 0.05em;
+}
+
+header h2 {
+    font-style: italic;
+    color: var(--text-muted);
+}
+
+/* ========================================
+   Note Cards - Parchment Style
+   ========================================
+   Override template variables for consistent theming, then add
+   decorative effects that go beyond simple color changes.
+*/
+.card[data-template="note"],
+.modal.viewer[data-template="note"] {
+    --template-border: #d9d0be;
+    --template-bg: #f6f0e2;
+    --template-preview-bg: transparent;
+    --template-title-text: #4a4138;
+    --template-meta-text: #8a8279;
+    --template-heading-font: Georgia, 'Times New Roman', serif;
+}
+
+.card[data-template="note"] {
+    /* Textured parchment background using CSS gradients */
+    background:
+        /* Subtle paper grain texture */
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(139, 119, 101, 0.03) 2px,
+            rgba(139, 119, 101, 0.03) 4px
+        ),
+        repeating-linear-gradient(
+            90deg,
+            transparent,
+            transparent 2px,
+            rgba(139, 119, 101, 0.02) 2px,
+            rgba(139, 119, 101, 0.02) 4px
+        ),
+        /* Base parchment gradient */
+        linear-gradient(
+            135deg,
+            #f9f5eb 0%,
+            #f5efe0 25%,
+            #f8f3e6 50%,
+            #f3ead8 75%,
+            #f6f0e2 100%
+        );
+
+    /* Soft shadow for depth */
+    box-shadow:
+        0 2px 8px rgba(101, 84, 67, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+
+    /* Slightly rough border */
+    border: 1px solid #d9d0be;
+    border-radius: 3px;
+}
+
+.card[data-template="note"]:hover {
+    box-shadow:
+        0 4px 16px rgba(101, 84, 67, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* Note card title - uses template variable */
+.card[data-template="note"] .card-title {
+    font-family: var(--template-heading-font);
+    color: var(--template-title-text);
+}
+
+/* Note preview content */
+.card[data-template="note"] .card-preview {
+    background: var(--template-preview-bg);
+    border-bottom: 1px solid rgba(180, 168, 148, 0.3);
+}
+
+/* ========================================
+   Note Viewer - Full Manuscript Style
+   ======================================== */
+
+.modal.viewer[data-template="note"] .viewer-content {
+    font-family: var(--template-heading-font);
+    line-height: 1.7;
+    /* Subtle parchment texture */
+    background:
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 3px,
+            rgba(139, 119, 101, 0.02) 3px,
+            rgba(139, 119, 101, 0.02) 6px
+        ),
+        linear-gradient(
+            180deg,
+            #faf6ed 0%,
+            #f5efe0 100%
+        );
+}
+
+.modal.viewer[data-template="note"] h1,
+.modal.viewer[data-template="note"] h2,
+.modal.viewer[data-template="note"] h3 {
+    font-family: var(--template-heading-font);
+    color: var(--template-title-text);
+    border-bottom-color: var(--template-border);
+}
+
+/* ========================================
+   Code Cards - Terminal Style (One Dark theme)
+   ========================================
+   Override template variables to style both card and viewer consistently.
+   This is the recommended pattern - define variables once, they apply everywhere.
+*/
+.card[data-template="code"],
+.modal.viewer[data-template="code"] {
+    --template-border: #3a3f4a;
+    --template-bg: #282c34;
+    --template-output-bg: #2c323c;
+    --template-code-bg: #282c34;
+    --template-code-text: #abb2bf;
+    --template-title-text: #e0e4eb;
+    --template-meta-text: #7a8292;
+}
+
+/* ========================================
+   Bookmark Cards - Clean Modern
+   ======================================== */
+
+.card[data-template="bookmark"] {
+    background: white;
+    border: 1px solid #e0ddd5;
+}
+
+.card[data-template="bookmark"]:hover {
+    border-color: var(--accent);
+}
+
+/* ========================================
+   Section Headers
+   ======================================== */
+
+.section-header h3 {
+    font-family: Georgia, 'Times New Roman', serif;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    border-bottom: 2px solid #d9d0be;
+}
+
+/* ========================================
+   Toolbar Styling
+   ======================================== */
+
+.toolbar {
+    background: linear-gradient(180deg, #f9f6f0 0%, #f3efe5 100%);
+    border-bottom: 1px solid #ddd5c5;
+}
+
+.toolbar button {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ========================================
+   Scrollbar Styling (WebKit browsers)
+   ======================================== */
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c9c0b0;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #b5a996;
+}
+
+/* Dark scrollbars for code areas */
+.card[data-template="code"] ::-webkit-scrollbar-track,
+.modal.viewer[data-template="code"] ::-webkit-scrollbar-track {
+    background: var(--template-code-bg);
+}
+
+.card[data-template="code"] ::-webkit-scrollbar-thumb,
+.modal.viewer[data-template="code"] ::-webkit-scrollbar-thumb {
+    background: #555;
+}
+
+.card[data-template="code"] ::-webkit-scrollbar-thumb:hover,
+.modal.viewer[data-template="code"] ::-webkit-scrollbar-thumb:hover {
+    background: #666;
+}

@@ -6,7 +6,8 @@ This folder contains a Research Notebook - a collection of notes, code snippets,
 
 ```
 notebook-folder/
-├── notebook.json           # Notebook metadata (title, subtitle, section order)
+├── settings.yaml           # Notebook metadata (title, subtitle, sections)
+├── theme.css               # Optional: Custom CSS theme
 ├── README.md               # This file
 ├── CLAUDE.md               # Instructions for Claude Code
 ├── sections/
@@ -92,6 +93,21 @@ git log --oneline sections/papers/attention-mechanisms.md
 Notes support wiki-style internal links:
 - `[[Section Name > Item Title]]` - Links to another item
 - Links work across notes, code, and bookmarks
+
+## Custom Themes
+
+Create a `theme.css` file in your notebook root to customize the appearance. The CSS is loaded automatically when you open the notebook.
+
+This demo includes a "Manuscript" theme with:
+- Warm sepia color palette
+- Textured parchment backgrounds for note cards
+- Serif typography for a scholarly feel
+- Dark terminal style for code cards
+
+See `theme.css` for documented examples of:
+- Global CSS variable overrides
+- Card-specific styles using `[data-template="note"]` selectors
+- Viewer modal customization
 
 ## Opening the Notebook
 

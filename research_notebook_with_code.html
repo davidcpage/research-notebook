@@ -548,15 +548,22 @@
         }
 
         .preview-content {
-            font-size: 0.9rem;
+            font-size: 0.925rem;
             color: var(--text-secondary);
-            line-height: 1.5;
+            line-height: 1.7;
             overflow: hidden;
         }
 
+        .preview-content h1 { font-family: 'Playfair Display', serif; font-size: 1.5rem; margin-bottom: 0.75rem; color: var(--text-primary); }
+        .preview-content h2 { font-family: 'Playfair Display', serif; font-size: 1.25rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .preview-content h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; margin: 1rem 0 0.5rem; color: var(--text-primary); }
+        .preview-content p { margin-bottom: 0.875rem; }
+        .preview-content ul, .preview-content ol { margin: 0.875rem 0; padding-left: 1.5rem; }
+        .preview-content li { margin-bottom: 0.375rem; }
         .preview-content code { font-family: 'Consolas', 'Monaco', monospace; background: #fff; padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.9em; }
         .preview-content pre { background: #fff; padding: 0.75rem; overflow-x: auto; margin: 0.5rem 0; border-radius: 4px; border: 1px solid #e8e4dc; }
         .preview-content pre code { background: none; padding: 0; }
+        .preview-content blockquote { border-left: 3px solid var(--accent); padding-left: 1rem; margin: 0.875rem 0; color: var(--text-secondary); font-style: italic; }
         .preview-content table { border-collapse: collapse; margin: 0.5rem 0; width: 100%; font-size: 0.85em; }
         .preview-content table th,
         .preview-content table td { border: 1px solid var(--border); padding: 0.25rem 0.5rem; text-align: left; }
@@ -646,7 +653,7 @@
             padding: 0.75rem;
             overflow: hidden;
             position: relative;
-            background: var(--code-bg);
+            background: inherit;
         }
 
         .split-output-content {
@@ -663,11 +670,11 @@
         .split-code {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.4rem;
-            color: var(--code-text);
+            color: var(--template-code-text, var(--code-text));
             line-height: 1.2;
             margin: 0;
             overflow: hidden;
-            background: var(--code-bg);
+            background: transparent;
             padding: 0.5rem;
             height: 100%;
         }
@@ -676,7 +683,7 @@
             font-family: inherit;
             font-size: inherit;
             background: transparent !important;
-            color: var(--code-text);
+            color: inherit;
         }
 
         /* Fields preview */
@@ -696,31 +703,69 @@
             color: var(--text-muted);
         }
 
-        /* Template-specific card styles via data-template */
+        /* Note template: define colors once, used by both card and viewer */
+        .card[data-template="note"],
+        .modal.viewer[data-template="note"] {
+            --template-border: var(--note-border);
+            --template-bg: #f0ebe0;
+            --template-preview-bg: #e8e3d8;
+            --template-title-text: var(--text-primary);
+            --template-meta-text: var(--text-muted);
+            --template-heading-font: 'Playfair Display', serif;
+            --template-body-font: inherit;
+        }
+
         .card[data-template="note"] {
-            border-color: var(--note-border);
+            border-color: var(--template-border);
         }
 
         .card[data-template="note"] .card-preview {
-            background: #e8e3d8;
+            background: var(--template-preview-bg);
             padding: 0 15%;
         }
 
+        /* Code template: define colors once, used by both card and viewer.
+           Default is light card with dark code areas. Themes can override --template-* variables. */
+        .card[data-template="code"],
+        .modal.viewer[data-template="code"] {
+            --template-border: #d0dcd0;
+            --template-bg: white;
+            --template-output-bg: #eef4ee;
+            --template-code-bg: var(--code-bg);
+            --template-code-text: var(--code-text);
+            --template-title-text: var(--text-primary);
+            --template-meta-text: var(--text-muted);
+        }
+
         .card[data-template="code"] {
-            border-color: #d0dcd0;
+            border-color: var(--template-border);
+            background: var(--template-bg);
         }
 
         .card[data-template="code"] .card-preview {
-            background: var(--code-bg);
+            background: var(--template-code-bg);
+        }
+
+        .card[data-template="code"] .card-content {
+            background: var(--template-bg);
+        }
+
+        .card[data-template="code"] .card-title {
+            color: var(--template-title-text);
+        }
+
+        .card[data-template="code"] .card-meta {
+            background: var(--template-bg);
+            color: var(--template-meta-text);
         }
 
         .card[data-template="code"] .preview-split-left {
-            background: #eef4ee;
-            border-right: 1px solid #d0dcd0;
+            background: var(--template-output-bg);
+            border-right: 1px solid var(--template-border);
         }
 
         .card[data-template="code"] .preview-split-right {
-            background: var(--code-bg);
+            background: var(--template-code-bg);
         }
 
         .card[data-template="bookmark"] .card-preview {
@@ -728,6 +773,29 @@
             display: flex;
             align-items: center;
             justify-content: center;
+        }
+
+        /* Theme template: define colors once, used by both card and viewer */
+        .card[data-template="theme"],
+        .modal.viewer[data-template="theme"] {
+            --template-border: #d0c8e0;
+            --template-bg: #2d2d2d;
+            --template-code-bg: #2d2d2d;
+            --template-code-text: #c5c8c6;
+        }
+
+        .card[data-template="theme"] {
+            border-color: var(--template-border);
+        }
+
+        .card[data-template="theme"] .card-preview {
+            background: var(--template-code-bg);
+        }
+
+        .card[data-template="theme"] .preview-code {
+            background: var(--template-code-bg);
+            color: var(--template-code-text);
+            font-size: 0.65rem;
         }
 
         /* ========== Generic Viewer Styles (Phase 2 Template System) ========== */
@@ -1021,25 +1089,75 @@
 
         /* Template-specific viewer styles */
         .modal.viewer[data-template="note"] {
-            background: #f0ebe0;
-            border: 1px solid var(--note-border);
+            background: var(--template-bg);
+            border: 1px solid var(--template-border);
+        }
+
+        .modal.viewer[data-template="note"] .modal-header h2 {
+            font-family: var(--template-heading-font);
+            color: var(--template-title-text);
+        }
+
+        .modal.viewer[data-template="note"] .viewer-meta {
+            color: var(--template-meta-text);
         }
 
         .modal.viewer[data-template="code"] {
-            background: #f8faf8;
-            border: 1px solid #d0dcd0;
+            background: var(--template-bg);
+            border: 1px solid var(--template-border);
+        }
+
+        .modal.viewer[data-template="code"] .modal-header {
+            background: var(--template-bg);
+        }
+
+        .modal.viewer[data-template="code"] .modal-header h2 {
+            color: var(--template-title-text);
         }
 
         .modal.viewer[data-template="code"] .viewer-split-left {
-            background: #eef4ee;
+            background: var(--template-output-bg);
         }
 
         .modal.viewer[data-template="code"] .viewer-split-right {
-            background: var(--code-bg);
+            background: var(--template-code-bg);
+        }
+
+        .modal.viewer[data-template="code"] .viewer-footer {
+            background: var(--template-bg);
+            border-top-color: var(--template-border);
+        }
+
+        .modal.viewer[data-template="code"] .viewer-meta {
+            color: var(--template-meta-text);
+        }
+
+        .modal.viewer[data-template="code"] .viewer-actions .btn-secondary {
+            color: var(--template-title-text);
+            border-color: var(--template-border);
+        }
+
+        .modal.viewer[data-template="code"] .viewer-actions .btn-secondary:hover {
+            background: var(--template-output-bg);
+            border-color: var(--template-title-text);
         }
 
         .modal.viewer[data-template="bookmark"] {
             background: var(--bg-secondary);
+        }
+
+        .modal.viewer[data-template="theme"] {
+            background: var(--template-bg);
+            border: 1px solid var(--template-border);
+        }
+
+        .modal.viewer[data-template="theme"] .viewer-content {
+            background: var(--template-code-bg);
+            color: var(--template-code-text);
+        }
+
+        .modal.viewer[data-template="theme"] .viewer-content pre {
+            color: var(--template-code-text);
         }
 
         /* Override highlight.js in generic viewer */
@@ -2160,6 +2278,38 @@
                         show_create_button: false,
                         sort_order: 98
                     }
+                },
+                theme: {
+                    name: 'theme',
+                    description: 'Custom CSS theme for notebook styling',
+                    schema: {
+                        content: { type: 'code', language: 'css', required: true }
+                    },
+                    card: {
+                        layout: 'document',
+                        preview_field: 'content',
+                        placeholder: '🎨'
+                    },
+                    viewer: {
+                        layout: 'document',
+                        content_field: 'content'
+                    },
+                    editor: {
+                        fields: [
+                            { field: 'content', label: 'Theme CSS', multiline: true, rows: 30, monospace: true }
+                        ]
+                    },
+                    style: {
+                        variables: {
+                            '--preview-bg': '#2d2d2d'
+                        }
+                    },
+                    ui: {
+                        button_label: 'Theme',
+                        icon: '🎨',
+                        show_create_button: false,
+                        sort_order: 97
+                    }
                 }
             };
         }
@@ -2954,6 +3104,10 @@
                 // YAML fields: convert object to string for preview
                 const yamlStr = typeof content === 'object' ? jsyaml.dump(content, { indent: 2, lineWidth: -1 }) : String(content);
                 return `<pre class="preview-code">${escapeHtml(yamlStr.substring(0, 400))}</pre>`;
+            } else if (fieldType === 'code') {
+                // Code fields: monospace with language class (check before 'content' field name)
+                const codePreview = escapeHtml(content.substring(0, 400));
+                return `<pre class="preview-code"><code class="language-${fieldDef?.language || 'python'}">${codePreview || 'No code'}</code></pre>`;
             } else if (fieldType === 'markdown' || field === 'content') {
                 // Use existing renderNotePreview for markdown
                 const previewHtml = renderNotePreview(content, format);
@@ -2961,9 +3115,6 @@
                     return `<div class="preview-placeholder">${placeholder}</div>`;
                 }
                 return `<div class="preview-page"><div class="preview-scaler"><div class="preview-content">${previewHtml}</div></div></div>`;
-            } else if (fieldType === 'code') {
-                const codePreview = escapeHtml(content.substring(0, 400));
-                return `<pre class="preview-code"><code class="language-${fieldDef?.language || 'python'}">${codePreview || 'No code'}</code></pre>`;
             } else if (typeof content === 'object') {
                 // Handle any object that slipped through
                 const str = JSON.stringify(content, null, 2);
@@ -4822,8 +4973,8 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 for await (const [filename, fileHandle] of dirHandle.entries()) {
                     if (fileHandle.kind !== 'file') continue;
 
-                    // Skip files with excluded extensions
-                    if (excludedExtensions.some(ext => filename.endsWith(ext))) continue;
+                    // Skip files with excluded extensions (but allow theme.css specifically)
+                    if (filename !== 'theme.css' && excludedExtensions.some(ext => filename.endsWith(ext))) continue;
 
                     // Skip hidden files unless they're in the allowed list
                     if (filename.startsWith('.') && !includedDotfiles.includes(filename)) continue;
@@ -4881,6 +5032,21 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                             } catch (e) {
                                 console.error(`[Filesystem] Error parsing template ${filename}:`, e);
                             }
+                            continue;
+                        }
+
+                        // Special handling for theme.css - use theme template
+                        if (filename === 'theme.css') {
+                            loadedData.systemNotes.push({
+                                template: 'theme',
+                                system: true,
+                                id: 'system-theme.css',
+                                filename: filename,
+                                title: 'Theme',
+                                content: content,
+                                modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
+                            });
+                            console.log(`[Filesystem] Loaded theme card: ${filename}`);
                             continue;
                         }
 
@@ -5344,6 +5510,24 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 
                 recordSave(filename);
                 console.log('[Filesystem] Saved template:', filename);
+                return;
+            }
+
+            // Theme card is handled specially (saved as theme.css, reloads CSS)
+            if (card.template === 'theme' || card.filename === 'theme.css') {
+                const filename = 'theme.css';
+                const fileHandle = await notebookDirHandle.getFileHandle(filename, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(card.content);
+                await writable.close();
+                card.filename = filename;
+                card.id = 'system-theme.css';
+
+                // Reload the theme CSS into the page
+                await loadThemeCss(notebookDirHandle);
+
+                recordSave(filename);
+                console.log('[Filesystem] Saved and reloaded theme.css');
                 return;
             }
 

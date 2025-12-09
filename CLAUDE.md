@@ -58,11 +58,15 @@ To add a new card type (fully automatic with template system):
 
 Note: Card rendering, viewer display, and editing all work automatically via templates.
 
-**System cards (settings, templates):**
+**System cards (settings, templates, theme):**
 - `settings.yaml` and `*.template.yaml` files are loaded as system cards with special templates
 - Both use `yaml` layout to display all schema fields as formatted YAML
 - Settings has 3 special cases: editor footer (folder info), save handler (updates globals), entry point (⚙ button)
 - Templates loaded in `loadFromFilesystem()` with parsed fields for yaml layout rendering
+- **Theme card**: `theme.css` is loaded as a system card with the `theme` template
+  - Editable in-app via the generic editor (CSS code field)
+  - Saving automatically reloads the CSS into the page via `loadThemeCss()`
+  - Card uses dark background styling to match CSS editor aesthetic
 - **Auto-creation of templates**: When loading an existing notebook, `ensureTemplatesForExistingCards()` creates template files only for card types that already have cards but are missing template files. This supports customization of existing cards without auto-creating templates the user may have intentionally removed.
 
 **Adding new field types:**
@@ -237,6 +241,46 @@ Since this is a single HTML file:
 - Type safety: All items must have valid `type` field ('bookmark', 'note', or 'code')
 - Escape HTML in user input using `escapeHtml()` function
 - **Storage**: IndexedDB handles large datasets (GBs) without quota issues, unlike localStorage (5-10MB)
+
+### Template CSS Variables Pattern
+To keep card and viewer styling consistent, templates define CSS custom properties that both card and viewer inherit. This ensures changing one variable updates both views automatically.
+
+**Standard template variables**:
+- `--template-border` - Border color for card and viewer
+- `--template-bg` - Background for card body, viewer header/footer
+- `--template-preview-bg` - Background for card preview area
+- `--template-title-text` - Title text color
+- `--template-meta-text` - Meta/date text color
+- `--template-heading-font` - Font for headings (note template)
+- `--template-output-bg` - Background for output areas (code template split-left)
+- `--template-code-bg` - Background for code areas (code template)
+- `--template-code-text` - Text color in code areas (code template)
+
+**How it works**: The main app defines default values, then theme.css can override:
+```css
+/* Note template - parchment style */
+.card[data-template="note"],
+.modal.viewer[data-template="note"] {
+    --template-border: #d9d0be;
+    --template-bg: #f6f0e2;
+    --template-title-text: #4a4138;
+    --template-heading-font: Georgia, serif;
+}
+
+/* Code template - dark terminal style */
+.card[data-template="code"],
+.modal.viewer[data-template="code"] {
+    --template-border: #3a3f4a;
+    --template-bg: #282c34;
+    --template-output-bg: #2c323c;
+    --template-code-bg: #282c34;
+    --template-code-text: #abb2bf;
+    --template-title-text: #e0e4eb;
+    --template-meta-text: #7a8292;
+}
+```
+
+**Adding a new template**: Define variables in the same selector pattern, then use them in your card/viewer CSS rules. See `note`, `code`, and `theme` templates in HTML_HEAD for examples.
 
 ### Storage Architecture
 

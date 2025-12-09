@@ -1,7 +1,10 @@
 notebook_title: Research Notebook
 notebook_subtitle: Bookmarks, notes, and connections
 sections:
-  - research
+  - name: research
+    visible: true
+  - name: _system
+    visible: true
 extensions:
   .md:
     parser: yaml-frontmatter
