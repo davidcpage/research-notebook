@@ -1432,6 +1432,115 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Print styles for exporting viewer content */
+        @media print {
+            /* Hide everything except the viewer modal */
+            body > *:not(.modal-overlay) {
+                display: none !important;
+            }
+
+            /* Reset modal overlay to static positioning for print flow */
+            .modal-overlay {
+                position: static !important;
+                background: none !important;
+                display: block !important;
+                opacity: 1 !important;
+                visibility: visible !important;
+                overflow: visible !important;
+            }
+
+            .modal-overlay:not(.active) {
+                display: none !important;
+            }
+
+            /* Reset modal to static, full-width, auto-height for proper pagination */
+            .modal.viewer {
+                position: static !important;
+                transform: none !important;
+                width: 100% !important;
+                max-width: none !important;
+                max-height: none !important;
+                min-height: auto !important;
+                height: auto !important;
+                overflow: visible !important;
+                box-shadow: none !important;
+                display: block !important;
+            }
+
+            .viewer-content {
+                overflow: visible !important;
+                height: auto !important;
+                max-height: none !important;
+            }
+
+            /* Hide UI elements not needed in print */
+            .modal-close,
+            .viewer-footer,
+            .viewer-backlinks {
+                display: none !important;
+            }
+
+            /* Remove modal frame/border */
+            .modal.viewer {
+                border: none !important;
+                border-radius: 0 !important;
+            }
+
+            .modal-header {
+                border-bottom: none !important;
+            }
+
+            /* Ensure content flows across pages */
+            .viewer-content,
+            .viewer-content * {
+                break-inside: auto;
+            }
+
+            /* Avoid breaking inside these elements */
+            pre, code, img, .katex-display {
+                break-inside: avoid;
+            }
+
+            /* Tables need extra specificity and display reset for break-inside to work */
+            table, .viewer-content table, .markdown-content table {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;  /* Legacy property for older browsers */
+                display: table !important;  /* Ensure table display mode */
+            }
+
+            thead {
+                display: table-header-group;  /* Repeat headers on each page if table does break */
+            }
+
+            tr {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            /* Remove parchment/colored backgrounds for cleaner PDF */
+            html, body,
+            .modal-overlay,
+            .modal.viewer,
+            .modal.viewer[data-template="note"],
+            .modal.viewer[data-template="code"],
+            .modal.viewer[data-template="bookmark"],
+            .viewer-content,
+            .markdown-content {
+                background: white !important;
+            }
+
+            /* Page margins */
+            @page {
+                margin: 1in;
+            }
+
+            /* Ensure backgrounds print (for code blocks) */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
     </style>
 </head>
 <!-- ========== SECTION: HTML_BODY_AND_MODALS ========== -->
