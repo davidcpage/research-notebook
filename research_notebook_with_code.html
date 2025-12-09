@@ -557,6 +557,11 @@
         .preview-content code { font-family: 'Consolas', 'Monaco', monospace; background: #fff; padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.9em; }
         .preview-content pre { background: #fff; padding: 0.75rem; overflow-x: auto; margin: 0.5rem 0; border-radius: 4px; border: 1px solid #e8e4dc; }
         .preview-content pre code { background: none; padding: 0; }
+        .preview-content table { border-collapse: collapse; margin: 0.5rem 0; width: 100%; font-size: 0.85em; }
+        .preview-content table th,
+        .preview-content table td { border: 1px solid var(--border); padding: 0.25rem 0.5rem; text-align: left; }
+        .preview-content table th { background: var(--bg-primary); font-weight: 600; }
+        .preview-content table tr:nth-child(even) { background: #fafafa; }
 
         .preview-page::after {
             content: '';
@@ -821,6 +826,11 @@
         .viewer-markdown a { color: var(--accent); text-decoration: none; }
         .viewer-markdown a:hover { text-decoration: underline; }
         .viewer-markdown img { max-width: 100%; height: auto; border-radius: 4px; margin: 0.5rem 0; }
+        .viewer-markdown table { border-collapse: collapse; margin: 0.875rem 0; width: 100%; font-size: 0.9em; }
+        .viewer-markdown table th,
+        .viewer-markdown table td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; }
+        .viewer-markdown table th { background: var(--bg-primary); font-weight: 600; }
+        .viewer-markdown table tr:nth-child(even) { background: #fafafa; }
 
         .viewer-text {
             margin: 0;
@@ -904,6 +914,11 @@
             line-height: 1.6;
             color: var(--text-secondary);
         }
+        .viewer-description table { border-collapse: collapse; margin: 0.75rem 0; width: 100%; font-size: 0.9em; }
+        .viewer-description table th,
+        .viewer-description table td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; }
+        .viewer-description table th { background: var(--bg-primary); font-weight: 600; }
+        .viewer-description table tr:nth-child(even) { background: #fafafa; }
 
         /* Split pane viewer layout */
         .viewer-split-pane {
