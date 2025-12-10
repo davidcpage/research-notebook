@@ -88,7 +88,7 @@ When adding field type handling in `renderEditorField()`, check type-specific co
 
 ### Single-File Structure
 - All CSS, HTML, and JavaScript in `research_notebook.html`
-- External CDN dependencies: PDF.js, Marked.js, KaTeX, Pyodide
+- External CDN dependencies: PDF.js, Marked.js, KaTeX, Pyodide, Highlight.js, CodeMirror 6
 
 ### Data Model
 ```javascript
@@ -117,6 +117,7 @@ data = {
 - Pyodide runtime: `pyodide`, `pyodideLoading`, `pyodideReady`
 - Filesystem: `notebookDirHandle`, `filesystemLinked`
 - Generic editor: `editingCard` (in GENERIC_EDITOR section)
+- CodeMirror: `codeMirrorInstances`, `codeMirrorModules` (in GENERIC_EDITOR section)
 
 ### System Notes
 - Files at notebook root loaded as "system notes" in `_system` section
@@ -200,6 +201,39 @@ Templates define CSS custom properties that both card and viewer inherit, ensuri
 - Pre-loads: numpy, pandas, matplotlib
 - First load: ~10-20 seconds; cached: 1-2 seconds
 - Debug: Check console for `[Pyodide]` logs, network tab for CDN requests
+
+---
+
+## CodeMirror (Editor Syntax Highlighting)
+
+CodeMirror 6 provides syntax highlighting in editor fields for code, YAML, and CSS.
+
+### Architecture
+- **Loaded via ES modules** using import maps (no build step required)
+- **Lazy loading**: CodeMirror modules load on first editor open, then cached
+- **Import map**: Defined in HTML_HEAD, maps `@codemirror/*` packages to esm.sh CDN
+- **Dark theme**: Uses One Dark theme for consistent appearance
+
+### Key Functions (GENERIC_EDITOR section)
+- `loadCodeMirror()`: Lazy-loads CodeMirror modules, returns cached modules
+- `createCodeMirrorEditor(container, options)`: Creates editor instance with language support
+- `getCodeMirrorValue(fieldName)`: Gets content from a CodeMirror instance
+- `destroyCodeMirrorInstances()`: Cleanup when editor closes
+
+### Supported Languages
+- Python (`@codemirror/lang-python`) - for code cards
+- YAML (`@codemirror/lang-yaml`) - for settings, templates
+- CSS (`@codemirror/lang-css`) - for theme.css
+
+### Adding a New Language
+1. Add package to import map in HTML_HEAD (e.g., `"@codemirror/lang-javascript": "https://esm.sh/*@codemirror/lang-javascript@6.x.x"`)
+2. Add import in `loadCodeMirror()`
+3. Add case in `createCodeMirrorEditor()` switch statement
+4. Set `language` property in template's editor field config
+
+### Dual Highlighting System
+- **Editing**: CodeMirror (full editor features: line numbers, bracket matching, etc.)
+- **Viewing**: Highlight.js (lightweight, for read-only display in cards/viewers)
 
 ---
 

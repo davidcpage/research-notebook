@@ -1,5 +1,5 @@
 <!-- ========== SECTION: HTML_HEAD ========== -->
-<!-- External dependencies: PDF.js, Marked.js, KaTeX, Pyodide, Highlight.js -->
+<!-- External dependencies: PDF.js, Marked.js, KaTeX, Pyodide, Highlight.js, CodeMirror -->
 <!-- All CSS styles included below -->
 <!DOCTYPE html>
 <html lang="en">
@@ -7,6 +7,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Research Notebook</title>
+    <!-- CodeMirror 6 import map for editor syntax highlighting -->
+    <script type="importmap">
+    {
+        "imports": {
+            "style-mod": "https://esm.sh/style-mod@4.1.2",
+            "w3c-keyname": "https://esm.sh/w3c-keyname@2.2.8",
+            "crelt": "https://esm.sh/crelt@1.0.6",
+            "@marijn/find-cluster-break": "https://esm.sh/@marijn/find-cluster-break@1.0.2",
+            "@lezer/common": "https://esm.sh/*@lezer/common@1.2.3",
+            "@lezer/highlight": "https://esm.sh/*@lezer/highlight@1.2.1",
+            "@lezer/lr": "https://esm.sh/*@lezer/lr@1.4.2",
+            "@lezer/python": "https://esm.sh/*@lezer/python@1.1.15",
+            "@lezer/yaml": "https://esm.sh/*@lezer/yaml@1.0.3",
+            "@lezer/css": "https://esm.sh/*@lezer/css@1.1.9",
+            "@codemirror/autocomplete": "https://esm.sh/*@codemirror/autocomplete@6.18.4",
+            "@codemirror/commands": "https://esm.sh/*@codemirror/commands@6.7.1",
+            "@codemirror/language": "https://esm.sh/*@codemirror/language@6.10.6",
+            "@codemirror/lint": "https://esm.sh/*@codemirror/lint@6.8.4",
+            "@codemirror/search": "https://esm.sh/*@codemirror/search@6.5.8",
+            "@codemirror/state": "https://esm.sh/*@codemirror/state@6.5.0",
+            "@codemirror/view": "https://esm.sh/*@codemirror/view@6.35.0",
+            "@codemirror/lang-python": "https://esm.sh/*@codemirror/lang-python@6.1.6",
+            "@codemirror/lang-yaml": "https://esm.sh/*@codemirror/lang-yaml@6.1.2",
+            "@codemirror/lang-css": "https://esm.sh/*@codemirror/lang-css@6.3.1",
+            "@codemirror/theme-one-dark": "https://esm.sh/*@codemirror/theme-one-dark@6.1.2",
+            "codemirror": "https://esm.sh/*codemirror@6.0.1"
+        }
+    }
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Source+Sans+3:wght@300;400;500&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <!-- Marked.js for markdown rendering -->
@@ -358,6 +387,27 @@
             outline: none;
             border-color: #4a7c4a;
             background: #1e1e1e;
+        }
+
+        /* CodeMirror editor container */
+        .codemirror-container {
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            min-height: 200px;
+            max-height: 500px;
+        }
+
+        .codemirror-container .cm-editor {
+            height: 100%;
+            min-height: 200px;
+            max-height: 500px;
+            font-size: 0.9rem;
+        }
+
+        .codemirror-container .cm-scroller {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            line-height: 1.5;
         }
 
         .code-output {
@@ -2387,7 +2437,7 @@
                     },
                     editor: {
                         fields: [
-                            { field: 'content', label: 'Theme CSS', multiline: true, rows: 30, monospace: true }
+                            { field: 'content', label: 'Theme CSS', multiline: true, rows: 30, monospace: true, language: 'css' }
                         ]
                     },
                     style: {
@@ -3842,6 +3892,103 @@
         let editingCard = null;  // { templateName, sectionId, card, isNew }
         let editorManualThumbnail = null;  // For thumbnail field uploads
 
+        // CodeMirror editor instances (field name -> EditorView)
+        let codeMirrorInstances = {};
+        let codeMirrorLoaded = false;
+        let codeMirrorModules = null;  // Cached imports: { EditorView, basicSetup, python, yaml, css }
+
+        // Load CodeMirror modules (lazy, once)
+        async function loadCodeMirror() {
+            if (codeMirrorModules) return codeMirrorModules;
+            if (codeMirrorLoaded) {
+                // Wait for loading to complete
+                while (!codeMirrorModules) {
+                    await new Promise(r => setTimeout(r, 50));
+                }
+                return codeMirrorModules;
+            }
+            codeMirrorLoaded = true;
+            try {
+                const [cm, langPython, langYaml, langCss, themeOneDark, cmCommands, cmView] = await Promise.all([
+                    import('codemirror'),
+                    import('@codemirror/lang-python'),
+                    import('@codemirror/lang-yaml'),
+                    import('@codemirror/lang-css'),
+                    import('@codemirror/theme-one-dark'),
+                    import('@codemirror/commands'),
+                    import('@codemirror/view')
+                ]);
+                codeMirrorModules = {
+                    EditorView: cm.EditorView,
+                    basicSetup: cm.basicSetup,
+                    python: langPython.python,
+                    yaml: langYaml.yaml,
+                    css: langCss.css,
+                    oneDark: themeOneDark.oneDark,
+                    indentWithTab: cmCommands.indentWithTab,
+                    keymap: cmView.keymap
+                };
+                console.log('[CodeMirror] Loaded successfully');
+                return codeMirrorModules;
+            } catch (err) {
+                console.error('[CodeMirror] Failed to load:', err);
+                codeMirrorLoaded = false;
+                throw err;
+            }
+        }
+
+        // Create a CodeMirror editor in a container element
+        async function createCodeMirrorEditor(container, options = {}) {
+            const { language = 'python', value = '', fieldName = '' } = options;
+            const cm = await loadCodeMirror();
+
+            // Get language extension
+            let langExtension;
+            switch (language) {
+                case 'yaml': langExtension = cm.yaml(); break;
+                case 'css': langExtension = cm.css(); break;
+                case 'python':
+                default: langExtension = cm.python(); break;
+            }
+
+            // Create editor with dark theme and proper Tab handling
+            const editor = new cm.EditorView({
+                doc: value,
+                extensions: [
+                    cm.basicSetup,
+                    langExtension,
+                    cm.oneDark,  // Dark theme
+                    cm.keymap.of([cm.indentWithTab]),  // Tab inserts indentation
+                    cm.EditorView.theme({
+                        '&': { height: '100%' },
+                        '.cm-scroller': { overflow: 'auto' }
+                    })
+                ],
+                parent: container
+            });
+
+            // Store instance if field name provided
+            if (fieldName) {
+                codeMirrorInstances[fieldName] = editor;
+            }
+
+            return editor;
+        }
+
+        // Get value from a CodeMirror instance by field name
+        function getCodeMirrorValue(fieldName) {
+            const editor = codeMirrorInstances[fieldName];
+            return editor ? editor.state.doc.toString() : '';
+        }
+
+        // Destroy all CodeMirror instances (call when closing editor)
+        function destroyCodeMirrorInstances() {
+            for (const [name, editor] of Object.entries(codeMirrorInstances)) {
+                editor.destroy();
+            }
+            codeMirrorInstances = {};
+        }
+
         // Open the generic editor modal
         function openEditor(templateName, sectionId, card = null) {
             const template = templateRegistry[templateName];
@@ -4028,36 +4175,59 @@
                 hint.textContent = 'Supports Markdown and LaTeX ($inline$, $$display$$). Link with [[Title]] or [[id:xyz]]';
                 div.appendChild(hint);
             } else if (type === 'yaml') {
-                // YAML textarea - value is an object, display as YAML string
-                inputEl = document.createElement('textarea');
-                inputEl.id = `editor-${field}`;
-                inputEl.className = 'code-editor';
-                inputEl.rows = rows || 15;
-                inputEl.spellcheck = false;
+                // YAML editor with CodeMirror
                 // Convert object to YAML string for editing
+                let yamlValue = '';
                 if (value && typeof value === 'object') {
-                    inputEl.value = jsyaml.dump(value, { indent: 2, lineWidth: -1 });
+                    yamlValue = jsyaml.dump(value, { indent: 2, lineWidth: -1 });
                 } else if (typeof value === 'string') {
-                    inputEl.value = value;
-                } else {
-                    inputEl.value = '';
+                    yamlValue = value;
                 }
-                div.appendChild(inputEl);
+
+                const editorContainer = document.createElement('div');
+                editorContainer.id = `editor-${field}`;
+                editorContainer.className = 'codemirror-container';
+                editorContainer.setAttribute('data-language', 'yaml');
+                editorContainer.setAttribute('data-field', field);
+                div.appendChild(editorContainer);
+
+                // Initialize CodeMirror async
+                createCodeMirrorEditor(editorContainer, {
+                    language: 'yaml',
+                    value: yamlValue,
+                    fieldName: field
+                }).catch(err => {
+                    console.error('Failed to initialize CodeMirror for YAML:', err);
+                    // Fallback to textarea
+                    editorContainer.innerHTML = `<textarea class="code-editor" style="width:100%;height:300px;">${escapeHtml(yamlValue)}</textarea>`;
+                });
 
                 const yamlHint = document.createElement('p');
                 yamlHint.className = 'form-hint';
                 yamlHint.textContent = 'Edit YAML configuration. Invalid YAML will show an error on save.';
                 div.appendChild(yamlHint);
             } else if (type === 'code' || (multiline && monospace)) {
-                // Code textarea
-                inputEl = document.createElement('textarea');
-                inputEl.id = `editor-${field}`;
-                inputEl.className = 'code-editor';
-                inputEl.rows = rows || 15;
-                inputEl.spellcheck = false;
-                inputEl.placeholder = `# Write Python code here\nimport numpy as np\nimport pandas as pd\nimport matplotlib.pyplot as plt\n\nprint('Hello, World!')`;
-                inputEl.value = value || '';
-                div.appendChild(inputEl);
+                // Code editor with CodeMirror
+                // Determine language from fieldConfig or default to python
+                const language = fieldConfig.language || 'python';
+
+                const editorContainer = document.createElement('div');
+                editorContainer.id = `editor-${field}`;
+                editorContainer.className = 'codemirror-container';
+                editorContainer.setAttribute('data-language', language);
+                editorContainer.setAttribute('data-field', field);
+                div.appendChild(editorContainer);
+
+                // Initialize CodeMirror async
+                createCodeMirrorEditor(editorContainer, {
+                    language: language,
+                    value: value || '',
+                    fieldName: field
+                }).catch(err => {
+                    console.error('Failed to initialize CodeMirror for code:', err);
+                    // Fallback to textarea
+                    editorContainer.innerHTML = `<textarea class="code-editor" style="width:100%;height:300px;">${escapeHtml(value || '')}</textarea>`;
+                });
             } else if (multiline || type === 'markdown') {
                 // Regular textarea
                 inputEl = document.createElement('textarea');
@@ -4423,6 +4593,22 @@
                 return editorManualThumbnail || editingCard.card[fieldName] || null;
             }
 
+            // Check for CodeMirror instance first (for code and yaml types)
+            if (codeMirrorInstances[fieldName]) {
+                const cmValue = getCodeMirrorValue(fieldName);
+                if (type === 'yaml') {
+                    // Parse YAML string back to object
+                    try {
+                        return cmValue ? jsyaml.load(cmValue) : null;
+                    } catch (e) {
+                        console.error('[Editor] Invalid YAML:', e.message);
+                        showToast('Invalid YAML: ' + e.message, true);
+                        return null;
+                    }
+                }
+                return cmValue;
+            }
+
             const el = document.getElementById(`editor-${fieldName}`);
             if (!el) return null;
 
@@ -4435,6 +4621,7 @@
             } else if (type === 'date' && el.value) {
                 return el.value;
             } else if (type === 'yaml') {
+                // Fallback for textarea (if CodeMirror failed to load)
                 // Parse YAML string back to object
                 try {
                     return el.value ? jsyaml.load(el.value) : null;
@@ -4587,14 +4774,21 @@
 
         // Run code in editor (for code template)
         async function runEditorCode() {
-            const codeEl = document.getElementById('editor-code');
             const outputEl = document.getElementById('editorCodeOutput');
             const outputContainer = document.getElementById('editorOutput');
             const runBtn = document.getElementById('editorRunBtn');
 
-            if (!codeEl || !outputEl) return;
+            if (!outputEl) return;
 
-            const code = codeEl.value;
+            // Get code from CodeMirror instance or fallback to textarea
+            let code = '';
+            if (codeMirrorInstances['code']) {
+                code = getCodeMirrorValue('code');
+            } else {
+                const codeEl = document.getElementById('editor-code');
+                code = codeEl ? codeEl.value : '';
+            }
+
             if (!code.trim()) {
                 showToast('Please enter some code first');
                 return;
@@ -4627,6 +4821,9 @@
 
         // Close the editor modal
         function closeEditor() {
+            // Clean up CodeMirror instances before clearing DOM
+            destroyCodeMirrorInstances();
+
             document.getElementById('editorModal').classList.remove('active');
             document.getElementById('editorBody').innerHTML = '';
             document.getElementById('editorActions').innerHTML = '';
