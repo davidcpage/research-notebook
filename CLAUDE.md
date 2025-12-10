@@ -64,7 +64,14 @@ Card rendering, viewer display, and editing all work automatically via templates
 ### System cards (settings, templates, theme)
 - `settings.yaml` and `*.template.yaml` are system cards with special templates using `yaml` layout
 - **Theme card**: `theme.css` loaded as system card, saving reloads CSS via `loadThemeCss()`
-- **Auto-creation**: `ensureTemplatesForExistingCards()` creates template files only for card types that have cards but missing templates
+- **Auto-creation**: `ensureTemplateFiles()` creates `settings.yaml`, `theme.css`, and default template files for new notebooks. `ensureTemplatesForExistingCards()` creates template files only for card types that have cards but missing templates
+
+### Theming
+- `theme.css` in notebook root overrides app styles (loads after built-in CSS)
+- New notebooks get a minimal starter `theme.css` with documented variables
+- Full reference: `/theme.css` in repo root documents all customizable selectors
+- Demo theme: `examples/demo-notebook/theme.css` shows elaborate theming with textures
+- Key function: `getDefaultThemeContent()` generates the starter theme for new notebooks
 
 ### Adding new field types
 When adding field type handling in `renderEditorField()`, check type-specific conditions BEFORE generic ones like `multiline && monospace`. The yaml type must be checked early or it falls through to code textarea handling.

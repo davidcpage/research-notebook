@@ -2431,6 +2431,88 @@
             });
         }
 
+        // Generate default theme.css content (minimal starter for new notebooks)
+        function getDefaultThemeContent() {
+            return `/*
+ * Research Notebook Theme
+ * =======================
+ * Customize your notebook's appearance by uncommenting and modifying styles below.
+ * This file loads after the app's built-in styles, so your changes take precedence.
+ *
+ * For a complete reference of all customizable elements, see:
+ * https://github.com/anthropics/research-notebook/blob/main/theme.css
+ */
+
+
+/* ==========================================================================
+   GLOBAL COLOR VARIABLES
+   ==========================================================================
+   Uncomment and modify these to change colors throughout the entire app.
+*/
+
+/*
+:root {
+    /* Backgrounds */
+    --bg-primary: #f8f6f3;        /* Main page background */
+    --bg-secondary: #ffffff;      /* Card and modal backgrounds */
+    --bg-accent: #1a1a1a;         /* Header background */
+
+    /* Text colors */
+    --text-primary: #1a1a1a;      /* Main body text */
+    --text-secondary: #5a5a5a;    /* Secondary text */
+    --text-muted: #8a8a8a;        /* Muted text, metadata */
+
+    /* Borders */
+    --border: #e0ddd8;            /* Standard borders */
+    --border-dark: #c5c2bd;       /* Darker borders (buttons) */
+
+    /* Accent color (buttons, links, highlights) */
+    --accent: #c45d3a;            /* Primary accent (terracotta) */
+    --accent-hover: #a84d2e;      /* Accent hover state */
+
+    /* Code blocks */
+    --code-bg: #1a3a52;           /* Code background (dark teal) */
+    --code-text: #e0e6ed;         /* Code text color */
+
+    /* Internal wiki links */
+    --link-color: #2563eb;        /* Link color (blue) */
+    --link-hover: #1d4ed8;        /* Link hover color */
+}
+*/
+
+
+/* ==========================================================================
+   TEMPLATE STYLING
+   ==========================================================================
+   Style specific card types using template variables.
+   The same selector styles BOTH the card AND its viewer for consistency.
+
+   Available variables:
+   --template-border, --template-bg, --template-preview-bg,
+   --template-title-text, --template-meta-text, --template-heading-font,
+   --template-code-bg, --template-code-text, --template-output-bg
+*/
+
+/* Example: Customize note cards */
+/*
+.card[data-template="note"],
+.modal.viewer[data-template="note"] {
+    --template-border: #d9d0be;
+    --template-bg: #f6f0e2;
+    --template-heading-font: Georgia, serif;
+}
+*/
+
+
+/* ==========================================================================
+   YOUR CUSTOMIZATIONS
+   ==========================================================================
+   Add your custom styles below.
+*/
+
+`;
+        }
+
         // Generate default settings.yaml content
         function getDefaultSettingsContent(title = 'Research Notebook', subtitle = 'Bookmarks, notes, and connections', sections = ['research']) {
             const registry = getDefaultExtensionRegistry();
@@ -2760,6 +2842,7 @@
 
             const filesToCreate = [
                 { name: 'settings.yaml', getContent: getDefaultSettingsContent },
+                { name: 'theme.css', getContent: getDefaultThemeContent },
                 { name: 'note.template.yaml', getContent: () => getTemplateFileContent('note') },
                 { name: 'code.template.yaml', getContent: () => getTemplateFileContent('code') },
                 { name: 'bookmark.template.yaml', getContent: () => getTemplateFileContent('bookmark') }

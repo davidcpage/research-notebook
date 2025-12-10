@@ -9,6 +9,7 @@ A browser-based research management tool that combines bookmarks, markdown notes
 - **Executable Python code** cells via Pyodide (numpy, pandas, matplotlib pre-loaded)
 - **Bidirectional backlinks** between items
 - **File-based storage** using the File System Access API
+- **Customizable themes** via CSS - edit `theme.css` in your notebook folder
 
 ## Getting Started
 
@@ -55,6 +56,20 @@ The single-file application (`research_notebook.html`, ~5000 lines) is structure
   python3 generate_index.py --section PYODIDE_RUNTIME  # Single section
   ```
 - **`CLAUDE.md`**: Detailed guidance for Claude Code when working on this codebase
+
+## Theming
+
+Each notebook includes a `theme.css` file you can edit to customize colors and styling:
+
+```css
+:root {
+    --accent: #c45d3a;        /* Change the accent color */
+    --bg-primary: #f8f6f3;    /* Change the background */
+    --code-bg: #1a3a52;       /* Change code block colors */
+}
+```
+
+See `theme.css` in the repo root for a full reference of all customizable CSS variables and selectors. The `examples/demo-notebook/theme.css` shows a more elaborate theme with textures.
 
 ## Requirements
 

@@ -1,0 +1,791 @@
+/*
+ * Research Notebook - Default Theme Reference
+ * ============================================
+ *
+ * This file documents all customizable CSS elements with their default values.
+ * All styles are commented out - uncomment and modify what you want to change.
+ *
+ * How it works:
+ * - This file loads AFTER the app's built-in styles
+ * - Any styles you uncomment will override the defaults
+ * - Save this file in the app to see changes immediately
+ *
+ * For more elaborate theming with textures and effects, see:
+ * examples/demo-notebook/theme.css
+ */
+
+
+/* ============================================================================
+   GLOBAL CSS VARIABLES
+   ============================================================================
+   Override these to change colors throughout the entire app.
+   All UI elements reference these variables.
+*/
+
+/*
+:root {
+    /* Backgrounds */
+    /* --bg-primary: #f8f6f3;        /* Main page background */
+    /* --bg-secondary: #ffffff;      /* Card and modal backgrounds */
+    /* --bg-accent: #1a1a1a;         /* Header background */
+
+    /* Text colors */
+    /* --text-primary: #1a1a1a;      /* Main body text */
+    /* --text-secondary: #5a5a5a;    /* Secondary text */
+    /* --text-muted: #8a8a8a;        /* Muted text, metadata */
+
+    /* Borders */
+    /* --border: #e0ddd8;            /* Standard borders */
+    /* --border-dark: #c5c2bd;       /* Darker borders (buttons) */
+
+    /* Accent colors */
+    /* --accent: #c45d3a;            /* Primary accent (terracotta) */
+    /* --accent-hover: #a84d2e;      /* Accent hover state */
+
+    /* Shadows */
+    /* --shadow: rgba(26, 26, 26, 0.08); /* Box shadows */
+
+    /* Note-specific */
+    /* --note-bg: #fffef9;           /* Note background tint */
+    /* --note-border: #e8e4d9;       /* Note border color */
+
+    /* Links (internal wiki links) */
+    /* --link-color: #2563eb;        /* Link color (blue) */
+    /* --link-hover: #1d4ed8;        /* Link hover color */
+
+    /* Code theme */
+    /* --code-bg: #1a3a52;           /* Code block background (dark teal) */
+    /* --code-text: #e0e6ed;         /* Code text color */
+}
+*/
+
+
+/* ============================================================================
+   HEADER
+   ============================================================================
+*/
+
+/*
+header {
+    background: var(--bg-accent);
+    color: var(--bg-primary);
+    padding: 2.5rem 2rem;
+}
+
+header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.5rem;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+}
+
+.tagline {
+    font-weight: 300;
+    color: rgba(248, 246, 243, 0.7);
+    font-size: 1rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+*/
+
+
+/* ============================================================================
+   TOOLBAR
+   ============================================================================
+*/
+
+/*
+.toolbar {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+}
+
+.btn {
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.75rem 1.5rem;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--accent-hover);
+}
+
+.btn-secondary {
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border-dark);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-primary);
+    border-color: var(--text-primary);
+}
+
+.btn-note {
+    background: var(--note-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--note-border);
+}
+
+.btn-code {
+    background: #f0f4f0;
+    color: var(--text-primary);
+    border: 1px solid #c8d4c8;
+}
+*/
+
+
+/* ============================================================================
+   MAIN CONTENT AREA
+   ============================================================================
+*/
+
+/*
+main {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 6rem 2rem;
+    color: var(--text-muted);
+}
+*/
+
+
+/* ============================================================================
+   SECTIONS
+   ============================================================================
+*/
+
+/*
+.section {
+    margin-bottom: 3rem;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--bg-accent);
+}
+
+.section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.75rem;
+    font-weight: 400;
+}
+
+.section-count {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.section-toggle {
+    color: var(--text-muted);
+}
+
+.section-toggle:hover {
+    color: var(--text-primary);
+}
+
+.section-delete {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+}
+
+.section-delete:hover {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+*/
+
+
+/* ============================================================================
+   CARD GRID
+   ============================================================================
+*/
+
+/*
+.items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+*/
+
+
+/* ============================================================================
+   TEMPLATE VARIABLES - THE KEY PATTERN
+   ============================================================================
+   Templates define CSS variables that apply to BOTH cards AND viewers.
+   This ensures visual consistency when clicking a card to open its viewer.
+
+   Define variables once using this selector pattern:
+
+   .card[data-template="typename"],
+   .modal.viewer[data-template="typename"] {
+       --template-border: ...;
+       --template-bg: ...;
+   }
+
+   Standard template variables:
+   - --template-border       Border color
+   - --template-bg           Background color
+   - --template-preview-bg   Card preview area background
+   - --template-title-text   Title text color
+   - --template-meta-text    Metadata text color
+   - --template-heading-font Heading font family
+   - --template-body-font    Body font family
+   - --template-output-bg    Output area background (code cards)
+   - --template-code-bg      Code area background (code cards)
+   - --template-code-text    Code text color (code cards)
+*/
+
+
+/* ============================================================================
+   NOTE TEMPLATE
+   ============================================================================
+   Warm parchment style with serif headings.
+*/
+
+/*
+.card[data-template="note"],
+.modal.viewer[data-template="note"] {
+    --template-border: var(--note-border);
+    --template-bg: #f0ebe0;
+    --template-preview-bg: #e8e3d8;
+    --template-title-text: var(--text-primary);
+    --template-meta-text: var(--text-muted);
+    --template-heading-font: 'Playfair Display', serif;
+    --template-body-font: inherit;
+}
+
+.card[data-template="note"] {
+    border-color: var(--template-border);
+}
+
+.card[data-template="note"] .card-preview {
+    background: var(--template-preview-bg);
+}
+*/
+
+
+/* ============================================================================
+   CODE TEMPLATE
+   ============================================================================
+   Light card with dark code areas. Split-pane preview shows output + code.
+*/
+
+/*
+.card[data-template="code"],
+.modal.viewer[data-template="code"] {
+    --template-border: #d0dcd0;
+    --template-bg: white;
+    --template-output-bg: #eef4ee;
+    --template-code-bg: var(--code-bg);
+    --template-code-text: var(--code-text);
+    --template-title-text: var(--text-primary);
+    --template-meta-text: var(--text-muted);
+}
+
+.card[data-template="code"] {
+    border-color: var(--template-border);
+    background: var(--template-bg);
+}
+
+.card[data-template="code"] .card-preview {
+    background: var(--template-code-bg);
+}
+
+.card[data-template="code"] .preview-split-left {
+    background: var(--template-output-bg);
+}
+
+.card[data-template="code"] .preview-split-right {
+    background: var(--template-code-bg);
+}
+*/
+
+
+/* ============================================================================
+   BOOKMARK TEMPLATE
+   ============================================================================
+   Clean card with thumbnail preview and gradient fallback.
+*/
+
+/*
+.card[data-template="bookmark"] .card-preview {
+    background: linear-gradient(135deg, var(--bg-primary) 0%, var(--border) 100%);
+}
+
+.card[data-template="bookmark"]:hover {
+    border-color: var(--accent);
+}
+*/
+
+
+/* ============================================================================
+   THEME TEMPLATE
+   ============================================================================
+   Dark preview for CSS code display.
+*/
+
+/*
+.card[data-template="theme"],
+.modal.viewer[data-template="theme"] {
+    --template-border: #d0c8e0;
+    --template-bg: #2d2d2d;
+    --template-code-bg: #2d2d2d;
+    --template-code-text: #c5c8c6;
+}
+
+.card[data-template="theme"] {
+    border-color: var(--template-border);
+}
+
+.card[data-template="theme"] .card-preview {
+    background: var(--template-code-bg);
+}
+*/
+
+
+/* ============================================================================
+   CARDS - BASE STYLES
+   ============================================================================
+*/
+
+/*
+.card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 8px 30px var(--shadow);
+    transform: translateY(-2px);
+}
+
+.card-preview {
+    width: 100%;
+    height: 180px;
+    overflow: hidden;
+}
+
+.card-content {
+    padding: 1.25rem;
+}
+
+.card-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.card-meta {
+    padding: 0 1.25rem 0.75rem 1.25rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+*/
+
+
+/* ============================================================================
+   MODALS - BASE STYLES
+   ============================================================================
+*/
+
+/*
+.modal-overlay {
+    background: rgba(26, 26, 26, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+.modal {
+    background: var(--bg-secondary);
+    max-width: 500px;
+    max-height: 90vh;
+}
+
+.modal-large {
+    max-width: 800px;
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+    font-family: 'Playfair Display', serif;
+    font-weight: 400;
+    font-size: 1.5rem;
+}
+
+.modal-close {
+    color: var(--text-muted);
+}
+
+.modal-close:hover {
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+}
+*/
+
+
+/* ============================================================================
+   VIEWER MODAL
+   ============================================================================
+   Larger modal for viewing card content in detail.
+*/
+
+/*
+.modal.viewer {
+    max-width: 900px;
+    min-height: 60vh;
+    max-height: 90vh;
+}
+
+.modal.viewer .modal-header h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.viewer-content {
+    padding: 1.25rem;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.viewer-footer {
+    padding: 1rem 1.25rem;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+}
+
+.viewer-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.viewer-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+*/
+
+
+/* ============================================================================
+   MARKDOWN CONTENT
+   ============================================================================
+   Styles for rendered markdown in viewers and previews.
+*/
+
+/*
+.viewer-markdown {
+    line-height: 1.7;
+    font-size: 0.925rem;
+    color: var(--text-secondary);
+}
+
+.viewer-markdown h1,
+.viewer-markdown h2,
+.viewer-markdown h3 {
+    font-family: 'Playfair Display', serif;
+    color: var(--text-primary);
+}
+
+.viewer-markdown h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+.viewer-markdown h2 { font-size: 1.25rem; margin: 1.25rem 0 0.5rem; }
+.viewer-markdown h3 { font-size: 1.1rem; margin: 1rem 0 0.5rem; }
+
+.viewer-markdown p { margin-bottom: 0.875rem; }
+.viewer-markdown ul, .viewer-markdown ol { margin: 0.875rem 0; padding-left: 1.5rem; }
+.viewer-markdown li { margin-bottom: 0.375rem; }
+
+.viewer-markdown code {
+    font-family: 'Consolas', 'Monaco', monospace;
+    background: #fff;
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.viewer-markdown pre {
+    background: #fff;
+    padding: 1rem;
+    overflow-x: auto;
+    margin: 0.875rem 0;
+    border-radius: 4px;
+    border: 1px solid #e8e4dc;
+}
+
+.viewer-markdown blockquote {
+    border-left: 3px solid var(--accent);
+    padding-left: 1rem;
+    margin: 0.875rem 0;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.viewer-markdown a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.viewer-markdown a:hover {
+    text-decoration: underline;
+}
+
+.viewer-markdown table {
+    border-collapse: collapse;
+    margin: 0.875rem 0;
+    width: 100%;
+}
+
+.viewer-markdown table th,
+.viewer-markdown table td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+}
+
+.viewer-markdown table th {
+    background: var(--bg-primary);
+    font-weight: 600;
+}
+
+.viewer-markdown table tr:nth-child(even) {
+    background: #fafafa;
+}
+*/
+
+
+/* ============================================================================
+   INTERNAL LINKS & BACKLINKS
+   ============================================================================
+   Wiki-style [[links]] between cards.
+*/
+
+/*
+.internal-link {
+    color: var(--link-color);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--link-color);
+}
+
+.internal-link:hover {
+    color: var(--link-hover);
+    border-bottom-style: solid;
+}
+
+.internal-link.broken {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.backlinks {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.backlinks-title {
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.backlink-item {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+}
+
+.backlink-item:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+*/
+
+
+/* ============================================================================
+   FORM ELEMENTS
+   ============================================================================
+*/
+
+/*
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--bg-secondary);
+}
+
+.form-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+*/
+
+
+/* ============================================================================
+   TOAST NOTIFICATIONS
+   ============================================================================
+*/
+
+/*
+.toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: var(--bg-accent);
+    color: var(--bg-primary);
+    padding: 1rem 1.5rem;
+    font-size: 0.875rem;
+}
+*/
+
+
+/* ============================================================================
+   EDITOR TABS
+   ============================================================================
+*/
+
+/*
+.editor-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+}
+
+.editor-tab {
+    padding: 0.5rem 1rem;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-secondary);
+}
+
+.editor-tab:hover {
+    color: var(--text-primary);
+}
+
+.editor-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.editor-preview {
+    padding: 1rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    min-height: 300px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+*/
+
+
+/* ============================================================================
+   SCROLLBAR STYLING (WebKit browsers only)
+   ============================================================================
+*/
+
+/*
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-dark);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+*/
+
+/* Dark scrollbars for code areas */
+/*
+.card[data-template="code"] ::-webkit-scrollbar-track,
+.modal.viewer[data-template="code"] ::-webkit-scrollbar-track {
+    background: var(--template-code-bg);
+}
+
+.card[data-template="code"] ::-webkit-scrollbar-thumb,
+.modal.viewer[data-template="code"] ::-webkit-scrollbar-thumb {
+    background: #555;
+}
+*/
+
+
+/* ============================================================================
+   YOUR CUSTOMIZATIONS
+   ============================================================================
+   Add your custom styles below this line.
+
+   Tips:
+   - Start by uncommenting and modifying :root variables for quick global changes
+   - Use the template variable pattern for consistent card/viewer styling
+   - Reference examples/demo-notebook/theme.css for texture and effect ideas
+*/
