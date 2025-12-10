@@ -1818,6 +1818,38 @@
                 max-height: none !important;
             }
 
+            /* Ensure text wraps properly within page margins */
+            .viewer-markdown,
+            .viewer-text,
+            .viewer-content {
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                max-width: 100% !important;
+            }
+
+            /* Pre/code blocks: preserve formatting (no wrapping for ASCII diagrams) */
+            .viewer-markdown pre,
+            .viewer-content pre,
+            pre {
+                white-space: pre !important;
+                overflow-x: visible !important;
+            }
+
+            /* Tables should not overflow page */
+            .viewer-markdown table,
+            .viewer-content table {
+                max-width: 100% !important;
+                table-layout: fixed !important;
+            }
+
+            .viewer-markdown td,
+            .viewer-markdown th,
+            .viewer-content td,
+            .viewer-content th {
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+            }
+
             /* Hide UI elements not needed in print */
             .modal-close,
             .viewer-footer,
@@ -1874,9 +1906,21 @@
                 background: white !important;
             }
 
-            /* Page margins */
+            /* Page setup: reduced margins for wider content area */
             @page {
-                margin: 1in;
+                margin: 0.5in;
+            }
+
+            /* Slightly smaller font for print to fit more content */
+            .viewer-markdown,
+            .viewer-content {
+                font-size: 0.85rem !important;
+            }
+
+            .viewer-markdown pre,
+            .viewer-content pre,
+            pre {
+                font-size: 0.75rem !important;
             }
 
             /* Ensure backgrounds print (for code blocks) */
