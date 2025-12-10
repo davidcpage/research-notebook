@@ -2067,8 +2067,25 @@
             // Each item has a 'type' field: 'bookmark', 'note', or 'code'
         };
 
-        // Track collapsed sections (not persisted)
+        // Track collapsed sections (persisted to sessionStorage across refresh)
         let collapsedSections = new Set();
+
+        // Save collapsed sections to sessionStorage
+        function saveCollapsedSections() {
+            sessionStorage.setItem('collapsedSections', JSON.stringify([...collapsedSections]));
+        }
+
+        // Restore collapsed sections from sessionStorage
+        function restoreCollapsedSections() {
+            const saved = sessionStorage.getItem('collapsedSections');
+            if (saved) {
+                try {
+                    collapsedSections = new Set(JSON.parse(saved));
+                } catch (e) {
+                    console.warn('Failed to restore collapsed sections:', e);
+                }
+            }
+        }
 
         // Pyodide state
         let pyodide = null;
@@ -6890,6 +6907,7 @@ sys.stderr = sys.__stderr__
             } else {
                 collapsedSections.add(sectionId);
             }
+            saveCollapsedSections();
             render();
         }
 
@@ -7218,6 +7236,9 @@ sys.stderr = sys.__stderr__
 
         // Initialize
         async function init() {
+            // Restore UI state from sessionStorage
+            restoreCollapsedSections();
+
             // Try to restore filesystem link first
             await initFilesystem();
 
