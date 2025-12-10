@@ -10,6 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Run `/start` or `python3 generate_index.py --sections` to see section layout with line numbers.
 
+**Finding functions**: Use `generate_index.py --section SECTION_NAME` to list functions in a section, or `--search KEYWORD` to find functions by name/description. Useful for tracing data flows across the codebase.
+
 Key sections: HTML_HEAD (CSS), HTML_BODY_AND_MODALS, STATE_AND_CONFIG, TEMPLATE_SYSTEM, GENERIC_EDITOR,
 DATA_PERSISTENCE, FILESYSTEM_STORAGE, PYODIDE_RUNTIME, INTERNAL_LINKING, RENDER_FUNCTIONS, EVENT_HANDLERS_AND_INIT
 
