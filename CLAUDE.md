@@ -17,6 +17,18 @@ Section markers: `// ========== SECTION: NAME ==========` (JS) or `<!-- ========
 
 Add a comment above new functions describing their purpose (parsed by generate_index.py).
 
+### Tracing Card/Viewer Rendering
+
+To find CSS or modify rendering for a card type, trace from template to render function:
+
+1. Find template definition in `getDefaultTemplates()` (or `.template.yaml` file)
+2. Note the `card.layout` and `viewer.layout` values (e.g., `image`, `document`, `split-pane`)
+3. Search for render function: `render{Layout}Preview` for cards, `render{Layout}Viewer` for viewers
+4. The render function shows exact HTML structure and CSS class names
+5. Search for those classes in HTML_HEAD section for styling
+
+Example: Bookmark uses `layout: 'image'` → `renderImagePreview()` / `renderImageViewer()` → classes like `.viewer-image-container`, `.viewer-thumbnail`, `.viewer-url`, `.viewer-description`
+
 ---
 
 ## Common Tasks
