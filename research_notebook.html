@@ -6564,8 +6564,23 @@ sys.stderr = sys.__stderr__
                 }
                 return null;
             }
-            
-            // Otherwise search by title (case-insensitive)
+
+            // Check for section-scoped link: [[Section > Card title]]
+            const scopedMatch = linkText.match(/^(.+?)\s*>\s*(.+)$/);
+            if (scopedMatch) {
+                const sectionName = scopedMatch[1].trim().toLowerCase();
+                const cardTitle = scopedMatch[2].trim().toLowerCase();
+                const section = data.sections.find(s => s.name && s.name.toLowerCase() === sectionName);
+                if (section) {
+                    const item = section.items.find(i => i.title && i.title.toLowerCase() === cardTitle);
+                    if (item) {
+                        return { ...item, sectionId: section.id };
+                    }
+                }
+                return null;
+            }
+
+            // Otherwise search by title across all sections (case-insensitive)
             const searchTitle = linkText.toLowerCase();
             for (const section of data.sections) {
                 const item = section.items.find(i => i.title && i.title.toLowerCase() === searchTitle);
@@ -6578,36 +6593,48 @@ sys.stderr = sys.__stderr__
 
         function findBacklinks(itemId) {
             const backlinks = [];
-            const pattern = new RegExp(`\\[\\[id:${itemId}\\]\\]|\\[\\[([^\\]]+)\\]\\]`, 'g');
-            
-            // Get the target item's title
+
+            // Get the target item's title and section
             let targetTitle = null;
+            let targetSectionName = null;
             for (const section of data.sections) {
                 const item = section.items.find(i => i.id === itemId);
                 if (item && item.title) {
                     targetTitle = item.title.toLowerCase();
+                    targetSectionName = section.name ? section.name.toLowerCase() : null;
                     break;
                 }
             }
-            
+
             for (const section of data.sections) {
                 for (const item of section.items) {
                     if (item.id === itemId) continue;
-                    
+
                     const content = item.type === 'note' ? item.content : item.description;
                     if (!content) continue;
-                    
+
                     // Check for ID link
                     if (content.includes(`[[id:${itemId}]]`)) {
                         backlinks.push({ ...item, sectionId: section.id });
                         continue;
                     }
-                    
-                    // Check for title link
+
+                    // Check for title link (plain or section-scoped)
                     if (targetTitle) {
                         const matches = content.matchAll(/\[\[([^\]]+)\]\]/g);
                         for (const match of matches) {
-                            if (match[1].toLowerCase() === targetTitle) {
+                            const linkText = match[1];
+                            // Check for section-scoped link: [[Section > Card title]]
+                            const scopedMatch = linkText.match(/^(.+?)\s*>\s*(.+)$/);
+                            if (scopedMatch) {
+                                const sectionName = scopedMatch[1].trim().toLowerCase();
+                                const cardTitle = scopedMatch[2].trim().toLowerCase();
+                                if (cardTitle === targetTitle && targetSectionName && sectionName === targetSectionName) {
+                                    backlinks.push({ ...item, sectionId: section.id });
+                                    break;
+                                }
+                            } else if (linkText.toLowerCase() === targetTitle) {
+                                // Plain title link
                                 backlinks.push({ ...item, sectionId: section.id });
                                 break;
                             }
@@ -6615,7 +6642,7 @@ sys.stderr = sys.__stderr__
                     }
                 }
             }
-            
+
             return backlinks;
         }
 
