@@ -5270,6 +5270,20 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 
                 console.log(`[Filesystem] Loaded ${loadedData.sections.length} sections`);
 
+                // Apply visibility from settings to loaded sections
+                if (notebookSettings?.sections) {
+                    for (const section of loadedData.sections) {
+                        const sectionSlug = slugify(section.name);
+                        const settingsRecord = notebookSettings.sections.find(s =>
+                            (typeof s === 'string' ? s : s.name) === sectionSlug
+                        );
+                        if (settingsRecord && typeof settingsRecord === 'object') {
+                            section.visible = settingsRecord.visible !== false;
+                        }
+                        // If not found in settings, default to visible (visible: true)
+                    }
+                }
+
                 // Ensure _system section exists in settings if there are system notes
                 if (loadedData.systemNotes && loadedData.systemNotes.length > 0) {
                     if (!notebookSettings.sections.some(s => (typeof s === 'string' ? s : s.name) === '_system')) {
