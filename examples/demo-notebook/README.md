@@ -111,4 +111,4 @@ See `theme.css` for documented examples of:
 
 ## Opening the Notebook
 
-Open `research_notebook_with_code.html` in Chrome/Edge and select this folder when prompted.
+Open `research_notebook.html` in Chrome/Edge and select this folder when prompted.

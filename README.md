@@ -12,7 +12,7 @@ A browser-based research management tool that combines bookmarks, markdown notes
 
 ## Getting Started
 
-1. Open `research_notebook_with_code.html` in Chrome or Edge
+1. Open `research_notebook.html` in Chrome or Edge
 2. Select a folder to store your notebook
 3. Start creating sections, notes, bookmarks, and code cells
 
@@ -44,7 +44,7 @@ This means:
 
 ### LLM-Navigable Codebase
 
-The single-file application (`research_notebook_with_code.html`, ~5000 lines) is structured for LLM navigation:
+The single-file application (`research_notebook.html`, ~5000 lines) is structured for LLM navigation:
 
 - **Section markers**: `// ========== SECTION: NAME ==========` divide the code
 - **Inline comments**: Each function has a descriptive comment above it

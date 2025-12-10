@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Navigating the Large Single-File Application
 
-**IMPORTANT**: `research_notebook_with_code.html` is a 5000+ line single-file application that cannot be read in full in one context window.
+**IMPORTANT**: `research_notebook.html` is a 5000+ line single-file application that cannot be read in full in one context window.
 
 ### How to Navigate
 
@@ -80,7 +80,7 @@ When adding field type handling in `renderEditorField()`, check type-specific co
 ## Architecture
 
 ### Single-File Structure
-- All CSS, HTML, and JavaScript in `research_notebook_with_code.html`
+- All CSS, HTML, and JavaScript in `research_notebook.html`
 - External CDN dependencies: PDF.js, Marked.js, KaTeX, Pyodide
 
 ### Data Model
@@ -199,7 +199,7 @@ Templates define CSS custom properties that both card and viewer inherit, ensuri
 ## Development Guidelines
 
 ### Testing
-- Open `research_notebook_with_code.html` directly in browser (no build/server needed)
+- Open `research_notebook.html` directly in browser (no build/server needed)
 - Data in IndexedDB: Database `ResearchNotebookDB`, Store `notebook`
 - View in DevTools → Application → IndexedDB
 

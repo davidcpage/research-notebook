@@ -1492,11 +1492,11 @@ function renderCardPreview(card, template) {
 - ✅ `deleteItemFile()` updated to support `template` field in addition to `type`
 - ✅ Generic editor modal HTML (`#editorModal`) with dynamic body and action buttons
 
-**Code Location:** GENERIC_EDITOR section in `research_notebook_with_code.html` (lines ~2951-3531)
+**Code Location:** GENERIC_EDITOR section in `research_notebook.html` (lines ~2951-3531)
 
 **Note:** Legacy type-specific editor modals (`#noteModal`, `#bookmarkModal`, `#codeModal`) are retained but no longer used. They can be removed in Phase 4 cleanup.
 
-**Code Location (Template System):** TEMPLATE_SYSTEM section in `research_notebook_with_code.html` (lines ~1715-2950)
+**Code Location (Template System):** TEMPLATE_SYSTEM section in `research_notebook.html` (lines ~1715-2950)
 
 ---
 
