@@ -7175,6 +7175,11 @@ sys.stderr = sys.__stderr__
                 e.preventDefault();
                 saveEditor();
             }
+            // Ctrl/Cmd+S to save
+            if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                saveEditor();
+            }
         });
 
         // Close modals on overlay click
