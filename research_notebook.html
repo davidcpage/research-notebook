@@ -2380,9 +2380,18 @@
                                 visible: { type: 'boolean', default: true, label: 'Visible' }
                             }
                         },
+                        default_author: { type: 'text' },
+                        authors: {
+                            type: 'records',
+                            allowDelete: true,
+                            allowAdd: true,
+                            schema: {
+                                name: { type: 'text', label: 'Name' },
+                                icon: { type: 'text', label: 'Icon file' }
+                            }
+                        },
                         extensions: { type: 'yaml' },
-                        theme: { type: 'text' },
-                        default_author: { type: 'text' }
+                        theme: { type: 'text' }
                     },
                     card: {
                         layout: 'yaml',
@@ -2396,9 +2405,10 @@
                             { field: 'notebook_title', label: 'Notebook Title' },
                             { field: 'notebook_subtitle', label: 'Subtitle' },
                             { field: 'sections', label: 'Sections' },
+                            { field: 'default_author', label: 'Default Author' },
+                            { field: 'authors', label: 'Author Icons' },
                             { field: 'extensions', label: 'Extension Registry', multiline: true, rows: 20, monospace: true },
-                            { field: 'theme', label: 'Theme CSS file (optional)' },
-                            { field: 'default_author', label: 'Default Author' }
+                            { field: 'theme', label: 'Theme CSS file (optional)' }
                         ]
                     },
                     style: {
@@ -2600,19 +2610,43 @@
 `;
         }
 
+        // Settings schema - single source of truth for settings fields and defaults
+        const SETTINGS_SCHEMA = {
+            notebook_title: { default: 'Research Notebook' },
+            notebook_subtitle: { default: 'Bookmarks, notes, and connections' },
+            sections: { default: [{ name: 'research', visible: true }] },
+            default_author: { default: null },
+            authors: { default: [{ name: 'Claude', icon: 'claude.svg' }] },
+            extensions: { default: () => getDefaultExtensionRegistry() },
+            theme: { default: null }
+        };
+
+        // Build settings object from parsed data, filling in defaults
+        function buildSettingsObject(parsed = {}) {
+            const settings = {};
+            for (const [key, config] of Object.entries(SETTINGS_SCHEMA)) {
+                if (parsed[key] !== undefined) {
+                    // Use parsed value, with special handling for sections
+                    settings[key] = key === 'sections'
+                        ? normalizeSectionsFormat(parsed[key])
+                        : parsed[key];
+                } else {
+                    // Use default (call function if needed)
+                    settings[key] = typeof config.default === 'function'
+                        ? config.default()
+                        : config.default;
+                }
+            }
+            return settings;
+        }
+
         // Generate default settings.yaml content
         function getDefaultSettingsContent(title = 'Research Notebook', subtitle = 'Bookmarks, notes, and connections', sections = ['research']) {
-            const registry = getDefaultExtensionRegistry();
-            const settings = {
+            const settings = buildSettingsObject({
                 notebook_title: title,
                 notebook_subtitle: subtitle,
-                sections: sections,
-                authors: [
-                    { name: 'Claude', icon: 'claude.svg' }
-                ],
-                extensions: registry,
-                theme: null
-            };
+                sections: sections
+            });
             return jsyaml.dump(settings, {
                 indent: 2,
                 lineWidth: -1,
@@ -2627,14 +2661,7 @@
         // Load settings from settings.yaml (with migration from legacy format)
         async function loadSettings(dirHandle) {
             if (!dirHandle) {
-                notebookSettings = {
-                    notebook_title: 'Research Notebook',
-                    notebook_subtitle: 'Bookmarks, notes, and connections',
-                    sections: [{ name: 'research', visible: true }],
-                    authors: [{ name: 'Claude', icon: 'claude.svg' }],
-                    extensions: getDefaultExtensionRegistry(),
-                    theme: null
-                };
+                notebookSettings = buildSettingsObject();
                 return notebookSettings;
             }
 
@@ -2644,14 +2671,7 @@
                 const file = await settingsFile.getFile();
                 const content = await file.text();
                 const parsed = jsyaml.load(content);
-                notebookSettings = {
-                    notebook_title: parsed.notebook_title || 'Research Notebook',
-                    notebook_subtitle: parsed.notebook_subtitle || 'Bookmarks, notes, and connections',
-                    sections: normalizeSectionsFormat(parsed.sections || []),
-                    authors: parsed.authors || [],
-                    extensions: parsed.extensions || getDefaultExtensionRegistry(),
-                    theme: parsed.theme || null
-                };
+                notebookSettings = buildSettingsObject(parsed);
                 console.log('[Settings] Loaded settings.yaml');
                 return notebookSettings;
             } catch (e) {
@@ -3700,10 +3720,7 @@
 
             // Render content based on viewer layout, with author badge inside content area
             const contentEl = document.getElementById('viewerContent');
-            const authorBadge = (card.author && card.author.toLowerCase().includes('claude'))
-                ? `<div class="author-badge" title="Authored by ${escapeHtml(card.author)}">${CLAUDE_ICON_SVG}</div>`
-                : '';
-            contentEl.innerHTML = renderViewerContent(card, template) + authorBadge;
+            contentEl.innerHTML = renderViewerContent(card, template) + renderAuthorBadge(card);
 
             // Apply syntax highlighting if needed
             contentEl.querySelectorAll('pre code').forEach(el => {
@@ -6090,14 +6107,13 @@ Create \`sections/{section-name}/{slug}.code.py\`:
         async function saveNotebookMeta() {
             if (!filesystemLinked || !notebookDirHandle) return;
 
-            // Update notebookSettings with current data
-            notebookSettings = {
+            // Update notebookSettings with current data, preserving existing settings
+            notebookSettings = buildSettingsObject({
+                ...notebookSettings,
                 notebook_title: data.title,
                 notebook_subtitle: data.subtitle,
-                sections: data.sections.map(s => ({ name: slugify(s.name), visible: s.visible !== false })),
-                extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
-                theme: notebookSettings?.theme || null
-            };
+                sections: data.sections.map(s => ({ name: slugify(s.name), visible: s.visible !== false }))
+            });
             await saveSettings(notebookDirHandle);
             recordSave('settings.yaml');
         }
@@ -6108,19 +6124,23 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 
             // Settings card is handled specially
             if (card.template === 'settings' || card.filename === 'settings.yaml') {
-                // Update notebookSettings and data from the card fields
-                notebookSettings = {
-                    notebook_title: card.notebook_title || 'Research Notebook',
-                    notebook_subtitle: card.notebook_subtitle || '',
-                    sections: card.sections || notebookSettings?.sections || [],
-                    extensions: card.extensions || notebookSettings?.extensions || getDefaultExtensionRegistry(),
-                    theme: card.theme || null
-                };
+                // Update notebookSettings from the card fields
+                notebookSettings = buildSettingsObject({
+                    notebook_title: card.notebook_title,
+                    notebook_subtitle: card.notebook_subtitle,
+                    sections: card.sections || notebookSettings?.sections,
+                    default_author: card.default_author,
+                    authors: card.authors,
+                    extensions: card.extensions || notebookSettings?.extensions,
+                    theme: card.theme
+                });
                 // Also update data.title/subtitle so UI reflects changes
                 data.title = notebookSettings.notebook_title;
                 data.subtitle = notebookSettings.notebook_subtitle;
                 // Update extension registry
                 extensionRegistry = notebookSettings.extensions;
+                // Reload author registry with new authors
+                await loadAuthors(notebookDirHandle);
 
                 // Reorder data.sections to match the new order from settings
                 // card.sections is now an array of {name, visible} records
