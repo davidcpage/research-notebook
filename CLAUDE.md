@@ -318,12 +318,24 @@ plt.title('Sine Wave')
 # Don't call plt.show() or plt.close() - app auto-captures
 ```
 
-### Author Field and Claude Badge
+### Author Field and Author Icons
 Note and code cards support an `author` field to track who created them:
-- Set `author: Claude` (or any string containing "claude") to display the Claude icon badge
 - Badge appears in top-right corner of the content area (on the markdown/code preview)
 - Set `default_author` in Settings to auto-populate author for new cards created in the UI
 - When creating cards via files, include `author` in frontmatter (see examples above)
+
+**Author icons are configured via `authors.yaml`:**
+```yaml
+# authors.yaml (in notebook root)
+authors:
+  - name: Claude
+    icon: claude.svg
+  - name: David
+    icon: david.svg
+```
+
+Icon files are stored in `assets/author-icons/` as SVG files. Matching is exact (case-insensitive).
+New notebooks include a default `authors.yaml` with Claude configured and `assets/author-icons/claude.svg`.
 
 ### Known Gotcha: System Notes Leak
 When creating a new notebook folder, always clear `data.systemNotes = []` in addition to `data.sections`. Otherwise, system notes from the previously open notebook get copied to the new folder.
