@@ -270,6 +270,7 @@ CodeMirror 6 provides syntax highlighting in editor fields for code, YAML, CSS, 
 ---
 id: unique-id
 title: Note Title
+author: Claude
 created: 2024-12-08T09:00:00Z
 modified: 2024-12-08T09:00:00Z
 ---
@@ -301,6 +302,7 @@ Your markdown content here...
 # ---
 # id: code-example
 # title: Plot Example
+# author: Claude
 # created: 2024-12-08T09:00:00Z
 # modified: 2024-12-08T09:00:00Z
 # ---
@@ -313,6 +315,13 @@ plt.plot(x, np.sin(x))
 plt.title('Sine Wave')
 # Don't call plt.show() or plt.close() - app auto-captures
 ```
+
+### Author Field and Claude Badge
+Note and code cards support an `author` field to track who created them:
+- Set `author: Claude` (or any string containing "claude") to display the Claude icon badge
+- Badge appears in top-right corner of the content area (on the markdown/code preview)
+- Set `default_author` in Settings to auto-populate author for new cards created in the UI
+- When creating cards via files, include `author` in frontmatter (see examples above)
 
 ### Known Gotcha: System Notes Leak
 When creating a new notebook folder, always clear `data.systemNotes = []` in addition to `data.sections`. Otherwise, system notes from the previously open notebook get copied to the new folder.
