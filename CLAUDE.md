@@ -206,13 +206,13 @@ Templates define CSS custom properties that both card and viewer inherit, ensuri
 
 ## CodeMirror (Editor Syntax Highlighting)
 
-CodeMirror 6 provides syntax highlighting in editor fields for code, YAML, and CSS.
+CodeMirror 6 provides syntax highlighting in editor fields for code, YAML, CSS, and Markdown.
 
 ### Architecture
 - **Loaded via ES modules** using import maps (no build step required)
 - **Lazy loading**: CodeMirror modules load on first editor open, then cached
 - **Import map**: Defined in HTML_HEAD, maps `@codemirror/*` packages to esm.sh CDN
-- **Dark theme**: Uses One Dark theme for consistent appearance
+- **Theming**: One Dark theme for code/YAML/CSS, custom light theme for Markdown
 
 ### Key Functions (GENERIC_EDITOR section)
 - `loadCodeMirror()`: Lazy-loads CodeMirror modules, returns cached modules
@@ -221,9 +221,17 @@ CodeMirror 6 provides syntax highlighting in editor fields for code, YAML, and C
 - `destroyCodeMirrorInstances()`: Cleanup when editor closes
 
 ### Supported Languages
-- Python (`@codemirror/lang-python`) - for code cards
-- YAML (`@codemirror/lang-yaml`) - for settings, templates
-- CSS (`@codemirror/lang-css`) - for theme.css
+- Python (`@codemirror/lang-python`) - for code cards, dark theme with line numbers
+- YAML (`@codemirror/lang-yaml`) - for settings, templates, dark theme with line numbers
+- CSS (`@codemirror/lang-css`) - for theme.css, dark theme with line numbers
+- Markdown (`@codemirror/lang-markdown`) - for notes and bookmark descriptions, light theme without line numbers
+
+### Markdown Editor Features
+- **Light parchment theme**: Warm background (#faf8f5) matching note card style
+- **Custom syntax highlighting**: Headings (brown, sized), bold, italic, links (blue), inline code (red), blockquotes, lists
+- **No line numbers**: Cleaner prose editing experience (uses `minimalSetup` instead of `basicSetup`)
+- **Monospace font**: Preserved for ASCII diagram compatibility
+- **Two modes**: Full editor with Write/Preview tabs (notes), compact editor without tabs (bookmark descriptions)
 
 ### Adding a New Language
 1. Add package to import map in HTML_HEAD (e.g., `"@codemirror/lang-javascript": "https://esm.sh/*@codemirror/lang-javascript@6.x.x"`)
@@ -232,7 +240,7 @@ CodeMirror 6 provides syntax highlighting in editor fields for code, YAML, and C
 4. Set `language` property in template's editor field config
 
 ### Dual Highlighting System
-- **Editing**: CodeMirror (full editor features: line numbers, bracket matching, etc.)
+- **Editing**: CodeMirror (full editor features: syntax highlighting, bracket matching, etc.)
 - **Viewing**: Highlight.js (lightweight, for read-only display in cards/viewers)
 
 ---

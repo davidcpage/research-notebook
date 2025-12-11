@@ -21,6 +21,9 @@
             "@lezer/python": "https://esm.sh/*@lezer/python@1.1.15",
             "@lezer/yaml": "https://esm.sh/*@lezer/yaml@1.0.3",
             "@lezer/css": "https://esm.sh/*@lezer/css@1.1.9",
+            "@lezer/markdown": "https://esm.sh/*@lezer/markdown@1.6.1",
+            "@lezer/html": "https://esm.sh/*@lezer/html@1.3.12",
+            "@lezer/javascript": "https://esm.sh/*@lezer/javascript@1.5.4",
             "@codemirror/autocomplete": "https://esm.sh/*@codemirror/autocomplete@6.18.4",
             "@codemirror/commands": "https://esm.sh/*@codemirror/commands@6.7.1",
             "@codemirror/language": "https://esm.sh/*@codemirror/language@6.10.6",
@@ -31,6 +34,9 @@
             "@codemirror/lang-python": "https://esm.sh/*@codemirror/lang-python@6.1.6",
             "@codemirror/lang-yaml": "https://esm.sh/*@codemirror/lang-yaml@6.1.2",
             "@codemirror/lang-css": "https://esm.sh/*@codemirror/lang-css@6.3.1",
+            "@codemirror/lang-markdown": "https://esm.sh/*@codemirror/lang-markdown@6.5.0",
+            "@codemirror/lang-html": "https://esm.sh/*@codemirror/lang-html@6.4.11",
+            "@codemirror/lang-javascript": "https://esm.sh/*@codemirror/lang-javascript@6.2.4",
             "@codemirror/theme-one-dark": "https://esm.sh/*@codemirror/theme-one-dark@6.1.2",
             "codemirror": "https://esm.sh/*codemirror@6.0.1"
         }
@@ -3909,24 +3915,57 @@
             }
             codeMirrorLoaded = true;
             try {
-                const [cm, langPython, langYaml, langCss, themeOneDark, cmCommands, cmView] = await Promise.all([
+                const [cm, langPython, langYaml, langCss, langMarkdown, themeOneDark, cmCommands, cmView, cmLanguage, lezerHighlight] = await Promise.all([
                     import('codemirror'),
                     import('@codemirror/lang-python'),
                     import('@codemirror/lang-yaml'),
                     import('@codemirror/lang-css'),
+                    import('@codemirror/lang-markdown'),
                     import('@codemirror/theme-one-dark'),
                     import('@codemirror/commands'),
-                    import('@codemirror/view')
+                    import('@codemirror/view'),
+                    import('@codemirror/language'),
+                    import('@lezer/highlight')
                 ]);
+                // Create custom markdown highlight style with warm, readable colors
+                const t = lezerHighlight.tags;
+                const markdownHighlightStyle = cmLanguage.HighlightStyle.define([
+                    { tag: t.heading1, color: '#8b4513', fontSize: '1.4em', fontWeight: 'bold' },
+                    { tag: t.heading2, color: '#8b4513', fontSize: '1.25em', fontWeight: 'bold' },
+                    { tag: t.heading3, color: '#8b4513', fontSize: '1.1em', fontWeight: 'bold' },
+                    { tag: t.heading4, color: '#8b4513', fontWeight: 'bold' },
+                    { tag: t.heading5, color: '#8b4513', fontWeight: 'bold' },
+                    { tag: t.heading6, color: '#8b4513', fontWeight: 'bold' },
+                    { tag: t.heading, color: '#8b4513', fontWeight: 'bold' },
+                    { tag: t.strong, fontWeight: 'bold', color: '#2d3748' },
+                    { tag: t.emphasis, fontStyle: 'italic', color: '#4a5568' },
+                    { tag: t.strikethrough, textDecoration: 'line-through', color: '#718096' },
+                    { tag: t.link, color: '#2b6cb0', textDecoration: 'underline' },
+                    { tag: t.url, color: '#3182ce' },
+                    { tag: t.monospace, color: '#c53030', backgroundColor: '#fef2f2', fontFamily: 'monospace' },
+                    { tag: t.quote, color: '#6b7280', fontStyle: 'italic', borderLeft: '3px solid #d1d5db' },
+                    { tag: t.list, color: '#7c3aed' },
+                    { tag: t.contentSeparator, color: '#9ca3af' },
+                    { tag: t.processingInstruction, color: '#9ca3af' },  // For markdown markers like #, *, etc.
+                    { tag: t.meta, color: '#9ca3af' }  // For frontmatter, etc.
+                ]);
+
                 codeMirrorModules = {
                     EditorView: cm.EditorView,
                     basicSetup: cm.basicSetup,
+                    minimalSetup: cm.minimalSetup,
                     python: langPython.python,
                     yaml: langYaml.yaml,
                     css: langCss.css,
+                    markdown: langMarkdown.markdown,
                     oneDark: themeOneDark.oneDark,
+                    markdownHighlightStyle: markdownHighlightStyle,
+                    syntaxHighlighting: cmLanguage.syntaxHighlighting,
                     indentWithTab: cmCommands.indentWithTab,
-                    keymap: cmView.keymap
+                    keymap: cmView.keymap,
+                    lineNumbers: cmView.lineNumbers,
+                    highlightActiveLine: cmView.highlightActiveLine,
+                    highlightActiveLineGutter: cmView.highlightActiveLineGutter
                 };
                 console.log('[CodeMirror] Loaded successfully');
                 return codeMirrorModules;
@@ -3947,23 +3986,59 @@
             switch (language) {
                 case 'yaml': langExtension = cm.yaml(); break;
                 case 'css': langExtension = cm.css(); break;
+                case 'markdown': langExtension = cm.markdown(); break;
                 case 'python':
                 default: langExtension = cm.python(); break;
             }
 
-            // Create editor with dark theme and proper Tab handling
+            // Build extensions based on language type
+            const isMarkdown = language === 'markdown';
+            const extensions = [
+                // Use minimal setup for markdown (no line numbers), basic for code
+                isMarkdown ? cm.minimalSetup : cm.basicSetup,
+                langExtension,
+                cm.keymap.of([cm.indentWithTab]),
+                cm.EditorView.theme({
+                    '&': { height: '100%' },
+                    '.cm-scroller': { overflow: 'auto' }
+                })
+            ];
+
+            // Add theme: custom light theme for markdown, One Dark for code
+            if (isMarkdown) {
+                // Light theme with custom markdown syntax highlighting
+                extensions.push(cm.EditorView.theme({
+                    '&': {
+                        backgroundColor: '#faf8f5',
+                        color: '#3a3632'
+                    },
+                    '.cm-content': {
+                        caretColor: '#4a4542',
+                        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace',
+                        fontSize: '14px',
+                        lineHeight: '1.6'
+                    },
+                    '.cm-cursor': {
+                        borderLeftColor: '#4a4542'
+                    },
+                    '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
+                        backgroundColor: '#d7d4cf'
+                    },
+                    '.cm-activeLine': {
+                        backgroundColor: '#f0ebe0'
+                    }
+                }, { dark: false }));
+                extensions.push(cm.syntaxHighlighting(cm.markdownHighlightStyle));
+                extensions.push(cm.highlightActiveLine());
+            } else {
+                // Dark theme for code/yaml/css
+                extensions.push(cm.oneDark);
+            }
+
+            // Create editor
             const editor = new cm.EditorView({
                 doc: value,
-                extensions: [
-                    cm.basicSetup,
-                    langExtension,
-                    cm.oneDark,  // Dark theme
-                    cm.keymap.of([cm.indentWithTab]),  // Tab inserts indentation
-                    cm.EditorView.theme({
-                        '&': { height: '100%' },
-                        '.cm-scroller': { overflow: 'auto' }
-                    })
-                ],
+                extensions,
                 parent: container
             });
 
@@ -4148,7 +4223,7 @@
                 }
                 div.appendChild(thumbnailDiv);
             } else if (type === 'markdown' && preview) {
-                // Markdown with preview tabs
+                // Markdown with preview tabs and CodeMirror editor
                 const tabsDiv = document.createElement('div');
                 tabsDiv.className = 'editor-tabs';
                 tabsDiv.innerHTML = `
@@ -4157,13 +4232,24 @@
                 `;
                 div.appendChild(tabsDiv);
 
-                inputEl = document.createElement('textarea');
-                inputEl.id = `editor-${field}`;
-                inputEl.className = 'markdown-editor';
-                inputEl.rows = rows || 10;
-                inputEl.placeholder = `Write in Markdown...\n\nUse [[Title]] to link to other items.\nUse $x^2$ for inline math, $$E=mc^2$$ for display math.`;
-                inputEl.value = value || '';
-                div.appendChild(inputEl);
+                // CodeMirror container for markdown editing
+                const editorContainer = document.createElement('div');
+                editorContainer.id = `editor-${field}`;
+                editorContainer.className = 'codemirror-container markdown-editor';
+                editorContainer.setAttribute('data-language', 'markdown');
+                editorContainer.setAttribute('data-field', field);
+                div.appendChild(editorContainer);
+
+                // Initialize CodeMirror async
+                createCodeMirrorEditor(editorContainer, {
+                    language: 'markdown',
+                    value: value || '',
+                    fieldName: field
+                }).catch(err => {
+                    console.error('Failed to initialize CodeMirror for markdown:', err);
+                    // Fallback to textarea
+                    editorContainer.innerHTML = `<textarea class="markdown-editor-fallback" style="width:100%;height:300px;">${escapeHtml(value || '')}</textarea>`;
+                });
 
                 const previewDiv = document.createElement('div');
                 previewDiv.id = 'editorPreview';
@@ -4228,8 +4314,29 @@
                     // Fallback to textarea
                     editorContainer.innerHTML = `<textarea class="code-editor" style="width:100%;height:300px;">${escapeHtml(value || '')}</textarea>`;
                 });
-            } else if (multiline || type === 'markdown') {
-                // Regular textarea
+            } else if (type === 'markdown') {
+                // Markdown field without preview tabs - use CodeMirror with markdown highlighting
+                const editorContainer = document.createElement('div');
+                editorContainer.id = `editor-${field}`;
+                editorContainer.className = 'codemirror-container codemirror-markdown-compact';
+                editorContainer.setAttribute('data-language', 'markdown');
+                editorContainer.setAttribute('data-field', field);
+                // Set height based on rows config
+                editorContainer.style.height = `${(rows || 4) * 24}px`;
+                div.appendChild(editorContainer);
+
+                // Initialize CodeMirror async
+                createCodeMirrorEditor(editorContainer, {
+                    language: 'markdown',
+                    value: value || '',
+                    fieldName: field
+                }).catch(err => {
+                    console.error('Failed to initialize CodeMirror for markdown:', err);
+                    // Fallback to textarea
+                    editorContainer.innerHTML = `<textarea style="width:100%;height:100%;">${escapeHtml(value || '')}</textarea>`;
+                });
+            } else if (multiline) {
+                // Regular textarea for non-markdown multiline
                 inputEl = document.createElement('textarea');
                 inputEl.id = `editor-${field}`;
                 inputEl.rows = rows || 4;
@@ -4670,21 +4777,32 @@
         // Switch between write/preview tabs
         function switchEditorTab(tab) {
             const tabs = document.querySelectorAll('#editorBody .editor-tab');
-            const textarea = document.querySelector('#editorBody textarea.markdown-editor');
+            const editorContainer = document.querySelector('#editorBody .codemirror-container.markdown-editor');
+            const fallbackTextarea = document.querySelector('#editorBody textarea.markdown-editor-fallback');
             const preview = document.getElementById('editorPreview');
 
-            if (!textarea || !preview) return;
+            // Get the editor element (CodeMirror container or fallback textarea)
+            const editorEl = editorContainer || fallbackTextarea;
+            if (!editorEl || !preview) return;
 
             tabs.forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
 
             if (tab === 'preview') {
-                textarea.style.display = 'none';
+                editorEl.style.display = 'none';
                 preview.style.display = 'block';
                 preview.classList.add('active');
 
-                // Render markdown preview
-                const content = textarea.value;
+                // Render markdown preview - get content from CodeMirror or fallback textarea
+                let content;
+                if (editorContainer && codeMirrorInstances['content']) {
+                    content = getCodeMirrorValue('content');
+                } else if (fallbackTextarea) {
+                    content = fallbackTextarea.value;
+                } else {
+                    content = '';
+                }
+
                 const format = editingCard.card.format || 'markdown';
                 if (format === 'markdown') {
                     preview.innerHTML = renderMarkdownWithLinks(content);
@@ -4692,7 +4810,7 @@
                     preview.innerHTML = `<pre>${escapeHtml(content)}</pre>`;
                 }
             } else {
-                textarea.style.display = 'block';
+                editorEl.style.display = 'block';
                 preview.style.display = 'none';
                 preview.classList.remove('active');
             }

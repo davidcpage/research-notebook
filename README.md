@@ -7,7 +7,7 @@ A browser-based research management tool that combines bookmarks, markdown notes
 - **Bookmarks** with auto-generated thumbnails (via microlink API or PDF.js)
 - **Markdown notes** with LaTeX math support and wiki-style `[[internal links]]`
 - **Executable Python code** cells via Pyodide (numpy, pandas, matplotlib pre-loaded)
-- **Syntax-highlighted editor** with CodeMirror 6 (Python, YAML, CSS) - line numbers, bracket matching, code folding
+- **Syntax-highlighted editor** with CodeMirror 6 (Python, YAML, CSS, Markdown) - dark theme for code, light parchment theme for prose
 - **Bidirectional backlinks** between items
 - **File-based storage** using the File System Access API
 - **Customizable themes** via CSS - edit `theme.css` in your notebook folder
