@@ -324,9 +324,10 @@ Note and code cards support an `author` field to track who created them:
 - Set `default_author` in Settings to auto-populate author for new cards created in the UI
 - When creating cards via files, include `author` in frontmatter (see examples above)
 
-**Author icons are configured via `authors.yaml`:**
+**Author icons are configured in `settings.yaml`:**
 ```yaml
-# authors.yaml (in notebook root)
+# In settings.yaml
+default_author: Claude
 authors:
   - name: Claude
     icon: claude.svg
@@ -335,7 +336,7 @@ authors:
 ```
 
 Icon files are stored in `assets/author-icons/` as SVG files. Matching is exact (case-insensitive).
-New notebooks include a default `authors.yaml` with Claude configured and `assets/author-icons/claude.svg`.
+New notebooks include Claude configured by default with `assets/author-icons/claude.svg`.
 
 ### Known Gotcha: System Notes Leak
 When creating a new notebook folder, always clear `data.systemNotes = []` in addition to `data.sections`. Otherwise, system notes from the previously open notebook get copied to the new folder.
