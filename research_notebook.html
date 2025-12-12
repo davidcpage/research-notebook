@@ -8134,12 +8134,35 @@ sys.stderr = sys.__stderr__
             }
         });
 
-        // Close modals on overlay click
+        // Close modals on overlay click - but prevent accidental close during text selection
+        // Track where mousedown occurred to ensure intentional clicks only
         document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            let mousedownTarget = null;
+
+            overlay.addEventListener('mousedown', (e) => {
+                mousedownTarget = e.target;
+            });
+
             overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
-                    overlay.classList.remove('active');
+                // Only close if BOTH mousedown and mouseup (click) happened on the overlay itself
+                // This prevents accidental closes when selecting text and dragging outside the modal
+                if (e.target === overlay && mousedownTarget === overlay) {
+                    // Call proper close function based on modal type for cleanup
+                    if (overlay.id === 'editorModal') {
+                        closeEditor();
+                    } else if (overlay.id === 'viewerModal') {
+                        closeViewer();
+                    } else if (overlay.id === 'sectionModal') {
+                        closeSectionModal();
+                    } else if (overlay.id === 'diffModal') {
+                        closeDiffModal();
+                    } else if (overlay.id === 'onboardingModal') {
+                        closeOnboarding();
+                    } else {
+                        overlay.classList.remove('active');
+                    }
                 }
+                mousedownTarget = null;
             });
         });
 
