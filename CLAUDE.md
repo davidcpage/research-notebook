@@ -67,6 +67,7 @@ Card rendering, viewer display, and editing all work automatically via templates
 - `settings.yaml` and `*.template.yaml` are system cards with special templates using `yaml` layout
 - **Theme card**: `theme.css` loaded as system card, saving reloads CSS via `loadThemeCss()`
 - **Auto-creation**: `ensureTemplateFiles()` creates `settings.yaml`, `theme.css`, and default template files for new notebooks. `ensureTemplatesForExistingCards()` creates template files only for card types that have cards but missing templates
+- **Modified indicator**: Template files (note, code, bookmark), README.md, and CLAUDE.md show orange "MODIFIED" badge when they differ from defaults. Viewer shows "Show Diff" button (uses jsdiff library), "Merge Defaults" (templates only), and "Reset to Defaults" buttons. Key functions: `isSystemCardModified()`, `getSystemCardDefaultContent()`, `showSystemCardDiff()`, `resetSystemCardDefaults()`
 
 ### Theming
 - `theme.css` in notebook root overrides app styles (loads after built-in CSS)
@@ -262,6 +263,8 @@ CodeMirror 6 provides syntax highlighting in editor fields for code, YAML, CSS, 
 
 ### Debugging
 **IMPORTANT**: Always check browser DevTools Console (F12 / Cmd+Option+I) for full error message and stack trace. Toast messages alone are insufficient.
+
+**For Claude**: When the user reports something "isn't working" or "has no effect", ask them for the browser console output before diving into code inspection. Console errors often reveal the issue immediately (e.g., calling a non-existent function).
 
 ---
 

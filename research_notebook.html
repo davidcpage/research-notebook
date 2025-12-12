@@ -54,6 +54,8 @@
     <script src="https://cdn.jsdelivr.net/pyodide/v0.28.2/full/pyodide.js"></script>
     <!-- js-yaml for YAML parsing (template system) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+    <!-- jsdiff for template diff display -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
     <!-- Highlight.js for syntax highlighting -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -596,6 +598,108 @@
             height: 100%;
         }
 
+        /* Modified Template Indicator */
+        .card.template-modified {
+            border-color: #d4a574;
+            box-shadow: 0 0 0 1px #d4a574;
+        }
+        .card.template-modified:hover {
+            border-color: #c49464;
+            box-shadow: 0 8px 30px var(--shadow), 0 0 0 1px #c49464;
+        }
+        .modified-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: #d4a574;
+            color: white;
+            font-size: 9px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            z-index: 15;
+        }
+
+        /* Template Diff Modal */
+        .diff-body {
+            padding: 0;
+        }
+        .diff-legend {
+            display: flex;
+            gap: 20px;
+            padding: 12px 20px;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+        .diff-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+        }
+        .diff-removed-sample {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            line-height: 18px;
+            text-align: center;
+            background: #fdd;
+            color: #a33;
+            border-radius: 3px;
+            font-weight: bold;
+            font-family: monospace;
+        }
+        .diff-added-sample {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            line-height: 18px;
+            text-align: center;
+            background: #dfd;
+            color: #363;
+            border-radius: 3px;
+            font-weight: bold;
+            font-family: monospace;
+        }
+        .diff-content {
+            margin: 0;
+            padding: 16px 20px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            overflow-x: auto;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        .diff-header {
+            color: #808080;
+        }
+        .diff-hunk {
+            color: #569cd6;
+            background: rgba(86, 156, 214, 0.1);
+            display: block;
+            margin: 8px 0 4px 0;
+        }
+        .diff-removed {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f48771;
+            display: block;
+        }
+        .diff-added {
+            background: rgba(76, 175, 80, 0.2);
+            color: #89d185;
+            display: block;
+        }
+        .diff-context {
+            color: #d4d4d4;
+            display: block;
+        }
+
         /* Card Preview Layouts */
         .preview-placeholder {
             font-size: 3rem;
@@ -894,6 +998,11 @@
             overflow: hidden;
             width: 90%;
             box-sizing: border-box;
+        }
+
+        .modal.viewer.template-modified {
+            border: 2px solid #d4a574;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4), 0 0 0 1px #d4a574;
         }
 
         .modal.viewer * {
@@ -2100,6 +2209,26 @@
         </div>
     </div>
 
+    <!-- Template Diff Modal -->
+    <div class="modal-overlay" id="diffModal">
+        <div class="modal modal-large">
+            <div class="modal-header">
+                <h2 id="diffTitle">Template Changes</h2>
+                <button class="modal-close" onclick="closeDiffModal()">×</button>
+            </div>
+            <div class="modal-body diff-body">
+                <div class="diff-legend">
+                    <span class="diff-legend-item"><span class="diff-removed-sample">−</span> Removed from defaults</span>
+                    <span class="diff-legend-item"><span class="diff-added-sample">+</span> Added/changed</span>
+                </div>
+                <pre class="diff-content" id="diffContent"></pre>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDiffModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Onboarding Modal -->
     <div class="modal-overlay" id="onboardingModal">
         <div class="modal" style="max-width: 500px;">
@@ -2512,6 +2641,81 @@
             return jsyaml.dump(template, {
                 indent: 2,
                 lineWidth: -1,  // No line wrapping
+                quotingType: '"',
+                forceQuotes: false
+            });
+        }
+
+        // Check if a system card's content differs from defaults
+        // Covers: template files (note, code, bookmark), README.md, CLAUDE.md
+        function isSystemCardModified(card) {
+            const defaultContent = getSystemCardDefaultContent(card);
+            if (!defaultContent) return false;
+
+            const currentContent = getSystemCardCurrentContent(card);
+            return currentContent !== defaultContent;
+        }
+
+        // Legacy alias for backward compatibility
+        function isTemplateModified(card) {
+            return isSystemCardModified(card);
+        }
+
+        // Get the default content for a system card (template, README.md, or CLAUDE.md)
+        function getSystemCardDefaultContent(card) {
+            // Template files (note.template.yaml, code.template.yaml, bookmark.template.yaml)
+            if (card.template === 'template') {
+                const defaultTemplateNames = ['note', 'code', 'bookmark'];
+                if (defaultTemplateNames.includes(card.name)) {
+                    return getTemplateFileContent(card.name);
+                }
+            }
+
+            // README.md - use current notebook title for comparison
+            if (card.filename === 'README.md') {
+                return getReadmeTemplate(data.title || 'Research Notebook');
+            }
+
+            // CLAUDE.md
+            if (card.filename === 'CLAUDE.md') {
+                return getClaudeMdTemplate();
+            }
+
+            return null;
+        }
+
+        // Get the current content of a system card for comparison
+        function getSystemCardCurrentContent(card) {
+            // Template files - reconstruct YAML
+            if (card.template === 'template') {
+                return getTemplateFileContentFromCard(card);
+            }
+
+            // README.md and CLAUDE.md - use the content field directly
+            if (card.filename === 'README.md' || card.filename === 'CLAUDE.md') {
+                return card.content || '';
+            }
+
+            return '';
+        }
+
+        // Generate YAML from a template card's fields (for comparison with defaults)
+        function getTemplateFileContentFromCard(card) {
+            const templateObj = {
+                name: card.name,
+                description: card.description,
+                schema: card.schema,
+                card: card.card,
+                viewer: card.viewer,
+                editor: card.editor,
+                style: card.style,
+                ui: card.ui
+            };
+            // Filter out undefined values to match default generation
+            Object.keys(templateObj).forEach(k => templateObj[k] === undefined && delete templateObj[k]);
+            return jsyaml.dump(templateObj, {
+                indent: 2,
+                lineWidth: -1,
                 quotingType: '"',
                 forceQuotes: false
             });
@@ -3469,12 +3673,18 @@
                 ? `<a href="${escapeHtml(titleLinkUrl)}" target="_blank" onclick="event.stopPropagation()" title="Open link">${escapeHtml(title)}</a>`
                 : escapeHtml(title);
 
+            // Check if this is a modified template
+            const isModified = isTemplateModified(card);
+            const modifiedClass = isModified ? ' template-modified' : '';
+            const modifiedBadge = isModified ? '<span class="modified-badge">MODIFIED</span>' : '';
+
             return `
-                <div class="card"
+                <div class="card${modifiedClass}"
                      data-template="${template.name}"
                      data-item-id="${card.id}"
                      data-section-id="${sectionId}"
                      onclick="openViewer('${sectionId}', '${card.id}')">
+                    ${modifiedBadge}
                     <div class="card-preview">${preview}</div>
                     <div class="card-content">
                         <h3 class="card-title">${titleHtml}</h3>
@@ -3770,7 +3980,13 @@
 
             // Set template attribute on modal for CSS styling
             const modal = document.getElementById('viewerModal');
-            modal.querySelector('.modal').setAttribute('data-template', template.name);
+            const modalInner = modal.querySelector('.modal');
+            modalInner.setAttribute('data-template', template.name);
+
+            // Add modified indicator for templates that differ from defaults
+            const isModified = isTemplateModified(card);
+            modalInner.classList.toggle('template-modified', isModified);
+
             modal.classList.add('active');
         }
 
@@ -3962,6 +4178,16 @@
                 actions += `<button class="btn btn-run btn-small" onclick="runViewerCode()">▶ Run</button>`;
             }
 
+            // Diff/Merge/Reset buttons for modified system cards
+            if (isSystemCardModified(card)) {
+                actions += `<button class="btn btn-secondary btn-small" onclick="showSystemCardDiff()">Show Diff</button>`;
+                // Merge only makes sense for YAML templates, not markdown files
+                if (card.template === 'template') {
+                    actions += `<button class="btn btn-primary btn-small" onclick="mergeTemplateDefaults()">Merge Defaults</button>`;
+                }
+                actions += `<button class="btn btn-secondary btn-small" onclick="resetSystemCardDefaults()">Reset to Defaults</button>`;
+            }
+
             // Common actions
             actions += `<button class="btn btn-secondary btn-small" onclick="editViewerCard()">✎ Edit</button>`;
             actions += `<button class="btn btn-secondary btn-small" onclick="deleteViewerCard()">× Delete</button>`;
@@ -4012,6 +4238,161 @@
             } else {
                 await confirmDeleteItem(sectionId, cardId, templateName);
             }
+        }
+
+        // Merge current template with defaults (adds missing fields, keeps customizations)
+        async function mergeTemplateDefaults() {
+            if (!currentViewingCard) return;
+            const card = currentViewingCard;
+
+            // Only works for templates with defaults
+            const defaults = getDefaultTemplates()[card.name];
+            if (!defaults) {
+                showToast('No defaults available for this template');
+                return;
+            }
+
+            // Deep merge: defaults as base, current card values on top
+            const currentValues = {
+                name: card.name,
+                description: card.description,
+                schema: card.schema,
+                card: card.card,
+                viewer: card.viewer,
+                editor: card.editor,
+                style: card.style,
+                ui: card.ui
+            };
+            // Filter out undefined values
+            Object.keys(currentValues).forEach(k => currentValues[k] === undefined && delete currentValues[k]);
+
+            const merged = deepMerge(defaults, currentValues);
+
+            // Find and update the actual system note
+            const systemNote = data.systemNotes?.find(n => n.id === card.id);
+            if (systemNote) {
+                Object.assign(systemNote, merged);
+                await saveCardFile('_system', systemNote);
+                await loadTemplates();
+                render();
+                openViewer('_system', card.id);
+                showToast('Template merged with defaults');
+            }
+        }
+
+        // Reset any system card (template, README.md, CLAUDE.md) to defaults
+        async function resetSystemCardDefaults() {
+            if (!currentViewingCard) return;
+            const card = currentViewingCard;
+
+            const defaultContent = getSystemCardDefaultContent(card);
+            if (!defaultContent) {
+                showToast('No defaults available for this file');
+                return;
+            }
+
+            const filename = card.filename || (card.name + '.template.yaml');
+            if (!confirm(`Reset ${filename} to defaults? Your customizations will be lost.`)) return;
+
+            // Find and update the actual system note
+            const systemNote = data.systemNotes?.find(n => n.id === card.id);
+            if (!systemNote) return;
+
+            if (card.template === 'template') {
+                // Template file - replace with default template object
+                const defaults = getDefaultTemplates()[card.name];
+                const preserved = {
+                    id: systemNote.id,
+                    filename: systemNote.filename,
+                    template: systemNote.template,
+                    system: systemNote.system,
+                    title: systemNote.title,
+                    modified: new Date().toISOString()
+                };
+                Object.assign(systemNote, defaults, preserved);
+                await saveCardFile('_system', systemNote);
+                await loadTemplates();
+            } else {
+                // Markdown file (README.md, CLAUDE.md) - replace content
+                systemNote.content = defaultContent;
+                systemNote.modified = new Date().toISOString();
+                await saveCardFile('_system', systemNote);
+            }
+
+            render();
+            openViewer('_system', card.id);
+            showToast(`${filename} reset to defaults`);
+        }
+
+        // Legacy alias
+        async function resetTemplateDefaults() {
+            await resetSystemCardDefaults();
+        }
+
+        // Show diff between current system card and defaults
+        function showSystemCardDiff() {
+            if (!currentViewingCard) return;
+            const card = currentViewingCard;
+
+            const defaultContent = getSystemCardDefaultContent(card);
+            const currentContent = getSystemCardCurrentContent(card);
+
+            if (!defaultContent) {
+                showToast('No defaults available for this file');
+                return;
+            }
+
+            // Determine the filename for the title
+            let filename = card.filename || (card.name + '.template.yaml');
+
+            // Use jsdiff to create a unified diff
+            const diff = Diff.createTwoFilesPatch(
+                'defaults',
+                'current',
+                defaultContent,
+                currentContent,
+                'Built-in defaults',
+                'Your version'
+            );
+
+            // Format the diff with syntax highlighting
+            const diffHtml = formatDiffHtml(diff);
+
+            document.getElementById('diffTitle').textContent = `Changes to ${filename}`;
+            document.getElementById('diffContent').innerHTML = diffHtml;
+            document.getElementById('diffModal').classList.add('active');
+        }
+
+        // Legacy alias
+        function showTemplateDiff() {
+            showSystemCardDiff();
+        }
+
+        // Format unified diff output as colored HTML
+        function formatDiffHtml(diff) {
+            const lines = diff.split('\n');
+            let html = '';
+
+            for (const line of lines) {
+                // Skip the file header lines (---, +++, @@)
+                if (line.startsWith('===') || line.startsWith('---') || line.startsWith('+++')) {
+                    html += `<span class="diff-header">${escapeHtml(line)}</span>\n`;
+                } else if (line.startsWith('@@')) {
+                    html += `<span class="diff-hunk">${escapeHtml(line)}</span>\n`;
+                } else if (line.startsWith('-')) {
+                    html += `<span class="diff-removed">${escapeHtml(line)}</span>\n`;
+                } else if (line.startsWith('+')) {
+                    html += `<span class="diff-added">${escapeHtml(line)}</span>\n`;
+                } else {
+                    html += `<span class="diff-context">${escapeHtml(line)}</span>\n`;
+                }
+            }
+
+            return html;
+        }
+
+        function closeDiffModal() {
+            document.getElementById('diffModal').classList.remove('active');
         }
 
         async function runViewerCode() {
@@ -5362,7 +5743,9 @@ This folder contains a Research Notebook - a collection of notes, code snippets,
 
 \`\`\`
 notebook-folder/
-├── notebook.json           # Notebook metadata (title, subtitle, section order)
+├── settings.yaml           # Notebook settings (title, subtitle, sections)
+├── theme.css               # Custom CSS theme (optional)
+├── *.template.yaml         # Card type templates (note, code, bookmark)
 ├── README.md               # This file
 ├── CLAUDE.md               # Instructions for Claude Code
 ├── sections/
@@ -5373,7 +5756,8 @@ notebook-folder/
 │       ├── code-title.output.html # Code execution output (auto-generated)
 │       └── bookmark.bookmark.json # Bookmark metadata
 └── assets/
-    └── thumbnails/         # Bookmark thumbnail images
+    ├── thumbnails/         # Bookmark thumbnail images
+    └── author-icons/       # Author icon SVGs
 \`\`\`
 
 ## File Formats
@@ -5527,7 +5911,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
   "id": "unique-section-id"
 }
 \`\`\`
-3. Add section slug to \`notebook.json\` sections array
+3. Add section slug to \`settings.yaml\` sections array
 
 ## Editing Items
 
