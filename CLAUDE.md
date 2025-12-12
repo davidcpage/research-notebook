@@ -102,7 +102,7 @@ data = {
   subtitle: string,
   sections: [
     {
-      id: string,
+      id: string,  // Stable ID: 'section-{dirName}'
       name: string,
       visible: boolean,  // Whether section is shown in main UI
       items: [
@@ -118,7 +118,7 @@ data = {
 
 ### Key State (STATE_AND_CONFIG section)
 - Global `data` object holds all sections and items
-- `collapsedSections` Set tracks UI state (not persisted)
+- `collapsedSections` Set tracks UI state (persisted to localStorage per-notebook)
 - Pyodide runtime: `pyodide`, `pyodideLoading`, `pyodideReady`
 - Filesystem: `notebookDirHandle`, `filesystemLinked`
 - Generic editor: `editingCard` (in GENERIC_EDITOR section)

@@ -2307,17 +2307,25 @@
             // Each item has a 'type' field: 'bookmark', 'note', or 'code'
         };
 
-        // Track collapsed sections (persisted to sessionStorage across refresh)
+        // Track collapsed sections (persisted to localStorage per-notebook)
         let collapsedSections = new Set();
 
-        // Save collapsed sections to sessionStorage
-        function saveCollapsedSections() {
-            sessionStorage.setItem('collapsedSections', JSON.stringify([...collapsedSections]));
+        // Get localStorage key for collapsed sections (notebook-specific)
+        function getCollapsedSectionsKey() {
+            const notebookName = notebookDirHandle?.name || 'default';
+            return `collapsedSections_${notebookName}`;
         }
 
-        // Restore collapsed sections from sessionStorage
+        // Save collapsed sections to localStorage
+        function saveCollapsedSections() {
+            localStorage.setItem(getCollapsedSectionsKey(), JSON.stringify([...collapsedSections]));
+        }
+
+        // Restore collapsed sections from localStorage
         function restoreCollapsedSections() {
-            const saved = sessionStorage.getItem('collapsedSections');
+            // Always reset first (in case switching notebooks)
+            collapsedSections = new Set();
+            const saved = localStorage.getItem(getCollapsedSectionsKey());
             if (saved) {
                 try {
                     collapsedSections = new Set(JSON.parse(saved));
@@ -6388,7 +6396,7 @@ sections:
 
                 for (const [dirName, { handle }] of discoveredSections) {
                     const section = {
-                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                        id: 'section-' + dirName,  // Stable ID based on directory name
                         name: dirName,  // Default to directory name
                         items: [],
                         visible: true,  // Default visible
@@ -6451,7 +6459,7 @@ sections:
 
                     // Create empty section - directory will be created on first save
                     const section = {
-                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                        id: 'section-' + dirName,  // Stable ID based on directory name
                         name: name,
                         items: [],
                         visible: typeof settingsRecord === 'object' ? settingsRecord.visible !== false : true,
@@ -6741,7 +6749,7 @@ sections:
                         } else {
                             // New section added via settings - create it
                             const newSection = {
-                                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                                id: 'section-' + sectionSlug,  // Stable ID based on directory name
                                 name: sectionName,
                                 items: [],
                                 visible: typeof sectionRecord === 'object' ? sectionRecord.visible !== false : true,
@@ -7113,6 +7121,7 @@ sections:
                     // Load from filesystem
                     const fsData = await loadFromFilesystem(handle);
                     data = fsData;
+                    restoreCollapsedSections();
                     render();
                     showToast(`📁 Linked to folder (loaded ${data.sections.length} sections)`);
                 } else {
@@ -7130,6 +7139,7 @@ sections:
                     // Reload to pick up the newly created system notes
                     const fsData = await loadFromFilesystem(handle);
                     data = fsData;
+                    restoreCollapsedSections();
                     render();
                     showToast('📁 Linked to folder (new notebook created)');
                 }
@@ -8449,13 +8459,12 @@ sys.stderr = sys.__stderr__
 
         // Initialize
         async function init() {
-            // Restore UI state from sessionStorage
-            restoreCollapsedSections();
-
             // Try to restore filesystem link first
             await initFilesystem();
 
             if (filesystemLinked) {
+                // Restore collapsed sections now that we know the notebook name
+                restoreCollapsedSections();
                 // Filesystem data already loaded in initFilesystem, just render
                 render();
             } else {
