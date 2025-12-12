@@ -5878,7 +5878,7 @@ Create \`sections/{section-name}/{slug}.md\`:
 
 \`\`\`markdown
 ---
-id: unique-id-here
+id: 1733329200000
 title: Your Note Title
 created: 2024-01-15T10:30:00Z
 modified: 2024-01-15T10:30:00Z
@@ -5892,7 +5892,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 
 \`\`\`python
 # ---
-# id: unique-id-here
+# id: 1733329200001
 # title: Your Code Title
 # created: 2024-01-15T10:30:00Z
 # modified: 2024-01-15T10:30:00Z
@@ -5908,7 +5908,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 \`\`\`json
 {
   "name": "Section Display Name",
-  "id": "unique-section-id"
+  "id": "section-1733329200002"
 }
 \`\`\`
 3. Add section slug to \`settings.yaml\` sections array
@@ -5922,7 +5922,8 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 ## Important Notes
 
 - **Slugs**: Filenames should be lowercase, hyphenated versions of titles (max 50 chars)
-- **IDs**: Each item needs a unique ID (use any string, e.g., timestamp or UUID)
+- **IDs**: Each item needs a unique ID (numeric timestamp like \`1733329200000\` works well)
+- **Timestamps**: ISO format, milliseconds optional (e.g., \`2024-01-15T10:30:00Z\` or \`2024-01-15T10:30:00.000Z\`)
 - **Don't edit**: \`.output.html\` files (auto-generated when code runs)
 - **Internal links**: Use \`[[Section Name > Item Title]]\` syntax in markdown
 - **Thumbnails**: Bookmarks can reference \`../../assets/thumbnails/{id}.png\`
