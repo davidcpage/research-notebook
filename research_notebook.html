@@ -2647,7 +2647,7 @@
         }
 
         // Check if a system card's content differs from defaults
-        // Covers: template files (note, code, bookmark), README.md, CLAUDE.md
+        // Covers: template files (note, code, bookmark), README.md, CLAUDE.md, theme.css
         function isSystemCardModified(card) {
             const defaultContent = getSystemCardDefaultContent(card);
             if (!defaultContent) return false;
@@ -2681,6 +2681,11 @@
                 return getClaudeMdTemplate();
             }
 
+            // theme.css
+            if (card.filename === 'theme.css') {
+                return getDefaultThemeContent();
+            }
+
             return null;
         }
 
@@ -2691,8 +2696,8 @@
                 return getTemplateFileContentFromCard(card);
             }
 
-            // README.md and CLAUDE.md - use the content field directly
-            if (card.filename === 'README.md' || card.filename === 'CLAUDE.md') {
+            // README.md, CLAUDE.md, theme.css - use the content field directly
+            if (card.filename === 'README.md' || card.filename === 'CLAUDE.md' || card.filename === 'theme.css') {
                 return card.content || '';
             }
 
