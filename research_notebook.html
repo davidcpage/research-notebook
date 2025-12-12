@@ -2614,7 +2614,7 @@
         const SETTINGS_SCHEMA = {
             notebook_title: { default: 'Research Notebook' },
             notebook_subtitle: { default: 'Bookmarks, notes, and connections' },
-            sections: { default: [{ name: 'research', visible: true }] },
+            sections: { default: [{ name: 'research', visible: true }, { name: '_system', visible: false }] },
             default_author: { default: null },
             authors: { default: [{ name: 'Claude', icon: 'claude.svg' }] },
             extensions: { default: () => getDefaultExtensionRegistry() },
@@ -2749,13 +2749,18 @@
         // New format: [{name: 'research', visible: true}, {name: 'projects', visible: true}]
         function normalizeSectionsFormat(sections) {
             if (!Array.isArray(sections)) return [];
-            return sections.map(s => {
+            const normalized = sections.map(s => {
                 if (typeof s === 'string') {
                     return { name: s, visible: true };
                 }
                 // Already an object, ensure visible has a default
                 return { name: s.name || '', visible: s.visible !== false };
             });
+            // Ensure _system section always exists (hidden by default)
+            if (!normalized.some(s => s.name === '_system')) {
+                normalized.push({ name: '_system', visible: false });
+            }
+            return normalized;
         }
 
         // Convert sections records to simple names array for filesystem operations
@@ -5897,19 +5902,6 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                             section.visible = settingsRecord.visible !== false;
                         }
                         // If not found in settings, default to visible (visible: true)
-                    }
-                }
-
-                // Ensure _system section exists in settings if there are system notes
-                if (loadedData.systemNotes && loadedData.systemNotes.length > 0) {
-                    if (!notebookSettings.sections.some(s => (typeof s === 'string' ? s : s.name) === '_system')) {
-                        // Add _system section (hidden by default)
-                        notebookSettings.sections.push({ name: '_system', visible: false });
-                        // Update settings card if it exists
-                        const settingsCard = loadedData.systemNotes.find(n => n.template === 'settings');
-                        if (settingsCard) {
-                            settingsCard.sections = notebookSettings.sections;
-                        }
                     }
                 }
 
