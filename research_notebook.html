@@ -1639,106 +1639,140 @@
             background: var(--bg-secondary);
         }
 
-        /* Records editor styles */
+        /* Records editor - datatable styles */
         .records-editor {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            background: white;
         }
 
-        .records-editor-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem;
+        .records-editor th {
+            padding: 0.4rem 0.5rem;
+            text-align: left;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: var(--text-muted);
             background: var(--bg-secondary);
-            border-radius: 4px;
-            transition: opacity 0.15s;
+            border-bottom: 1px solid var(--border);
         }
 
-        .records-editor-item.is-hidden {
+        .records-editor th:first-child,
+        .records-editor td:first-child {
+            width: 32px;
+            text-align: center;
+        }
+
+        .records-editor th:last-child {
+            width: auto;
+        }
+
+        .records-editor-row {
+            transition: background 0.15s, opacity 0.15s;
+        }
+
+        .records-editor-row:not(:last-child) td {
+            border-bottom: 1px solid var(--bg-secondary);
+        }
+
+        .records-editor-row:hover {
+            background: var(--bg-primary);
+        }
+
+        .records-editor-row.is-hidden {
             opacity: 0.5;
         }
 
-        .records-editor-fields {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            flex: 1;
+        .records-editor-row.dragging {
+            opacity: 0.4;
+            background: var(--bg-secondary);
+        }
+
+        .records-editor-row.drag-over {
+            box-shadow: inset 0 -2px 0 var(--accent);
+        }
+
+        .records-editor td {
+            padding: 0.25rem 0.5rem;
+            vertical-align: middle;
         }
 
         .records-editor-input {
-            flex: 1;
-            padding: 0.4rem 0.5rem;
-            border: 1px solid var(--border);
-            border-radius: 4px;
+            width: 100%;
+            padding: 0.3rem 0.4rem;
+            border: 1px solid transparent;
+            border-radius: 3px;
             font-size: 0.9rem;
+            background: transparent;
+            transition: all 0.15s;
+        }
+
+        .records-editor-input:hover {
             background: white;
+            border-color: var(--border);
         }
 
         .records-editor-input:focus {
             outline: none;
+            background: white;
             border-color: var(--accent);
         }
 
+        .records-editor-input::placeholder {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
         .records-editor-input[readonly] {
-            background: var(--bg-primary);
+            color: var(--text-muted);
             cursor: default;
         }
 
         .records-editor-toggle {
-            width: 32px;
-            height: 32px;
+            width: 22px;
+            height: 22px;
             padding: 0;
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 3px;
             background: white;
             cursor: pointer;
-            font-size: 1rem;
+            font-size: 0.8rem;
+            color: var(--accent);
             transition: all 0.15s;
         }
 
         .records-editor-toggle:hover {
-            background: var(--bg-primary);
             border-color: var(--accent);
+            background: var(--bg-primary);
         }
 
-        .records-editor-toggle.is-hidden {
-            opacity: 0.6;
+        .records-editor-toggle.is-checked {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
         }
 
-        .records-editor-buttons {
-            display: flex;
-            gap: 0.25rem;
-        }
-
-        .records-editor-btn {
-            width: 28px;
-            height: 28px;
-            padding: 0;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            background: white;
-            cursor: pointer;
-            font-size: 0.75rem;
+        .records-editor-drag-handle {
+            cursor: grab;
             color: var(--text-muted);
-            transition: all 0.15s;
+            padding: 0.25rem;
+            user-select: none;
+            font-size: 1rem;
         }
 
-        .records-editor-btn:hover {
-            background: var(--bg-primary);
-            border-color: var(--accent);
+        .records-editor-drag-handle:hover {
             color: var(--text-primary);
         }
 
-        .records-editor-btn-delete:hover {
-            background: #fee;
-            border-color: #c00;
-            color: #c00;
+        .records-editor-drag-handle:active {
+            cursor: grabbing;
         }
 
         .records-editor-add {
-            align-self: flex-start;
             margin-top: 0.5rem;
             padding: 0.4rem 0.8rem;
             border: 1px dashed var(--border);
@@ -2832,7 +2866,7 @@
         const SETTINGS_SCHEMA = {
             notebook_title: { default: 'Research Notebook' },
             notebook_subtitle: { default: 'Bookmarks, notes, and connections' },
-            sections: { default: [{ name: 'research', visible: true }, { name: '_system', visible: false }] },
+            sections: { default: [{ name: 'research', visible: true }, { name: 'System', path: '.', visible: false }] },
             default_author: { default: null },
             authors: { default: [{ name: 'Claude', icon: 'claude.svg' }] },
             extensions: { default: () => getDefaultExtensionRegistry() },
@@ -2971,12 +3005,15 @@
                 if (typeof s === 'string') {
                     return { name: s, visible: true };
                 }
-                // Already an object, ensure visible has a default
-                return { name: s.name || '', visible: s.visible !== false };
+                // Already an object, preserve path and ensure visible has a default
+                const record = { name: s.name || '', visible: s.visible !== false };
+                if (s.path) record.path = s.path;
+                return record;
             });
-            // Ensure _system section always exists (hidden by default)
-            if (!normalized.some(s => s.name === '_system')) {
-                normalized.push({ name: '_system', visible: false });
+            // Ensure System section (root files) always exists (hidden by default)
+            // Identified by path: '.' (root directory)
+            if (!normalized.some(s => s.path === '.')) {
+                normalized.push({ name: 'System', path: '.', visible: false });
             }
             return normalized;
         }
@@ -2986,14 +3023,13 @@
             return normalizeSectionsFormat(sections).map(s => s.name);
         }
 
-        // Check if the _system section is visible in settings
+        // Check if the System section (root files) is visible in settings
         function getSystemSectionVisible() {
             if (!notebookSettings?.sections) return false;
             const systemSection = notebookSettings.sections.find(s =>
-                (typeof s === 'string' ? s : s.name) === '_system'
+                typeof s === 'object' && s.path === '.'
             );
-            if (!systemSection) return false;
-            return typeof systemSection === 'string' ? true : systemSection.visible !== false;
+            return systemSection?.visible === true;
         }
 
         // Save settings to settings.yaml
@@ -4978,24 +5014,49 @@
                     div.appendChild(addBtn);
                 }
             } else if (type === 'records') {
-                // Records editor - list of objects with defined schema
-                const recordsContainer = document.createElement('div');
-                recordsContainer.className = 'records-editor';
-                recordsContainer.id = `editor-${field}`;
+                // Records editor - datatable with headers and draggable rows
                 const schema = fieldDef?.schema || {};
                 const allowDelete = fieldDef?.allowDelete !== false;
                 const allowAdd = fieldDef?.allowAdd !== false;
-                recordsContainer.setAttribute('data-schema', JSON.stringify(schema));
-                recordsContainer.setAttribute('data-allow-delete', allowDelete);
-                recordsContainer.setAttribute('data-allow-add', allowAdd);
+
+                const table = document.createElement('table');
+                table.className = 'records-editor';
+                table.setAttribute('data-schema', JSON.stringify(schema));
+                table.setAttribute('data-allow-delete', allowDelete);
+                table.setAttribute('data-allow-add', allowAdd);
+                table.setAttribute('data-field', field);
+
+                // Create header row
+                const thead = document.createElement('thead');
+                const headerRow = document.createElement('tr');
+
+                // Drag handle column header
+                const dragTh = document.createElement('th');
+                dragTh.style.width = '40px';
+                headerRow.appendChild(dragTh);
+
+                // Schema field headers
+                for (const [key, def] of Object.entries(schema)) {
+                    const th = document.createElement('th');
+                    th.textContent = def.label || key;
+                    headerRow.appendChild(th);
+                }
+
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
+
+                // Create body
+                const tbody = document.createElement('tbody');
+                tbody.id = `editor-${field}`;
 
                 const recordsArray = Array.isArray(value) ? value : [];
                 recordsArray.forEach((record, idx) => {
                     const recordRow = createRecordsEditorItem(field, schema, record, idx, allowDelete);
-                    recordsContainer.appendChild(recordRow);
+                    tbody.appendChild(recordRow);
                 });
 
-                div.appendChild(recordsContainer);
+                table.appendChild(tbody);
+                div.appendChild(table);
 
                 // Add button (only if allowAdd is true)
                 if (allowAdd) {
@@ -5004,18 +5065,19 @@
                     addBtn.className = 'records-editor-add';
                     addBtn.textContent = '+ Add item';
                     addBtn.onclick = () => {
-                        const container = document.getElementById(`editor-${field}`);
-                        const schemaStr = container.getAttribute('data-schema');
+                        const tbody = document.getElementById(`editor-${field}`);
+                        const table = tbody.closest('table');
+                        const schemaStr = table.getAttribute('data-schema');
                         const schema = JSON.parse(schemaStr);
-                        const canDelete = container.getAttribute('data-allow-delete') === 'true';
-                        const newIdx = container.children.length;
+                        const canDelete = table.getAttribute('data-allow-delete') === 'true';
+                        const newIdx = tbody.children.length;
                         // Create default record from schema
                         const defaultRecord = {};
                         for (const [key, def] of Object.entries(schema)) {
                             defaultRecord[key] = def.default !== undefined ? def.default : (def.type === 'boolean' ? true : '');
                         }
                         const newRow = createRecordsEditorItem(field, schema, defaultRecord, newIdx, canDelete);
-                        container.appendChild(newRow);
+                        tbody.appendChild(newRow);
                     };
                     div.appendChild(addBtn);
                 }
@@ -5110,50 +5172,110 @@
             });
         }
 
-        // Create a single records editor item row
+        // Create a single records editor table row with drag handle
         function createRecordsEditorItem(field, schema, record, index, allowDelete) {
-            const row = document.createElement('div');
-            row.className = 'records-editor-item';
+            const row = document.createElement('tr');
+            row.className = 'records-editor-row';
             row.setAttribute('data-index', index);
+            row.setAttribute('draggable', 'true');
 
-            // Create fields based on schema
-            const fieldsContainer = document.createElement('div');
-            fieldsContainer.className = 'records-editor-fields';
+            // Drag handle cell
+            const dragCell = document.createElement('td');
+            const dragHandle = document.createElement('span');
+            dragHandle.className = 'records-editor-drag-handle';
+            dragHandle.textContent = '⋮⋮';
+            dragHandle.title = 'Drag to reorder';
+            dragCell.appendChild(dragHandle);
+            row.appendChild(dragCell);
 
+            // Set up drag events
+            row.addEventListener('dragstart', (e) => {
+                row.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', index.toString());
+                // Store the field name for cross-table safety
+                e.dataTransfer.setData('application/x-records-field', field);
+            });
+
+            row.addEventListener('dragend', () => {
+                row.classList.remove('dragging');
+                // Clean up all drag-over states
+                const tbody = document.getElementById(`editor-${field}`);
+                tbody.querySelectorAll('.drag-over').forEach(r => r.classList.remove('drag-over'));
+            });
+
+            row.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                // Only show indicator if not dragging over self
+                if (!row.classList.contains('dragging')) {
+                    row.classList.add('drag-over');
+                }
+            });
+
+            row.addEventListener('dragleave', () => {
+                row.classList.remove('drag-over');
+            });
+
+            row.addEventListener('drop', (e) => {
+                e.preventDefault();
+                row.classList.remove('drag-over');
+
+                // Verify same field (table)
+                const sourceField = e.dataTransfer.getData('application/x-records-field');
+                if (sourceField !== field) return;
+
+                const tbody = document.getElementById(`editor-${field}`);
+                const draggingRow = tbody.querySelector('.dragging');
+                if (!draggingRow || draggingRow === row) return;
+
+                // Insert dragged row before or after this row based on position
+                const rows = Array.from(tbody.children);
+                const draggedIdx = rows.indexOf(draggingRow);
+                const targetIdx = rows.indexOf(row);
+
+                if (draggedIdx < targetIdx) {
+                    row.parentNode.insertBefore(draggingRow, row.nextSibling);
+                } else {
+                    row.parentNode.insertBefore(draggingRow, row);
+                }
+                updateRecordsEditorIndices(field);
+            });
+
+            // Create cells for each schema field
             for (const [key, def] of Object.entries(schema)) {
+                const td = document.createElement('td');
                 const value = record[key];
                 const fieldType = def.type || 'text';
                 const readOnly = def.readOnly === true;
 
                 if (fieldType === 'boolean') {
-                    // Render as clickable icon toggle
+                    // Render as clickable toggle with checkmark
                     const toggle = document.createElement('button');
                     toggle.type = 'button';
                     toggle.className = 'records-editor-toggle';
                     toggle.setAttribute('data-field', key);
-                    toggle.setAttribute('data-value', value !== false ? 'true' : 'false');
+                    const isChecked = value !== false;
+                    toggle.setAttribute('data-value', isChecked ? 'true' : 'false');
                     toggle.title = def.label || key;
-                    // Use eye icon for visibility
-                    if (key === 'visible') {
-                        toggle.textContent = value !== false ? '👁' : '👁‍🗨';
-                        toggle.classList.toggle('is-hidden', value === false);
-                    } else {
-                        toggle.textContent = value ? '✓' : '✗';
+                    toggle.textContent = isChecked ? '✓' : '';
+                    toggle.classList.toggle('is-checked', isChecked);
+                    // Grey out row when visible field is false
+                    if (key === 'visible' && !isChecked) {
+                        row.classList.add('is-hidden');
                     }
                     toggle.onclick = () => {
                         const current = toggle.getAttribute('data-value') === 'true';
                         const newVal = !current;
                         toggle.setAttribute('data-value', newVal ? 'true' : 'false');
+                        toggle.textContent = newVal ? '✓' : '';
+                        toggle.classList.toggle('is-checked', newVal);
+                        // Grey out row when visible field is toggled
                         if (key === 'visible') {
-                            toggle.textContent = newVal ? '👁' : '👁‍🗨';
-                            toggle.classList.toggle('is-hidden', !newVal);
-                            // Grey out the row when hidden
                             row.classList.toggle('is-hidden', !newVal);
-                        } else {
-                            toggle.textContent = newVal ? '✓' : '✗';
                         }
                     };
-                    fieldsContainer.appendChild(toggle);
+                    td.appendChild(toggle);
                 } else {
                     // Text input
                     const input = document.createElement('input');
@@ -5161,54 +5283,15 @@
                     input.className = 'records-editor-input';
                     input.setAttribute('data-field', key);
                     input.value = value || '';
-                    input.placeholder = def.label || key;
+                    input.placeholder = def.placeholder || def.label || key;
                     input.readOnly = readOnly;
                     if (readOnly) {
                         input.title = def.label || key;
                     }
-                    fieldsContainer.appendChild(input);
+                    td.appendChild(input);
                 }
+                row.appendChild(td);
             }
-
-            row.appendChild(fieldsContainer);
-
-            // Buttons container
-            const buttons = document.createElement('div');
-            buttons.className = 'records-editor-buttons';
-
-            // Move up button
-            const upBtn = document.createElement('button');
-            upBtn.type = 'button';
-            upBtn.className = 'records-editor-btn';
-            upBtn.textContent = '▲';
-            upBtn.title = 'Move up';
-            upBtn.onclick = () => moveRecordsItem(field, row, -1);
-            buttons.appendChild(upBtn);
-
-            // Move down button
-            const downBtn = document.createElement('button');
-            downBtn.type = 'button';
-            downBtn.className = 'records-editor-btn';
-            downBtn.textContent = '▼';
-            downBtn.title = 'Move down';
-            downBtn.onclick = () => moveRecordsItem(field, row, 1);
-            buttons.appendChild(downBtn);
-
-            // Delete button (only if allowed)
-            if (allowDelete) {
-                const delBtn = document.createElement('button');
-                delBtn.type = 'button';
-                delBtn.className = 'records-editor-btn records-editor-btn-delete';
-                delBtn.textContent = '×';
-                delBtn.title = 'Remove';
-                delBtn.onclick = () => {
-                    row.remove();
-                    updateRecordsEditorIndices(field);
-                };
-                buttons.appendChild(delBtn);
-            }
-
-            row.appendChild(buttons);
 
             // Set initial hidden state based on visible field
             if (record.visible === false) {
@@ -5218,27 +5301,10 @@
             return row;
         }
 
-        // Move a records item up or down
-        function moveRecordsItem(field, row, direction) {
-            const container = document.getElementById(`editor-${field}`);
-            const items = Array.from(container.children);
-            const currentIndex = items.indexOf(row);
-            const newIndex = currentIndex + direction;
-
-            if (newIndex < 0 || newIndex >= items.length) return;
-
-            if (direction < 0) {
-                container.insertBefore(row, items[newIndex]);
-            } else {
-                container.insertBefore(items[newIndex], row);
-            }
-            updateRecordsEditorIndices(field);
-        }
-
         // Update data-index attributes after reordering records
         function updateRecordsEditorIndices(field) {
-            const container = document.getElementById(`editor-${field}`);
-            Array.from(container.children).forEach((row, idx) => {
+            const tbody = document.getElementById(`editor-${field}`);
+            Array.from(tbody.children).forEach((row, idx) => {
                 row.setAttribute('data-index', idx);
             });
         }
@@ -5301,11 +5367,13 @@
                 });
                 return values;
             } else if (type === 'records') {
-                // Collect record objects from records editor items in order
-                const schemaStr = el.getAttribute('data-schema');
+                // Collect record objects from records editor table rows in order
+                // el is the tbody, schema is on the parent table
+                const table = el.closest('table');
+                const schemaStr = table?.getAttribute('data-schema') || el.getAttribute('data-schema');
                 const schema = JSON.parse(schemaStr || '{}');
                 const records = [];
-                const rows = el.querySelectorAll('.records-editor-item');
+                const rows = el.querySelectorAll('.records-editor-row');
                 rows.forEach(row => {
                     const record = {};
                     for (const key of Object.keys(schema)) {
@@ -6285,7 +6353,7 @@ sections:
 
                 for await (const [name, handle] of dirHandle.entries()) {
                     if (handle.kind !== 'directory') continue;
-                    if (name.startsWith('.')) continue;  // Skip dotfiles/dotdirs
+                    if (name.startsWith('.') || name.startsWith('_')) continue;  // Skip dotfiles/dotdirs and underscore-prefixed
                     if (RESERVED_DIRECTORIES.has(name)) continue;
 
                     discoveredSections.set(name, { handle });
@@ -6294,10 +6362,11 @@ sections:
                 console.log(`[Filesystem] Discovered ${discoveredSections.size} section directories`);
 
                 // Load sections and match to settings
-                // Filter out _system from settings (it's a virtual section for system notes)
+                // Filter out System section (path: '.') and legacy _system - they're virtual, not directories
                 const sectionsFromSettings = (notebookSettings?.sections || []).filter(s => {
-                    const name = typeof s === 'string' ? s : s.name;
-                    return name && !name.startsWith('_');
+                    if (typeof s === 'string') return !s.startsWith('_');
+                    if (s.path === '.') return false; // System section (root files)
+                    return s.name && !s.name.startsWith('_');
                 });
 
                 // Build lookup maps for matching directories to settings
@@ -6401,6 +6470,15 @@ sections:
                         path: s._dirName || slugify(s.name),
                         visible: s.visible !== false
                     }));
+                    // Ensure System section (root files, path: '.') is included
+                    if (!settingsCard.sections.some(s => s.path === '.')) {
+                        // Check original settings for visibility preference
+                        const originalSystem = notebookSettings?.sections?.find(s =>
+                            typeof s === 'object' && s.path === '.'
+                        );
+                        const visible = originalSystem?.visible === true;
+                        settingsCard.sections.push({ name: 'System', path: '.', visible });
+                    }
                 }
 
                 // Create template files for card types that exist but don't have template files
@@ -6635,17 +6713,21 @@ sections:
                 await loadAuthors(notebookDirHandle);
 
                 // Reorder data.sections to match the new order from settings
-                // card.sections is now an array of {name, visible} records
+                // card.sections is now an array of {name, path, visible} records
                 if (card.sections && Array.isArray(card.sections)) {
                     const newOrder = [];
                     for (const sectionRecord of card.sections) {
                         const sectionName = typeof sectionRecord === 'string' ? sectionRecord : sectionRecord.name;
                         if (!sectionName) continue;
 
-                        // Find section by matching slug or name
-                        const sectionSlug = slugify(sectionName);
+                        // Skip System section (path: '.') - it's virtual, not a directory
+                        if (typeof sectionRecord === 'object' && sectionRecord.path === '.') continue;
+
+                        // Find section by matching path, slug, or name
+                        const sectionPath = typeof sectionRecord === 'object' ? sectionRecord.path : null;
+                        const sectionSlug = sectionPath || slugify(sectionName);
                         let section = data.sections.find(s =>
-                            slugify(s.name) === sectionSlug || s._dirName === sectionSlug
+                            s._dirName === sectionSlug || slugify(s.name) === sectionSlug
                         );
 
                         if (section) {

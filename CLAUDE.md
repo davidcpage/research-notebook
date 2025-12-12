@@ -81,8 +81,10 @@ When adding field type handling in `renderEditorField()`, check type-specific co
 
 ### Reusable field types for lists
 - `type: 'list'` - Simple list of strings with up/down/delete buttons
-- `type: 'records'` - List of objects with defined schema (like a table)
-  - Boolean fields render as toggle buttons (eye icon for `visible` field)
+- `type: 'records'` - Datatable with column headers and draggable rows
+  - Boolean fields render as checkbox toggles (✓ when checked)
+  - Text fields render as inline editable inputs
+  - Drag handles for row reordering
 - Helper functions: `normalizeSectionsFormat()`, `getSectionNames()`, `getSystemSectionVisible()`
 
 ---
@@ -135,15 +137,23 @@ notebook-folder/
 ├── settings.yaml
 ├── theme.css (optional)
 ├── *.template.yaml
-├── sections/
-│   └── section-name/
-│       ├── _section.json
-│       ├── note-title.md
-│       ├── code-title.code.py
-│       ├── code-title.output.html
-│       └── bookmark-title.bookmark.json
-└── assets/thumbnails/
+├── CLAUDE.md
+├── README.md
+├── research/                    # Section directories at root
+│   ├── note-title.md
+│   ├── code-title.code.py
+│   ├── code-title.output.html
+│   └── bookmark-title.bookmark.json
+├── references/                  # Another section
+│   └── paper.bookmark.json
+└── assets/
+    ├── thumbnails/
+    └── author-icons/
 ```
+
+**Sections:** Directories at notebook root become sections. Reserved directories (`assets/`, `.git/`, `.notebook/`, `node_modules/`, dotfiles) are excluded.
+
+**System section:** Files at root (settings.yaml, theme.css, templates, CLAUDE.md, README.md) appear in a virtual "System" section configured with `path: '.'` in settings.yaml.
 
 **Why Filesystem?** Claude Code integration, Git versioning, portable files, no size limits.
 

@@ -54,9 +54,9 @@ sections:
 ### Tasks
 
 - [x] **1.1 Update settings schema**
-  - Section record: `name` (string), `visible` (boolean)
+  - Section record: `name` (string), `path` (string, optional), `visible` (boolean)
   - Remove `id` field - derived from slugified name
-  - Remove `path` field - derived from slugified name
+  - `path` field: optional override for directory name (e.g., `path: '.'` for System section)
   - Remove any order-related fields
 
 - [x] **1.2 Update settings template**
@@ -65,13 +65,13 @@ sections:
   - Document auto-discovery behavior
 
 - [x] **1.3 Build table editor for sections**
-  - Using existing records editor with updated schema
-  - Columns: Name (text input), Path (text input, optional), Visible (toggle)
-  - Row reordering via up/down buttons
+  - Proper datatable UI with column headers and drag-and-drop reordering
+  - Columns: Name (text input), Path (text input, optional), Visible (checkbox toggle)
+  - Drag handles (⋮⋮) for row reordering instead of up/down buttons
   - "Add Section" button (creates directory immediately)
   - **No delete button** - too destructive for non-empty sections
   - To delete: user removes directory via filesystem, section disappears on reload
-  - **Future:** Could improve to proper table UI, but current records editor is functional
+  - **System section**: Auto-added with `path: '.'` to show root files (settings, templates, CLAUDE.md, etc.)
 
 - [x] **1.4 Update filesystem read logic**
   - Scan notebook root for directories (excluding reserved)

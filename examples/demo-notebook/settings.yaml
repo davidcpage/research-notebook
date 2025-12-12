@@ -3,6 +3,9 @@ notebook_subtitle: Bookmarks, notes, and connections
 sections:
   - name: Research
     visible: true
+  - name: System
+    path: "."
+    visible: false
 default_author: ""
 authors:
   - name: Claude Opus
