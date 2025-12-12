@@ -1684,7 +1684,10 @@
         }
 
         .records-editor-row.is-hidden {
-            opacity: 0.5;
+            color: var(--text-muted);
+        }
+        .records-editor-row.is-hidden .records-editor-input {
+            color: var(--text-muted);
         }
 
         .records-editor-row.dragging {
@@ -1730,6 +1733,17 @@
         .records-editor-input[readonly] {
             color: var(--text-muted);
             cursor: default;
+        }
+
+        .records-editor-input.is-frozen {
+            background: var(--bg-secondary);
+            cursor: default;
+            pointer-events: none;
+        }
+
+        /* System section row: no hover effect */
+        .records-editor-row.is-system-section:hover {
+            background: transparent;
         }
 
         .records-editor-toggle {
@@ -2357,6 +2371,29 @@
             'node_modules'
         ]);
 
+        // Get the .notebook directory handle (creates if it doesn't exist when create=true)
+        async function getNotebookConfigDir(dirHandle, create = false) {
+            if (!dirHandle) return null;
+            try {
+                return await dirHandle.getDirectoryHandle('.notebook', { create });
+            } catch (e) {
+                if (!create) return null;
+                throw e;
+            }
+        }
+
+        // Get the .notebook/templates directory handle (creates if it doesn't exist when create=true)
+        async function getNotebookTemplatesDir(dirHandle, create = false) {
+            const configDir = await getNotebookConfigDir(dirHandle, create);
+            if (!configDir) return null;
+            try {
+                return await configDir.getDirectoryHandle('templates', { create });
+            } catch (e) {
+                if (!create) return null;
+                throw e;
+            }
+        }
+
         // Author registry (loaded from settings.yaml authors field)
         // Maps author names (lowercase) to icon SVG content
         let authorRegistry = {};
@@ -2918,90 +2955,42 @@
         // Global settings object (loaded from settings.yaml)
         let notebookSettings = null;
 
-        // Load settings from settings.yaml (with migration from legacy format)
+        // Load settings from .notebook/settings.yaml
         async function loadSettings(dirHandle) {
             if (!dirHandle) {
                 notebookSettings = buildSettingsObject();
                 return notebookSettings;
             }
 
-            // Try to load settings.yaml first (new format)
-            try {
-                const settingsFile = await dirHandle.getFileHandle('settings.yaml');
-                const file = await settingsFile.getFile();
-                const content = await file.text();
-                const parsed = jsyaml.load(content);
-                notebookSettings = buildSettingsObject(parsed);
-                console.log('[Settings] Loaded settings.yaml');
-                return notebookSettings;
-            } catch (e) {
-                // settings.yaml doesn't exist, try to migrate from legacy format
-                console.log('[Settings] No settings.yaml found, checking for legacy files...');
-            }
-
-            // Try to migrate from notebook.json + extensions.yaml
-            let title = 'Research Notebook';
-            let subtitle = 'Bookmarks, notes, and connections';
-            let sections = [];
-            let extensions = getDefaultExtensionRegistry();
-            let needsMigration = false;
-
-            // Try to read notebook.json
-            try {
-                const metaFile = await dirHandle.getFileHandle('notebook.json');
-                const file = await metaFile.getFile();
-                const meta = JSON.parse(await file.text());
-                title = meta.title || title;
-                subtitle = meta.subtitle || subtitle;
-                sections = meta.sections || [];
-                needsMigration = true;
-                console.log('[Settings] Found legacy notebook.json');
-            } catch (e) {
-                // No notebook.json
-            }
-
-            // Try to read extensions.yaml
-            try {
-                const extFile = await dirHandle.getFileHandle('extensions.yaml');
-                const file = await extFile.getFile();
-                const content = await file.text();
-                const parsed = jsyaml.load(content);
-                extensions = parsed.extensions || extensions;
-                needsMigration = true;
-                console.log('[Settings] Found legacy extensions.yaml');
-            } catch (e) {
-                // No extensions.yaml
-            }
-
-            notebookSettings = {
-                notebook_title: title,
-                notebook_subtitle: subtitle,
-                sections: normalizeSectionsFormat(sections),
-                extensions: extensions,
-                theme: null
-            };
-
-            // Perform migration if legacy files were found
-            if (needsMigration) {
-                console.log('[Settings] Migrating to settings.yaml...');
+            // Load from .notebook/settings.yaml
+            const configDir = await getNotebookConfigDir(dirHandle, false);
+            if (configDir) {
                 try {
-                    await saveSettings(dirHandle);
-                    // Delete legacy files after successful migration
-                    try {
-                        await dirHandle.removeEntry('notebook.json');
-                        console.log('[Settings] Deleted legacy notebook.json');
-                    } catch (e) { /* file might not exist */ }
-                    try {
-                        await dirHandle.removeEntry('extensions.yaml');
-                        console.log('[Settings] Deleted legacy extensions.yaml');
-                    } catch (e) { /* file might not exist */ }
-                    showToast('Migrated notebook settings to settings.yaml');
+                    const settingsFile = await configDir.getFileHandle('settings.yaml');
+                    const file = await settingsFile.getFile();
+                    const content = await file.text();
+                    const parsed = jsyaml.load(content);
+                    notebookSettings = buildSettingsObject(parsed);
+                    console.log('[Settings] Loaded .notebook/settings.yaml');
+                    return notebookSettings;
                 } catch (e) {
-                    console.error('[Settings] Migration failed:', e);
+                    // .notebook/settings.yaml doesn't exist, use defaults
+                    console.log('[Settings] No .notebook/settings.yaml found, using defaults');
                 }
             }
 
+            // No settings found - use defaults (new notebook)
+            notebookSettings = buildSettingsObject();
             return notebookSettings;
+        }
+
+        // Check if a section path includes root directory ('.')
+        // This identifies the System section
+        // Path can be '.' or an array like ['.', '.notebook', '.notebook/templates']
+        function sectionPathIncludesRoot(path) {
+            if (!path) return false;
+            if (Array.isArray(path)) return path.includes('.');
+            return path === '.';
         }
 
         // Normalize sections format: convert string array to records format
@@ -3016,12 +3005,17 @@
                 // Already an object, preserve path and ensure visible has a default
                 const record = { name: s.name || '', visible: s.visible !== false };
                 if (s.path) record.path = s.path;
+                // Normalize System section path to canonical array
+                // This upgrades old `path: '.'` to the full array
+                if (sectionPathIncludesRoot(record.path)) {
+                    record.path = ['.', '.notebook', '.notebook/templates'];
+                }
                 return record;
             });
-            // Ensure System section (root files) always exists (hidden by default)
-            // Identified by path: '.' (root directory)
-            if (!normalized.some(s => s.path === '.')) {
-                normalized.push({ name: 'System', path: '.', visible: false });
+            // Ensure System section always exists (hidden by default)
+            // Path array documents what it covers (actual loading is hardcoded)
+            if (!normalized.some(s => sectionPathIncludesRoot(s.path))) {
+                normalized.push({ name: 'System', path: ['.', '.notebook', '.notebook/templates'], visible: false });
             }
             return normalized;
         }
@@ -3035,12 +3029,12 @@
         function getSystemSectionVisible() {
             if (!notebookSettings?.sections) return false;
             const systemSection = notebookSettings.sections.find(s =>
-                typeof s === 'object' && s.path === '.'
+                typeof s === 'object' && sectionPathIncludesRoot(s.path)
             );
             return systemSection?.visible === true;
         }
 
-        // Save settings to settings.yaml
+        // Save settings to .notebook/settings.yaml
         async function saveSettings(dirHandle) {
             if (!dirHandle || !notebookSettings) return;
 
@@ -3051,11 +3045,13 @@
                 forceQuotes: false
             });
 
-            const settingsFile = await dirHandle.getFileHandle('settings.yaml', { create: true });
+            // Save to .notebook/settings.yaml (creates .notebook dir if needed)
+            const configDir = await getNotebookConfigDir(dirHandle, true);
+            const settingsFile = await configDir.getFileHandle('settings.yaml', { create: true });
             const writable = await settingsFile.createWritable();
             await writable.write(content);
             await writable.close();
-            console.log('[Settings] Saved settings.yaml');
+            console.log('[Settings] Saved .notebook/settings.yaml');
         }
 
         // Load extension registry from settings (or use defaults)
@@ -3147,7 +3143,7 @@
             return authorRegistry;
         }
 
-        // Load templates from filesystem (merged with defaults)
+        // Load templates from .notebook/templates/
         async function loadTemplates(dirHandle) {
             // Start with default templates (ensures settings is always available)
             const defaults = getDefaultTemplates();
@@ -3157,43 +3153,47 @@
                 return templateRegistry;
             }
 
-            // Scan root directory for .template.yaml files and merge with defaults
             const templatesToUpdate = [];
-            try {
-                for await (const [name, handle] of dirHandle.entries()) {
-                    if (handle.kind === 'file' && name.endsWith('.template.yaml')) {
-                        try {
-                            const file = await handle.getFile();
-                            const content = await file.text();
-                            const template = jsyaml.load(content);
-                            if (template && template.name) {
-                                // Deep merge: user overrides win, but new default fields are inherited
-                                const defaultTemplate = defaults[template.name];
-                                const mergedTemplate = defaultTemplate
-                                    ? deepMerge(defaultTemplate, template)
-                                    : template;
-                                templateRegistry[template.name] = mergedTemplate;
 
-                                // Check if merge added new fields - if so, save updated template
-                                if (defaultTemplate) {
-                                    const mergedYaml = jsyaml.dump(mergedTemplate, { indent: 2, lineWidth: -1, quotingType: '"', forceQuotes: false });
-                                    if (mergedYaml !== content) {
-                                        templatesToUpdate.push({ name, handle, content: mergedYaml });
-                                        console.log(`[Templates] Loaded ${name} (will update with new defaults)`);
+            // Load from .notebook/templates/
+            const templatesDir = await getNotebookTemplatesDir(dirHandle, false);
+            if (templatesDir) {
+                try {
+                    for await (const [name, handle] of templatesDir.entries()) {
+                        if (handle.kind === 'file' && name.endsWith('.yaml')) {
+                            try {
+                                const file = await handle.getFile();
+                                const content = await file.text();
+                                const template = jsyaml.load(content);
+                                if (template && template.name) {
+                                    // Deep merge: user overrides win, but new default fields are inherited
+                                    const defaultTemplate = defaults[template.name];
+                                    const mergedTemplate = defaultTemplate
+                                        ? deepMerge(defaultTemplate, template)
+                                        : template;
+                                    templateRegistry[template.name] = mergedTemplate;
+
+                                    // Check if merge added new fields - if so, save updated template
+                                    if (defaultTemplate) {
+                                        const mergedYaml = jsyaml.dump(mergedTemplate, { indent: 2, lineWidth: -1, quotingType: '"', forceQuotes: false });
+                                        if (mergedYaml !== content) {
+                                            templatesToUpdate.push({ name, handle, content: mergedYaml });
+                                            console.log(`[Templates] Loaded ${name} (will update with new defaults)`);
+                                        } else {
+                                            console.log(`[Templates] Loaded ${name}`);
+                                        }
                                     } else {
-                                        console.log(`[Templates] Loaded ${name}`);
+                                        console.log(`[Templates] Loaded ${name} (custom template)`);
                                     }
-                                } else {
-                                    console.log(`[Templates] Loaded ${name} (custom template)`);
                                 }
+                            } catch (e) {
+                                console.error(`[Templates] Error parsing ${name}:`, e);
                             }
-                        } catch (e) {
-                            console.error(`[Templates] Error parsing ${name}:`, e);
                         }
                     }
+                } catch (e) {
+                    console.error('[Templates] Error scanning .notebook/templates/:', e);
                 }
-            } catch (e) {
-                console.error('[Templates] Error scanning for templates:', e);
             }
 
             // Save any templates that were updated with new defaults
@@ -3211,7 +3211,7 @@
             return templateRegistry;
         }
 
-        // Load theme.css from notebook directory (user CSS overrides)
+        // Load theme.css from .notebook/theme.css
         async function loadThemeCss(dirHandle) {
             if (!dirHandle) return;
 
@@ -3221,20 +3221,24 @@
                 existingTheme.remove();
             }
 
-            try {
-                const themeFile = await dirHandle.getFileHandle('theme.css');
-                const file = await themeFile.getFile();
-                const content = await file.text();
+            // Load from .notebook/theme.css
+            const configDir = await getNotebookConfigDir(dirHandle, false);
+            if (configDir) {
+                try {
+                    const themeFile = await configDir.getFileHandle('theme.css');
+                    const file = await themeFile.getFile();
+                    const content = await file.text();
 
-                // Create and inject style element
-                const style = document.createElement('style');
-                style.id = 'theme-css';
-                style.textContent = content;
-                document.head.appendChild(style);
-                console.log('[Theme] Loaded theme.css');
-            } catch (e) {
-                // File doesn't exist, that's fine
-                console.log('[Theme] No theme.css found (optional)');
+                    // Create and inject style element
+                    const style = document.createElement('style');
+                    style.id = 'theme-css';
+                    style.textContent = content;
+                    document.head.appendChild(style);
+                    console.log('[Theme] Loaded .notebook/theme.css');
+                } catch (e) {
+                    // File doesn't exist, that's fine (theme is optional)
+                    console.log('[Theme] No theme.css found (optional)');
+                }
             }
         }
 
@@ -3274,35 +3278,65 @@
             }
         }
 
-        // Ensure template files exist in notebook (called on save if missing)
+        // Ensure config files exist in .notebook/ directory (creates them if missing)
         async function ensureTemplateFiles(dirHandle) {
             if (!dirHandle) return;
 
-            const filesToCreate = [
-                { name: 'settings.yaml', getContent: getDefaultSettingsContent },
-                { name: 'theme.css', getContent: getDefaultThemeContent },
-                { name: 'note.template.yaml', getContent: () => getTemplateFileContent('note') },
-                { name: 'code.template.yaml', getContent: () => getTemplateFileContent('code') },
-                { name: 'bookmark.template.yaml', getContent: () => getTemplateFileContent('bookmark') }
-            ];
-
             let createdFiles = [];
 
-            for (const { name, getContent } of filesToCreate) {
+            // Get or create .notebook directory
+            const configDir = await getNotebookConfigDir(dirHandle, true);
+            const templatesDir = await getNotebookTemplatesDir(dirHandle, true);
+
+            // Files to create in .notebook/
+            const configFiles = [
+                { name: 'settings.yaml', getContent: getDefaultSettingsContent },
+                { name: 'theme.css', getContent: getDefaultThemeContent }
+            ];
+
+            // Template files to create in .notebook/templates/
+            const templateFiles = [
+                { name: 'note.yaml', getContent: () => getTemplateFileContent('note') },
+                { name: 'code.yaml', getContent: () => getTemplateFileContent('code') },
+                { name: 'bookmark.yaml', getContent: () => getTemplateFileContent('bookmark') }
+            ];
+
+            // Create config files in .notebook/
+            for (const { name, getContent } of configFiles) {
                 try {
-                    await dirHandle.getFileHandle(name);
+                    await configDir.getFileHandle(name);
                     // File exists, don't overwrite
                 } catch (e) {
                     // File doesn't exist, create it
                     try {
-                        const fileHandle = await dirHandle.getFileHandle(name, { create: true });
+                        const fileHandle = await configDir.getFileHandle(name, { create: true });
                         const writable = await fileHandle.createWritable();
                         await writable.write(getContent());
                         await writable.close();
-                        createdFiles.push(name);
-                        console.log(`[Templates] Created ${name}`);
+                        createdFiles.push(`.notebook/${name}`);
+                        console.log(`[Templates] Created .notebook/${name}`);
                     } catch (writeError) {
-                        console.error(`[Templates] Error creating ${name}:`, writeError);
+                        console.error(`[Templates] Error creating .notebook/${name}:`, writeError);
+                    }
+                }
+            }
+
+            // Create template files in .notebook/templates/
+            for (const { name, getContent } of templateFiles) {
+                try {
+                    await templatesDir.getFileHandle(name);
+                    // File exists, don't overwrite
+                } catch (e) {
+                    // File doesn't exist, create it
+                    try {
+                        const fileHandle = await templatesDir.getFileHandle(name, { create: true });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(getContent());
+                        await writable.close();
+                        createdFiles.push(`.notebook/templates/${name}`);
+                        console.log(`[Templates] Created .notebook/templates/${name}`);
+                    } catch (writeError) {
+                        console.error(`[Templates] Error creating .notebook/templates/${name}:`, writeError);
                     }
                 }
             }
@@ -3332,7 +3366,7 @@
             }
 
             if (createdFiles.length > 0) {
-                showToast(`📋 Created template files: ${createdFiles.join(', ')}`);
+                showToast(`Created config files: ${createdFiles.join(', ')}`);
             }
 
             return createdFiles;
@@ -3359,41 +3393,49 @@
                 return [];
             }
 
-            // Map template names to their file names
-            const templateToFile = {
-                'note': 'note.template.yaml',
-                'code': 'code.template.yaml',
-                'bookmark': 'bookmark.template.yaml'
-            };
+            // Standard template names we know about
+            const knownTemplates = ['note', 'code', 'bookmark'];
 
             let createdFiles = [];
 
-            for (const templateName of templateTypesInUse) {
-                const filename = templateToFile[templateName];
-                if (!filename) continue;  // Skip unknown/custom templates
+            // Get .notebook/templates/ directory (may not exist yet)
+            const templatesDir = await getNotebookTemplatesDir(dirHandle, false);
 
-                // Check if template file exists
-                try {
-                    await dirHandle.getFileHandle(filename);
-                    // File exists, don't create
-                } catch (e) {
-                    // File doesn't exist but cards of this type exist, create it
+            for (const templateName of templateTypesInUse) {
+                if (!knownTemplates.includes(templateName)) continue;  // Skip unknown/custom templates
+
+                // Check if template file exists in .notebook/templates/
+                let exists = false;
+                if (templatesDir) {
                     try {
+                        await templatesDir.getFileHandle(`${templateName}.yaml`);
+                        exists = true;
+                    } catch (e) {
+                        // Not found
+                    }
+                }
+
+                if (!exists) {
+                    // Template doesn't exist, create it
+                    try {
+                        const newTemplatesDir = await getNotebookTemplatesDir(dirHandle, true);
                         const content = getTemplateFileContent(templateName);
-                        const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+                        const newFilename = `${templateName}.yaml`;
+                        const fileHandle = await newTemplatesDir.getFileHandle(newFilename, { create: true });
                         const writable = await fileHandle.createWritable();
                         await writable.write(content);
                         await writable.close();
-                        createdFiles.push(filename);
-                        console.log(`[Templates] Created ${filename} for existing ${templateName} cards`);
+                        const savedPath = `.notebook/templates/${newFilename}`;
+                        createdFiles.push(savedPath);
+                        console.log(`[Templates] Created ${savedPath} for existing ${templateName} cards`);
 
                         // Add to systemNotes so it appears in System section
                         const parsed = jsyaml.load(content);
                         loadedData.systemNotes.push({
                             template: 'template',
                             system: true,
-                            id: 'system-' + filename,
-                            filename: filename,
+                            id: 'system-' + templateName + '.template.yaml',
+                            filename: savedPath,
                             title: templateName + ' (template)',
                             name: parsed.name || templateName,
                             description: parsed.description || '',
@@ -3406,13 +3448,13 @@
                             modified: new Date().toISOString()
                         });
                     } catch (writeError) {
-                        console.error(`[Templates] Error creating ${filename}:`, writeError);
+                        console.error(`[Templates] Error creating template for ${templateName}:`, writeError);
                     }
                 }
             }
 
             if (createdFiles.length > 0) {
-                showToast(`📋 Created templates for existing cards: ${createdFiles.join(', ')}`);
+                showToast(`Created templates for existing cards: ${createdFiles.join(', ')}`);
                 // Reload templates so the registry has the newly created templates
                 await loadTemplates(dirHandle);
             }
@@ -5187,6 +5229,12 @@
             row.setAttribute('data-index', index);
             row.setAttribute('draggable', 'true');
 
+            // Detect if this is the System section (path includes '.')
+            const isSystemSection = sectionPathIncludesRoot(record.path);
+            if (isSystemSection) {
+                row.classList.add('is-system-section');
+            }
+
             // Drag handle cell
             const dragCell = document.createElement('td');
             const dragHandle = document.createElement('span');
@@ -5255,7 +5303,9 @@
                 const td = document.createElement('td');
                 const value = record[key];
                 const fieldType = def.type || 'text';
-                const readOnly = def.readOnly === true;
+                // System section: name and path are frozen (read-only)
+                const isFrozenField = isSystemSection && (key === 'name' || key === 'path');
+                const readOnly = def.readOnly === true || isFrozenField;
 
                 if (fieldType === 'boolean') {
                     // Render as clickable toggle with checkmark
@@ -5290,11 +5340,20 @@
                     input.type = 'text';
                     input.className = 'records-editor-input';
                     input.setAttribute('data-field', key);
-                    input.value = value || '';
+                    // Format array values for display (e.g., path arrays)
+                    let displayValue = value || '';
+                    if (Array.isArray(value)) {
+                        // Format paths nicely: '.' becomes 'root'
+                        displayValue = value.map(p => p === '.' ? 'root' : p).join(', ');
+                        // Store original array value as JSON for retrieval
+                        input.setAttribute('data-original-value', JSON.stringify(value));
+                    }
+                    input.value = displayValue;
                     input.placeholder = def.placeholder || def.label || key;
                     input.readOnly = readOnly;
                     if (readOnly) {
-                        input.title = def.label || key;
+                        input.title = isFrozenField ? 'System section field (read-only)' : (def.label || key);
+                        input.classList.add('is-frozen');
                     }
                     td.appendChild(input);
                 }
@@ -5391,7 +5450,17 @@
                             record[key] = toggle ? toggle.getAttribute('data-value') === 'true' : true;
                         } else {
                             const input = row.querySelector(`[data-field="${key}"]`);
-                            record[key] = input ? input.value : '';
+                            // Check for original value (array paths stored as JSON)
+                            const originalValue = input?.getAttribute('data-original-value');
+                            if (originalValue) {
+                                try {
+                                    record[key] = JSON.parse(originalValue);
+                                } catch (e) {
+                                    record[key] = input ? input.value : '';
+                                }
+                            } else {
+                                record[key] = input ? input.value : '';
+                            }
                         }
                     }
                     records.push(record);
@@ -5938,11 +6007,19 @@ This folder is a Research Notebook that stores notes, code, and bookmarks as pla
 
 ## Directory Structure
 
-Sections are directories at the root level. Each section directory contains cards (notes, code, bookmarks).
+Sections are directories at the root level. Configuration is stored in \`.notebook/\`.
 
 \`\`\`
 notebook/
-├── settings.yaml           # Notebook settings
+├── .notebook/              # Configuration directory
+│   ├── settings.yaml       # Notebook settings
+│   ├── theme.css           # Custom theme (optional)
+│   └── templates/          # Card templates
+│       ├── note.yaml
+│       ├── code.yaml
+│       └── bookmark.yaml
+├── CLAUDE.md               # This file
+├── README.md               # Notebook readme
 ├── research/               # Section directory
 │   ├── my-note.md
 │   └── analysis.code.py
@@ -5960,13 +6037,14 @@ notebook/
 | Code | \`.code.py\` | Python with comment frontmatter |
 | Code Output | \`.output.html\` | HTML (auto-generated, don't edit) |
 | Bookmarks | \`.bookmark.json\` | JSON |
+| Settings | \`.notebook/settings.yaml\` | YAML |
 | Thumbnails | \`assets/thumbnails/*.png\` | Images (auto-generated) |
 
 ## Reading Items
 
 \`\`\`bash
-# List all sections (directories at root, excluding assets)
-ls -d */
+# List all sections (directories at root, excluding .notebook, assets)
+ls -d */ | grep -v assets
 
 # Read a note
 cat research/attention-mechanisms.md
@@ -6010,9 +6088,9 @@ Create \`{section}/{slug}.code.py\`:
 
 ### New Section
 1. Create directory at root: \`mkdir {section-slug}\`
-2. Add to \`settings.yaml\` sections array with name and visible fields
+2. Add to \`.notebook/settings.yaml\` sections array with name and visible fields
 
-Example in settings.yaml:
+Example in .notebook/settings.yaml:
 \`\`\`yaml
 sections:
   - name: Research
@@ -6146,59 +6224,74 @@ sections:
 
             try {
 
-                // Read system notes (text files at root)
-                // Include: .md, .txt, .yaml (including templates), .css
-                // Exclude: .json, .html, .js, binary files, dotfiles
+                // Read system notes:
+                // - Config files from .notebook/ (settings.yaml, theme.css, templates/*.yaml)
+                // - User files from root (README.md, CLAUDE.md, etc.)
+
                 const excludedExtensions = ['.json', '.html', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico'];
 
-                for await (const [filename, fileHandle] of dirHandle.entries()) {
-                    if (fileHandle.kind !== 'file') continue;
-
-                    // Skip files with excluded extensions
-                    if (excludedExtensions.some(ext => filename.endsWith(ext))) continue;
-
-                    // Skip all dotfiles (hidden files)
-                    if (filename.startsWith('.')) continue;
-
-                    // Skip legacy config files
-                    if (filename === 'notebook.json') continue;
-
+                // Load config files from .notebook/ directory
+                const configDir = await getNotebookConfigDir(dirHandle, false);
+                if (configDir) {
+                    // Load settings.yaml from .notebook/
                     try {
-                        const file = await fileHandle.getFile();
+                        const settingsHandle = await configDir.getFileHandle('settings.yaml');
+                        const file = await settingsHandle.getFile();
+                        loadedData.systemNotes.push({
+                            template: 'settings',
+                            system: true,
+                            id: 'system-settings.yaml',
+                            filename: '.notebook/settings.yaml',
+                            title: 'Settings',
+                            notebook_title: notebookSettings?.notebook_title || 'Research Notebook',
+                            notebook_subtitle: notebookSettings?.notebook_subtitle || '',
+                            sections: notebookSettings?.sections || [],
+                            extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
+                            theme: notebookSettings?.theme || null,
+                            default_author: notebookSettings?.default_author || null,
+                            authors: notebookSettings?.authors || [],
+                            modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
+                        });
+                        console.log('[Filesystem] Loaded settings card');
+                    } catch (e) {
+                        // settings.yaml not found (new notebook)
+                    }
+
+                    // Load theme.css from .notebook/
+                    try {
+                        const themeHandle = await configDir.getFileHandle('theme.css');
+                        const file = await themeHandle.getFile();
                         const content = await file.text();
+                        loadedData.systemNotes.push({
+                            template: 'theme',
+                            system: true,
+                            id: 'system-theme.css',
+                            filename: '.notebook/theme.css',
+                            title: 'Theme',
+                            content: content,
+                            modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
+                        });
+                        console.log('[Filesystem] Loaded theme card');
+                    } catch (e) {
+                        // theme.css not found (optional)
+                    }
 
-                        // Special handling for settings.yaml - use settings template
-                        if (filename === 'settings.yaml') {
-                            loadedData.systemNotes.push({
-                                template: 'settings',
-                                system: true,
-                                id: 'system-settings.yaml',
-                                filename: filename,
-                                title: 'Settings',
-                                // Store parsed settings fields
-                                notebook_title: notebookSettings?.notebook_title || 'Research Notebook',
-                                notebook_subtitle: notebookSettings?.notebook_subtitle || '',
-                                sections: notebookSettings?.sections || [],
-                                extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
-                                theme: notebookSettings?.theme || null,
-                                modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
-                            });
-                            console.log(`[Filesystem] Loaded settings card: ${filename}`);
-                            continue;
-                        }
-
-                        // Special handling for *.template.yaml - use template template
-                        if (filename.endsWith('.template.yaml')) {
+                    // Load templates from .notebook/templates/
+                    const templatesDir = await getNotebookTemplatesDir(dirHandle, false);
+                    if (templatesDir) {
+                        for await (const [filename, fileHandle] of templatesDir.entries()) {
+                            if (fileHandle.kind !== 'file' || !filename.endsWith('.yaml')) continue;
                             try {
+                                const file = await fileHandle.getFile();
+                                const content = await file.text();
                                 const parsed = jsyaml.load(content);
-                                const templateName = filename.replace(/\.template\.yaml$/, '');
+                                const templateName = filename.replace(/\.yaml$/, '');
                                 loadedData.systemNotes.push({
                                     template: 'template',
                                     system: true,
-                                    id: 'system-' + filename,
-                                    filename: filename,
+                                    id: 'system-' + templateName + '.template.yaml',
+                                    filename: `.notebook/templates/${filename}`,
                                     title: templateName + ' (template)',
-                                    // Store parsed template fields
                                     name: parsed.name || templateName,
                                     description: parsed.description || '',
                                     schema: parsed.schema || {},
@@ -6209,37 +6302,42 @@ sections:
                                     ui: parsed.ui || {},
                                     modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
                                 });
-                                console.log(`[Filesystem] Loaded template card: ${filename}`);
+                                console.log(`[Filesystem] Loaded template: ${templateName}`);
                             } catch (e) {
                                 console.error(`[Filesystem] Error parsing template ${filename}:`, e);
                             }
-                            continue;
                         }
+                    }
+                }
 
-                        // Special handling for theme.css - use theme template
-                        if (filename === 'theme.css') {
-                            loadedData.systemNotes.push({
-                                template: 'theme',
-                                system: true,
-                                id: 'system-theme.css',
-                                filename: filename,
-                                title: 'Theme',
-                                content: content,
-                                modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
-                            });
-                            console.log(`[Filesystem] Loaded theme card: ${filename}`);
-                            continue;
-                        }
+                // Read user files from root directory (README.md, CLAUDE.md, etc.)
+                // Config files (settings.yaml, theme.css, *.template.yaml) are only in .notebook/
+                for await (const [filename, fileHandle] of dirHandle.entries()) {
+                    if (fileHandle.kind !== 'file') continue;
 
-                        // Determine format based on extension
+                    // Skip files with excluded extensions
+                    if (excludedExtensions.some(ext => filename.endsWith(ext))) continue;
+
+                    // Skip all dotfiles (hidden files)
+                    if (filename.startsWith('.')) continue;
+
+                    // Skip config files - they belong in .notebook/ only
+                    if (filename === 'settings.yaml') continue;
+                    if (filename === 'theme.css') continue;
+                    if (filename.endsWith('.template.yaml')) continue;
+                    if (filename === 'notebook.json') continue;  // Legacy
+
+                    try {
+                        const file = await fileHandle.getFile();
+                        const content = await file.text();
+
+                        // User files at root (README.md, CLAUDE.md, etc.)
                         const isMarkdown = filename.endsWith('.md');
                         const isYaml = filename.endsWith('.yaml');
                         let titleFromFilename = filename;
                         if (isMarkdown) titleFromFilename = filename.replace(/\.md$/, '');
-                        else if (filename.endsWith('.template.yaml')) titleFromFilename = filename.replace(/\.template\.yaml$/, '') + ' (template)';
                         else if (isYaml) titleFromFilename = filename.replace(/\.yaml$/, '');
 
-                        // Determine format for rendering
                         let format = 'text';
                         if (isMarkdown) format = 'markdown';
                         else if (isYaml) format = 'yaml';
@@ -6370,10 +6468,10 @@ sections:
                 console.log(`[Filesystem] Discovered ${discoveredSections.size} section directories`);
 
                 // Load sections and match to settings
-                // Filter out System section (path: '.') and legacy _system - they're virtual, not directories
+                // Filter out System section (path includes '.') and legacy _system - they're virtual, not directories
                 const sectionsFromSettings = (notebookSettings?.sections || []).filter(s => {
                     if (typeof s === 'string') return !s.startsWith('_');
-                    if (s.path === '.') return false; // System section (root files)
+                    if (sectionPathIncludesRoot(s.path)) return false; // System section (root files)
                     return s.name && !s.name.startsWith('_');
                 });
 
@@ -6478,14 +6576,15 @@ sections:
                         path: s._dirName || slugify(s.name),
                         visible: s.visible !== false
                     }));
-                    // Ensure System section (root files, path: '.') is included
-                    if (!settingsCard.sections.some(s => s.path === '.')) {
-                        // Check original settings for visibility preference
+                    // Ensure System section (root files, path includes '.') is included
+                    if (!settingsCard.sections.some(s => sectionPathIncludesRoot(s.path))) {
+                        // Check original settings for visibility preference and path
                         const originalSystem = notebookSettings?.sections?.find(s =>
-                            typeof s === 'object' && s.path === '.'
+                            typeof s === 'object' && sectionPathIncludesRoot(s.path)
                         );
                         const visible = originalSystem?.visible === true;
-                        settingsCard.sections.push({ name: 'System', path: '.', visible });
+                        const path = originalSystem?.path || '.';
+                        settingsCard.sections.push({ name: 'System', path, visible });
                     }
                 }
 
@@ -6728,8 +6827,8 @@ sections:
                         const sectionName = typeof sectionRecord === 'string' ? sectionRecord : sectionRecord.name;
                         if (!sectionName) continue;
 
-                        // Skip System section (path: '.') - it's virtual, not a directory
-                        if (typeof sectionRecord === 'object' && sectionRecord.path === '.') continue;
+                        // Skip System section (path includes '.') - it's virtual, not a directory
+                        if (typeof sectionRecord === 'object' && sectionPathIncludesRoot(sectionRecord.path)) continue;
 
                         // Find section by matching path, slug, or name
                         const sectionPath = typeof sectionRecord === 'object' ? sectionRecord.path : null;
@@ -6777,16 +6876,15 @@ sections:
                 }
 
                 await saveSettings(notebookDirHandle);
-                card.filename = 'settings.yaml';
+                card.filename = '.notebook/settings.yaml';
                 card.id = 'system-settings.yaml';
-                recordSave('settings.yaml');
-                console.log('[Filesystem] Saved settings.yaml');
+                recordSave('.notebook/settings.yaml');
+                console.log('[Filesystem] Saved .notebook/settings.yaml');
                 return;
             }
 
-            // Template cards are handled specially (serialized to YAML)
-            if (card.template === 'template' || (card.filename && card.filename.endsWith('.template.yaml'))) {
-                const filename = card.filename || (card.name + '.template.yaml');
+            // Template cards - save to .notebook/templates/{name}.yaml
+            if (card.template === 'template') {
                 // Reconstruct the template object from card fields
                 const templateObj = {
                     name: card.name,
@@ -6806,37 +6904,45 @@ sections:
                     forceQuotes: false
                 });
 
-                const fileHandle = await notebookDirHandle.getFileHandle(filename, { create: true });
+                // Always save to .notebook/templates/
+                const templatesDir = await getNotebookTemplatesDir(notebookDirHandle, true);
+                const templateFilename = (card.name || 'custom') + '.yaml';
+                const fileHandle = await templatesDir.getFileHandle(templateFilename, { create: true });
+                const savedPath = `.notebook/templates/${templateFilename}`;
+
                 const writable = await fileHandle.createWritable();
                 await writable.write(yamlContent);
                 await writable.close();
-                card.filename = filename;
-                card.id = 'system-' + filename;
+
+                card.filename = savedPath;
+                card.id = 'system-' + card.name + '.template.yaml';
 
                 // Reload the template into the registry
-                const templateName = filename.replace(/\.template\.yaml$/, '');
-                templateRegistry[templateName] = templateObj;
+                templateRegistry[card.name] = templateObj;
 
-                recordSave(filename);
-                console.log('[Filesystem] Saved template:', filename);
+                recordSave(savedPath);
+                console.log('[Filesystem] Saved template:', savedPath);
                 return;
             }
 
-            // Theme card is handled specially (saved as theme.css, reloads CSS)
-            if (card.template === 'theme' || card.filename === 'theme.css') {
-                const filename = 'theme.css';
-                const fileHandle = await notebookDirHandle.getFileHandle(filename, { create: true });
+            // Theme card - save to .notebook/theme.css
+            if (card.template === 'theme') {
+                const configDir = await getNotebookConfigDir(notebookDirHandle, true);
+                const fileHandle = await configDir.getFileHandle('theme.css', { create: true });
+                const savedPath = '.notebook/theme.css';
+
                 const writable = await fileHandle.createWritable();
                 await writable.write(card.content);
                 await writable.close();
-                card.filename = filename;
+
+                card.filename = savedPath;
                 card.id = 'system-theme.css';
 
                 // Reload the theme CSS into the page
                 await loadThemeCss(notebookDirHandle);
 
-                recordSave(filename);
-                console.log('[Filesystem] Saved and reloaded theme.css');
+                recordSave(savedPath);
+                console.log('[Filesystem] Saved theme');
                 return;
             }
 

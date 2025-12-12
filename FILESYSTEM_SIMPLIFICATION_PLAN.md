@@ -122,6 +122,8 @@ If user tries to create a section named "assets" or ".git", the UI should warn/p
 
 ## Phase 3: .notebook/ Configuration Directory
 
+**Status: COMPLETE**
+
 ### Current State
 ```
 notebook/
@@ -155,33 +157,38 @@ notebook/
 
 ### Tasks
 
-- [ ] **3.1 Update file path constants**
+- [x] **3.1 Update file path constants**
   - Settings: `.notebook/settings.yaml`
   - Theme: `.notebook/theme.css`
   - Templates: `.notebook/templates/{name}.yaml`
+  - Helper functions: `getNotebookConfigDir()`, `getNotebookTemplatesDir()`
 
-- [ ] **3.2 Update system card loading**
-  - Load from `.notebook/` directory
+- [x] **3.2 Update system card loading**
+  - Load from `.notebook/` directory first, fall back to root
   - Keep CLAUDE.md and README.md loading from root
+  - System section supports array paths: `path: ['.', '.notebook']`
 
-- [ ] **3.3 Update new notebook creation**
-  - Create `.notebook/` directory structure
-  - Place config files in new locations
+- [x] **3.3 Update new notebook creation**
+  - `ensureTemplateFiles()` creates `.notebook/` directory structure
+  - Places config files in new locations
 
-- [ ] **3.4 Migration**
-  - Detect old-style notebooks (settings.yaml at root)
-  - Offer migration or auto-migrate with backup
-  - Support reading from both locations during transition?
+- [x] **3.4 Migration**
+  - Read from both locations: `.notebook/` first, then root as fallback
+  - New writes always go to `.notebook/`
+  - No automatic migration - manual migration supported
+  - Old notebooks continue to work (reads from root)
 
-- [ ] **3.5 Update _system section display**
-  - Show `.notebook/` files as "Configuration" subsection?
-  - Or keep flat but with clear grouping
+- [x] **3.5 Update _system section display**
+  - Kept flat display - files from both root and `.notebook/` shown together
+  - Filename shows path (e.g., `.notebook/settings.yaml`)
+  - Configuration subsection deferred to later if needed
 
-### Questions/Decisions
+### Resolved Decisions
 
-- [ ] Should migration be automatic or opt-in?
-- [ ] How long to support old locations? (suggest: indefinitely for reading, new writes go to new location)
-- [ ] Does `.notebook/` need its own entry in settings, or is it implicit?
+- **Migration**: Manual only - no backwards compatibility, reads only from `.notebook/`
+- **`.notebook/` in settings**: Implicit - always loaded as config directory
+- **System section in UI**: Name and path are frozen (read-only, non-interactive), visibility and position still editable
+- **System section path**: Always normalized to `['.', '.notebook', '.notebook/templates']` on load (upgrades old `path: '.'`)
 
 ---
 
@@ -247,25 +254,30 @@ notebook/
 
 ### Order of Operations
 
-- **Phase 1** is the foundation - do this first
-- **Phase 3** builds on Phase 1 (moves config files)
+- **Phase 1** is the foundation - do this first (COMPLETE)
+- **Phase 3** builds on Phase 1 (moves config files) (COMPLETE)
 - **Phase 4** is independent and can be done anytime after Phase 1
 
 ### Migration Approach
 
 Since there's currently only one user, we're optimizing for clean design over backwards compatibility:
-- Phase 1: Manual migration of existing notebooks (move folders, delete `_section.json`)
-- Phase 3: Manual migration (move config files to `.notebook/`)
-- No need for legacy fallback code paths
+- Phase 1: Manual migration of existing notebooks (move folders, delete `_section.json`) - COMPLETE
+- Phase 3: Manual migration (move config files to `.notebook/`) - COMPLETE, reads from both locations
+- No need for legacy fallback code paths (but Phase 3 supports reading from root as fallback)
 
 ### Testing Checklist
 
-For each phase:
-- [ ] New notebook creation works
-- [ ] Existing notebook opens correctly
-- [ ] Migration (if applicable) works
-- [ ] All CRUD operations work
-- [ ] Claude Code file references work (@file paths)
+Phase 1 (COMPLETE):
+- [x] New notebook creation works
+- [x] Existing notebook opens correctly
+- [x] All CRUD operations work
+- [x] Claude Code file references work (@file paths)
+
+Phase 3 (COMPLETE):
+- [x] New notebook creation creates `.notebook/` structure
+- [x] Existing notebooks with root config files continue to work
+- [x] Config edits save to `.notebook/` location
+- [x] System section shows files from both locations
 
 ---
 
@@ -292,7 +304,7 @@ notebook/
     └── thumbnails/
 ```
 
-### After Phase 1 (directories = sections)
+### After Phase 1 (directories = sections) - COMPLETE
 ```
 notebook/
 ├── settings.yaml
@@ -315,6 +327,31 @@ notebook/
 - No `_section.json` files
 - Shorter file paths for Claude Code
 
+### After Phase 1 + 3 (current state) - COMPLETE
+```
+notebook/
+├── .notebook/
+│   ├── settings.yaml
+│   ├── theme.css
+│   └── templates/
+│       ├── note.yaml
+│       ├── code.yaml
+│       └── bookmark.yaml
+├── CLAUDE.md
+├── README.md
+├── research/
+│   └── my-note.md
+├── references/
+│   └── some-bookmark.bookmark.json
+└── assets/
+    └── thumbnails/
+```
+
+**Phase 3 changes:**
+- Config consolidated in `.notebook/`
+- Templates renamed from `{name}.template.yaml` to `.notebook/templates/{name}.yaml`
+- No backwards compatibility - reads only from `.notebook/`
+
 ### After All Phases (Phase 1 + 3 + 4)
 ```
 notebook/
@@ -336,6 +373,5 @@ notebook/
     └── images/
 ```
 
-**Additional changes in later phases:**
-- Config consolidated in `.notebook/`
+**Additional changes in Phase 4:**
 - Assets browsable in UI

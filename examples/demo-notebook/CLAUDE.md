@@ -4,11 +4,17 @@ This folder is a Research Notebook that stores notes, code, and bookmarks as pla
 
 ## Directory Structure
 
-Sections are directories at the root level. Each section directory contains cards (notes, code, bookmarks).
+Sections are directories at the root level. Configuration lives in `.notebook/`.
 
 ```
 notebook/
-├── settings.yaml           # Notebook settings
+├── .notebook/
+│   ├── settings.yaml       # Notebook settings
+│   ├── theme.css           # Custom styling
+│   └── templates/          # Card templates
+│       ├── note.yaml
+│       ├── code.yaml
+│       └── bookmark.yaml
 ├── research/               # Section directory
 │   ├── my-note.md
 │   └── analysis.code.py
@@ -20,12 +26,15 @@ notebook/
 
 ## Quick Reference
 
-| Type | Extension | Format |
-|------|-----------|--------|
-| Notes | `.md` | Markdown with YAML frontmatter |
-| Code | `.code.py` | Python with comment frontmatter |
-| Code Output | `.output.html` | HTML (auto-generated, don't edit) |
-| Bookmarks | `.bookmark.json` | JSON |
+| Type | Location | Format |
+|------|----------|--------|
+| Notes | `{section}/*.md` | Markdown with YAML frontmatter |
+| Code | `{section}/*.code.py` | Python with comment frontmatter |
+| Code Output | `{section}/*.output.html` | HTML (auto-generated, don't edit) |
+| Bookmarks | `{section}/*.bookmark.json` | JSON |
+| Settings | `.notebook/settings.yaml` | YAML |
+| Theme | `.notebook/theme.css` | CSS |
+| Templates | `.notebook/templates/*.yaml` | YAML |
 | Thumbnails | `assets/thumbnails/*.png` | Images (auto-generated) |
 
 ## Reading Items
@@ -76,9 +85,9 @@ Create `{section}/{slug}.code.py`:
 
 ### New Section
 1. Create directory at root: `mkdir {section-slug}`
-2. Add to `settings.yaml` sections array with name and visible fields
+2. Add to `.notebook/settings.yaml` sections array with name and visible fields
 
-Example in settings.yaml:
+Example in .notebook/settings.yaml:
 ```yaml
 sections:
   - name: Research

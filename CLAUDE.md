@@ -25,7 +25,7 @@ Add a comment above new functions describing their purpose (parsed by generate_i
 
 To find CSS or modify rendering for a card type, trace from template to render function:
 
-1. Find template definition in `getDefaultTemplates()` (or `.template.yaml` file)
+1. Find template definition in `getDefaultTemplates()` (or `.notebook/templates/*.yaml` file)
 2. Note the `card.layout` and `viewer.layout` values (e.g., `image`, `document`, `split-pane`)
 3. Search for render function: `render{Layout}Preview` for cards, `render{Layout}Viewer` for viewers
 4. The render function shows exact HTML structure and CSS class names
@@ -53,27 +53,27 @@ Example: Bookmark uses `layout: 'image'` → `renderImagePreview()` / `renderIma
 The app uses a template system defined in TEMPLATE_SYSTEM and GENERIC_EDITOR sections:
 - `extensionRegistry`: Maps file extensions to parsers (e.g., `.md` → yaml-frontmatter parser)
 - `templateRegistry`: Defines card types with schema, layout, styling, and editor configuration
-- Templates stored as `*.template.yaml` files in notebook root
-- Settings and extension mappings in `settings.yaml`
+- Templates stored in `.notebook/templates/*.yaml`
+- Settings in `.notebook/settings.yaml`
 
 To add a new card type:
-1. Add template to `getDefaultTemplates()` in TEMPLATE_SYSTEM (or create `.template.yaml` file)
+1. Add template to `getDefaultTemplates()` in TEMPLATE_SYSTEM (or create `.notebook/templates/*.yaml` file)
 2. Add extension mapping to `getDefaultExtensionRegistry()` if using new file format
 3. Define in template: `schema`, `card.layout`, `viewer.layout`, `editor.fields`, `editor.actions`, `ui`
 
 Card rendering, viewer display, and editing all work automatically via templates.
 
 ### System cards (settings, templates, theme)
-- `settings.yaml` and `*.template.yaml` are system cards with special templates using `yaml` layout
-- **Theme card**: `theme.css` loaded as system card, saving reloads CSS via `loadThemeCss()`
-- **Auto-creation**: `ensureTemplateFiles()` creates `settings.yaml`, `theme.css`, and default template files for new notebooks. `ensureTemplatesForExistingCards()` creates template files only for card types that have cards but missing templates
+- `.notebook/settings.yaml` and `.notebook/templates/*.yaml` are system cards with special templates using `yaml` layout
+- **Theme card**: `.notebook/theme.css` loaded as system card, saving reloads CSS via `loadThemeCss()`
+- **Auto-creation**: `ensureTemplateFiles()` creates `.notebook/` directory structure with settings, theme, and templates for new notebooks. `ensureTemplatesForExistingCards()` creates template files only for card types that have cards but missing templates
 - **Modified indicator**: Template files (note, code, bookmark), README.md, CLAUDE.md, and theme.css show orange "MODIFIED" badge when they differ from defaults. Viewer shows "Show Diff" button (uses jsdiff library), "Merge Defaults" (templates only), and "Reset to Defaults" buttons. Key functions: `isSystemCardModified()`, `getSystemCardDefaultContent()`, `showSystemCardDiff()`, `resetSystemCardDefaults()`
 
 ### Theming
-- `theme.css` in notebook root overrides app styles (loads after built-in CSS)
+- `.notebook/theme.css` overrides app styles (loads after built-in CSS)
 - New notebooks get a minimal starter `theme.css` with documented variables
 - Full reference: `/theme.css` in repo root documents all customizable selectors
-- Demo theme: `examples/demo-notebook/theme.css` shows elaborate theming with textures
+- Demo theme: `examples/demo-notebook/.notebook/theme.css` shows elaborate theming with textures
 - Key function: `getDefaultThemeContent()` generates the starter theme for new notebooks
 
 ### Adding new field types
@@ -134,9 +134,13 @@ data = {
 **Filesystem-based** via File System Access API (Chrome/Edge required):
 ```
 notebook-folder/
-├── settings.yaml
-├── theme.css (optional)
-├── *.template.yaml
+├── .notebook/
+│   ├── settings.yaml           # Notebook settings
+│   ├── theme.css               # Custom styling
+│   └── templates/
+│       ├── note.yaml
+│       ├── code.yaml
+│       └── bookmark.yaml
 ├── CLAUDE.md
 ├── README.md
 ├── research/                    # Section directories at root
@@ -153,7 +157,7 @@ notebook-folder/
 
 **Sections:** Directories at notebook root become sections. Reserved directories (`assets/`, `.git/`, `.notebook/`, `node_modules/`, dotfiles) are excluded.
 
-**System section:** Files at root (settings.yaml, theme.css, templates, CLAUDE.md, README.md) appear in a virtual "System" section configured with `path: '.'` in settings.yaml.
+**System section:** Config files (`.notebook/*`) and root files (CLAUDE.md, README.md) appear in a virtual "System" section. The section's path is normalized to `['.', '.notebook', '.notebook/templates']` on load. Name and path are frozen in the UI; only visibility is editable.
 
 **Why Filesystem?** Claude Code integration, Git versioning, portable files, no size limits.
 
@@ -337,9 +341,9 @@ Note and code cards support an `author` field to track who created them:
 - Set `default_author` in Settings to auto-populate author for new cards created in the UI
 - When creating cards via files, include `author` in frontmatter (see examples above)
 
-**Author icons are configured in `settings.yaml`:**
+**Author icons are configured in `.notebook/settings.yaml`:**
 ```yaml
-# In settings.yaml
+# In .notebook/settings.yaml
 default_author: Claude
 authors:
   - name: Claude
