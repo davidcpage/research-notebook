@@ -66,11 +66,12 @@ sections:
 
 - [x] **1.3 Build table editor for sections**
   - Using existing records editor with updated schema
-  - Columns: Name (text input), Visible (toggle)
+  - Columns: Name (text input), Path (text input, optional), Visible (toggle)
   - Row reordering via up/down buttons
   - "Add Section" button (creates directory immediately)
   - **No delete button** - too destructive for non-empty sections
   - To delete: user removes directory via filesystem, section disappears on reload
+  - **Future:** Could improve to proper table UI, but current records editor is functional
 
 - [x] **1.4 Update filesystem read logic**
   - Scan notebook root for directories (excluding reserved)
