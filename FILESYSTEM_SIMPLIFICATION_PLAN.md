@@ -194,59 +194,50 @@ notebook/
 
 ## Phase 4: Assets as First-Class Citizens
 
-### Current State
-- `assets/thumbnails/` exists but is hidden
-- No way to browse or manage assets in UI
-- No easy way to insert images into markdown
+**Status: COMPLETE** (core features done, media library deferred to future work)
 
-### Target State
-- Assets section showing image/SVG previews
-- Media library modal for browsing and uploading
-- "Insert image" button in markdown editor
+### Current State (After Implementation)
+- Image files displayed as cards with previews
+- Assets directory is a regular section (default invisible)
+- One level of subdirectory support for all sections (including System)
+- Subsection headers are subtle small-caps with light dividers
 
 ### Tasks
 
-- [ ] **4.1 Asset template type**
-  - New template for image files (.png, .jpg, .svg, .gif, .webp)
-  - Card layout: image preview
-  - Viewer layout: full-size image with metadata
+- [x] **4.1 Image template type**
+  - New `image` template for image files (.png, .jpg, .jpeg, .gif, .webp, .svg)
+  - Binary images read as data URLs
+  - Uses existing `image` layout (same as bookmark thumbnails)
+  - Card layout: image preview with placeholder
+  - Viewer layout: full-size image with optional caption
 
-- [ ] **4.2 Assets section configuration**
-  - Default section in settings:
-    ```yaml
-    sections:
-      - id: _assets
-        name: Assets
-        path: assets/
-        visible: false    # hidden by default
-        template: asset   # force asset template for all files
-    ```
-  - Toggle visibility to browse assets
+- [x] **4.2 Assets section configuration**
+  - Removed `assets` from `RESERVED_DIRECTORIES`
+  - Added to default settings: `{ name: 'Assets', path: 'assets', visible: false }`
+  - Toggle visibility in settings to browse assets
 
-- [ ] **4.3 Media library modal**
+- [ ] **4.3 Media library modal** (DEFERRED)
   - Grid view of all images in assets/
   - Drag-drop upload zone
   - Click to select/copy path
-  - Delete action
-  - Filter/search
+  - Can be added later
 
-- [ ] **4.4 Markdown editor integration**
+- [ ] **4.4 Markdown editor integration** (DEFERRED)
   - "Insert image" button in editor toolbar
-  - Opens media library modal
-  - Clicking image inserts `![filename](assets/filename.png)`
-  - Bonus: paste image from clipboard, auto-save to assets
+  - Can be added later
 
-- [ ] **4.5 Subdirectory support for assets**
-  - `assets/thumbnails/` - auto-generated card thumbnails
-  - `assets/images/` - user images
-  - `assets/author-icons/` - already exists
-  - Media library shows folder structure or flattens?
+- [x] **4.5 Subdirectory support (expanded scope)**
+  - **Applies to ALL sections**, not just assets
+  - One level of subdirectories loaded and tracked via `_subdir` field
+  - Items grouped by subdirectory with subtle headers
+  - System section: groups by filename path (root / .notebook / .notebook/templates)
+  - CSS: small-caps headers, light dividers between groups
 
-### Questions/Decisions
+### Resolved Decisions
 
-- [ ] Should assets section be a "real" section or a special virtual one?
-- [ ] Thumbnail generation: keep separate from user assets?
-- [ ] Image optimization on upload? (resize large images)
+- **Assets section**: Real section, not virtual - just another directory
+- **Subdirectories**: Applied to all sections for consistency
+- **Subsection UI**: Subtle small-caps headers, no separate collapse
 
 ---
 
@@ -256,7 +247,7 @@ notebook/
 
 - **Phase 1** is the foundation - do this first (COMPLETE)
 - **Phase 3** builds on Phase 1 (moves config files) (COMPLETE)
-- **Phase 4** is independent and can be done anytime after Phase 1
+- **Phase 4** is independent and can be done anytime after Phase 1 (COMPLETE)
 
 ### Migration Approach
 
@@ -278,6 +269,16 @@ Phase 3 (COMPLETE):
 - [x] Existing notebooks with root config files continue to work
 - [x] Config edits save to `.notebook/` location
 - [x] System section shows files from both locations
+
+Phase 4 (COMPLETE):
+- [x] Image files in assets/ display as cards with previews
+- [x] Assets section appears in settings (default invisible)
+- [x] Toggling Assets visibility shows/hides the section
+- [x] Subdirectories within sections show as subsections
+- [x] System section shows grouped by root/.notebook/.notebook/templates
+- [x] Subsection headers are subtle (small-caps, light dividers)
+- [x] Cards sort by modified date within each subsection
+- [x] New system notes can be created in root or .notebook via location selector
 
 ---
 

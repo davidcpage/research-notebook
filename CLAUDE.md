@@ -87,6 +87,15 @@ When adding field type handling in `renderEditorField()`, check type-specific co
   - Drag handles for row reordering
 - Helper functions: `normalizeSectionsFormat()`, `getSectionNames()`, `getSystemSectionVisible()`
 
+### Image template
+The `image` template supports image files (.png, .jpg, .jpeg, .gif, .webp, .svg):
+- Binary images are read as data URLs via `FileReader.readAsDataURL()`
+- SVG files are read as text and wrapped in a data URL
+- Uses the existing `image` layout (same as bookmark thumbnails)
+- Fields: `title` (derived from filename), `src` (data URL), `alt`, `caption`
+- Images can't be created in the UI (no create button) - they come from the filesystem
+- View Assets section (toggle visibility in settings) to see images in `assets/` directory
+
 ---
 
 ## Architecture
@@ -155,9 +164,11 @@ notebook-folder/
     └── author-icons/
 ```
 
-**Sections:** Directories at notebook root become sections. Reserved directories (`assets/`, `.git/`, `.notebook/`, `node_modules/`, dotfiles) are excluded.
+**Sections:** Directories at notebook root become sections. Reserved directories (`.git/`, `.notebook/`, `node_modules/`, dotfiles) are excluded. The `assets/` directory is a regular section (default invisible).
 
-**System section:** Config files (`.notebook/*`) and root files (CLAUDE.md, README.md) appear in a virtual "System" section. The section's path is normalized to `['.', '.notebook', '.notebook/templates']` on load. Name and path are frozen in the UI; only visibility is editable.
+**Subsections:** Sections support one level of subdirectories. Items are grouped by subdirectory with subtle small-caps headers. Items have `_subdir` field tracking their subdirectory.
+
+**System section:** Config files (`.notebook/*`) and root files (CLAUDE.md, README.md) appear in a virtual "System" section. The section's path is normalized to `['.', '.notebook', '.notebook/templates']` on load. Name and path are frozen in the UI; only visibility is editable. System notes are grouped by filename path (root / .notebook / .notebook/templates). New notes can be created in the System section via the "+ Note" button, with a location selector to choose root, .notebook, or .notebook/templates.
 
 **Why Filesystem?** Claude Code integration, Git versioning, portable files, no size limits.
 

@@ -348,6 +348,33 @@
             display: none;
         }
 
+        /* Subsection headers for grouped items within a section */
+        .subsection-header {
+            grid-column: 1 / -1;
+            font-size: 0.85rem;
+            font-variant: small-caps;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary);
+            padding: 1rem 0 0.5rem;
+            margin-top: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .subsection-header::before,
+        .subsection-header::after {
+            content: '';
+            width: 3rem;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .subsection-header:first-child {
+            margin-top: 0;
+            padding-top: 0;
+        }
+
         .section-toggle {
             background: none;
             border: none;
@@ -577,6 +604,15 @@
             color: var(--text-muted);
             display: flex;
             justify-content: space-between;
+        }
+
+        .card-meta-path {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.7rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 200px;
         }
 
         /* Author Badge */
@@ -1158,6 +1194,29 @@
             font-size: 4rem;
             color: var(--text-muted);
             opacity: 0.3;
+        }
+
+        .viewer-image-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-primary);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .viewer-image-path {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.75rem;
+            background: transparent;
+            color: var(--text-secondary);
+        }
+
+        .viewer-image-size {
+            white-space: nowrap;
         }
 
         .viewer-url {
@@ -2364,8 +2423,8 @@
         let isReloadingFromFilesystem = false;  // Flag to prevent observer triggering during reload
 
         // Reserved directory names (excluded from section auto-discovery)
+        // Note: 'assets' is NOT reserved - it's a regular section (default invisible)
         const RESERVED_DIRECTORIES = new Set([
-            'assets',
             '.notebook',
             '.git',
             'node_modules'
@@ -2447,7 +2506,14 @@
                 '.card.yaml': {
                     parser: 'yaml',
                     defaultTemplate: null  // Must specify template: in file
-                }
+                },
+                // Image files - loaded as binary data URLs
+                '.png': { parser: 'binary-image', defaultTemplate: 'image' },
+                '.jpg': { parser: 'binary-image', defaultTemplate: 'image' },
+                '.jpeg': { parser: 'binary-image', defaultTemplate: 'image' },
+                '.gif': { parser: 'binary-image', defaultTemplate: 'image' },
+                '.webp': { parser: 'binary-image', defaultTemplate: 'image' },
+                '.svg': { parser: 'text-image', defaultTemplate: 'image' }
             };
         }
 
@@ -2715,6 +2781,48 @@
                         show_create_button: false,
                         sort_order: 97
                     }
+                },
+                image: {
+                    name: 'image',
+                    description: 'Image file (PNG, JPG, SVG, GIF, WebP)',
+                    schema: {
+                        title: { type: 'text', required: true },  // filename with extension
+                        path: { type: 'text' },  // relative path (e.g., assets/thumbnails/img.png)
+                        filesize: { type: 'text' },  // human-readable size (e.g., "124 KB")
+                        src: { type: 'text', required: true },
+                        alt: { type: 'text' },
+                        caption: { type: 'markdown' }
+                    },
+                    card: {
+                        layout: 'image',
+                        preview_field: 'src',
+                        placeholder: '🖼️'
+                    },
+                    viewer: {
+                        layout: 'image',
+                        image_field: 'src',
+                        content_field: 'caption'
+                    },
+                    editor: {
+                        fields: [
+                            { field: 'title', label: 'Filename' },
+                            { field: 'path', label: 'Path', readonly: true },
+                            { field: 'filesize', label: 'Size', readonly: true },
+                            { field: 'alt', label: 'Alt Text' },
+                            { field: 'caption', label: 'Caption', multiline: true, rows: 3 }
+                        ]
+                    },
+                    style: {
+                        variables: {
+                            '--preview-bg': '#f5f5f5'
+                        }
+                    },
+                    ui: {
+                        button_label: 'Image',
+                        icon: '🖼️',
+                        show_create_button: false,
+                        sort_order: 96
+                    }
                 }
             };
         }
@@ -2911,7 +3019,11 @@
         const SETTINGS_SCHEMA = {
             notebook_title: { default: 'Research Notebook' },
             notebook_subtitle: { default: 'Bookmarks, notes, and connections' },
-            sections: { default: [{ name: 'research', visible: true }, { name: 'System', path: '.', visible: false }] },
+            sections: { default: [
+                { name: 'research', visible: true },
+                { name: 'Assets', path: 'assets', visible: false },
+                { name: 'System', path: '.', visible: false }
+            ] },
             default_author: { default: null },
             authors: { default: [{ name: 'Claude', icon: 'claude.svg' }] },
             extensions: { default: () => getDefaultExtensionRegistry() },
@@ -3992,7 +4104,20 @@
             const created = card.created || card.modified;
             const modified = card.modified;
 
-            let meta = `<span>${formatDate(created)}</span>`;
+            let meta = '';
+
+            // For image cards, show path and filesize instead of dates
+            if (card.template === 'image' || card.type === 'image') {
+                if (card.path) {
+                    meta += `<span class="card-meta-path">${escapeHtml(card.path)}</span>`;
+                }
+                if (card.filesize) {
+                    meta += `<span>${escapeHtml(card.filesize)}</span>`;
+                }
+                return meta || `<span>${formatDate(created)}</span>`;
+            }
+
+            meta = `<span>${formatDate(created)}</span>`;
             if (modified && created && modified !== created) {
                 meta += `<span>Updated ${formatDate(modified)}</span>`;
             }
@@ -4170,6 +4295,18 @@
                 html += `<div class="viewer-thumbnail"><img src="${escapeHtml(src)}" alt="" onerror="this.parentElement.innerHTML='<div class=\\'placeholder\\'>🔗</div>'"></div>`;
             } else {
                 html += '<div class="viewer-thumbnail"><div class="placeholder">🔗</div></div>';
+            }
+
+            // For image cards, show path and filesize
+            if (card.path || card.filesize) {
+                html += '<div class="viewer-image-meta">';
+                if (card.path) {
+                    html += `<code class="viewer-image-path">${escapeHtml(card.path)}</code>`;
+                }
+                if (card.filesize) {
+                    html += `<span class="viewer-image-size">${escapeHtml(card.filesize)}</span>`;
+                }
+                html += '</div>';
             }
 
             if (url) {
@@ -4744,6 +4881,44 @@
                     </select>
                 `;
                 bodyEl.appendChild(sectionGroup);
+
+                // Subdirectory selector (if section has subdirectories)
+                const section = data.sections.find(s => s.id === sectionId);
+                const subdirs = section ? [...new Set(section.items.map(i => i._subdir).filter(Boolean))].sort() : [];
+                if (subdirs.length > 0) {
+                    const subdirGroup = document.createElement('div');
+                    subdirGroup.className = 'form-group';
+                    const currentSubdir = card?._subdir || '';
+                    subdirGroup.innerHTML = `
+                        <label for="editorSubdir">Subdirectory</label>
+                        <select id="editorSubdir">
+                            <option value="" ${!currentSubdir ? 'selected' : ''}>(root)</option>
+                            ${subdirs.map(sd => `
+                                <option value="${escapeHtml(sd)}" ${sd === currentSubdir ? 'selected' : ''}>${escapeHtml(sd)}</option>
+                            `).join('')}
+                        </select>
+                    `;
+                    bodyEl.appendChild(subdirGroup);
+                }
+            } else {
+                // System section: show location selector using standard subdirectory UI
+                // Get subdirs from existing system notes using getSystemSubdir()
+                const systemSubdirs = [...new Set(data.systemNotes.map(n => getSystemSubdir(n)))].sort();
+                // Ensure all standard locations are available
+                const allLocations = [...new Set(['root', '.notebook', '.notebook/templates', ...systemSubdirs])].sort();
+                const currentSubdir = card ? getSystemSubdir(card) : 'root';
+
+                const subdirGroup = document.createElement('div');
+                subdirGroup.className = 'form-group';
+                subdirGroup.innerHTML = `
+                    <label for="editorSubdir">Location</label>
+                    <select id="editorSubdir">
+                        ${allLocations.map(loc => `
+                            <option value="${escapeHtml(loc)}" ${loc === currentSubdir ? 'selected' : ''}>${escapeHtml(loc)}</option>
+                        `).join('')}
+                    </select>
+                `;
+                bodyEl.appendChild(subdirGroup);
             }
 
             // Render each field from template.editor.fields
@@ -5138,6 +5313,12 @@
                 inputEl.id = `editor-${field}`;
                 inputEl.placeholder = label;
                 inputEl.value = value || '';
+                if (fieldConfig.readonly) {
+                    inputEl.readOnly = true;
+                    inputEl.style.background = 'var(--bg-secondary)';
+                    inputEl.style.color = 'var(--text-muted)';
+                    inputEl.style.cursor = 'default';
+                }
                 div.appendChild(inputEl);
             }
 
@@ -5683,6 +5864,11 @@
             const sectionSelect = document.getElementById('editorSection');
             const newSectionId = sectionSelect ? sectionSelect.value : sectionId;
 
+            // Get selected subdirectory (if any)
+            const subdirSelect = document.getElementById('editorSubdir');
+            const newSubdir = subdirSelect ? (subdirSelect.value || null) : (card._subdir || null);
+            cardData._subdir = newSubdir;
+
             // Set timestamps
             const now = new Date().toISOString();
             if (isNew) {
@@ -5728,12 +5914,15 @@
             try {
                 // Handle system notes
                 if (sectionId === '_system') {
+                    cardData.system = true;
                     const idx = data.systemNotes.findIndex(n => n.id === card.id);
                     if (idx >= 0) {
-                        // Preserve system note properties
-                        cardData.system = true;
+                        // Update existing system note
                         cardData.filename = card.filename;
                         data.systemNotes[idx] = { ...data.systemNotes[idx], ...cardData };
+                    } else {
+                        // Add new system note
+                        data.systemNotes.push(cardData);
                     }
                     await saveData();
                     await saveCardFile('_system', cardData);
@@ -6359,15 +6548,26 @@ sections:
                 }
 
                 // Helper function to load cards from a section directory
-                async function loadSectionItems(sectionHandle, sectionDirName) {
+                // subdir parameter is for one-level-deep subdirectory loading
+                async function loadSectionItems(sectionHandle, sectionDirName, subdir = null) {
                     const items = [];
 
-                    // First pass: collect all files and identify companion files
+                    // First pass: collect all files, directories, and identify companion files
                     const files = {};
+                    const subdirs = {};
                     const companionFiles = {};
-                    for await (const [filename, fileHandle] of sectionHandle.entries()) {
-                        if (fileHandle.kind !== 'file') continue;
-                        if (filename.startsWith('_')) continue;  // Skip metadata files
+                    for await (const [name, handle] of sectionHandle.entries()) {
+                        if (name.startsWith('_') || name.startsWith('.')) continue;  // Skip metadata/hidden files
+
+                        if (handle.kind === 'directory') {
+                            // Only process subdirectories from root level (one level deep)
+                            if (!subdir) {
+                                subdirs[name] = handle;
+                            }
+                            continue;
+                        }
+
+                        if (handle.kind !== 'file') continue;
 
                         // Check if this is a companion file (e.g., .output.html)
                         let isCompanion = false;
@@ -6375,15 +6575,15 @@ sections:
                             const config = extensionRegistry[ext];
                             if (config.companionFiles) {
                                 for (const companion of config.companionFiles) {
-                                    if (filename.endsWith(companion.suffix)) {
+                                    if (name.endsWith(companion.suffix)) {
                                         // Store companion content by base filename
-                                        const baseFilename = filename.slice(0, -companion.suffix.length) + ext;
+                                        const baseFilename = name.slice(0, -companion.suffix.length) + ext;
                                         if (!companionFiles[baseFilename]) companionFiles[baseFilename] = {};
                                         try {
-                                            const file = await fileHandle.getFile();
+                                            const file = await handle.getFile();
                                             companionFiles[baseFilename][companion.field] = await file.text();
                                         } catch (e) {
-                                            console.warn(`[Filesystem] Error reading companion file ${filename}:`, e);
+                                            console.warn(`[Filesystem] Error reading companion file ${name}:`, e);
                                         }
                                         isCompanion = true;
                                         break;
@@ -6394,7 +6594,7 @@ sections:
                         }
 
                         if (!isCompanion) {
-                            files[filename] = fileHandle;
+                            files[name] = handle;
                         }
                     }
 
@@ -6435,6 +6635,56 @@ sections:
                                 }
                             }
 
+                            // Check for image files (need binary reading, not text)
+                            const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
+                            const isImage = imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+
+                            if (isImage) {
+                                // Read image as data URL
+                                const reader = new FileReader();
+                                const dataUrl = await new Promise((resolve, reject) => {
+                                    reader.onload = () => resolve(reader.result);
+                                    reader.onerror = reject;
+                                    reader.readAsDataURL(file);
+                                });
+
+                                // Format filesize for display
+                                const formatFileSize = (bytes) => {
+                                    if (bytes < 1024) return bytes + ' B';
+                                    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                                    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                                };
+
+                                // Build relative path: section/subdir/filename or section/filename
+                                const relativePath = subdir
+                                    ? `${sectionDirName}/${subdir}/${filename}`
+                                    : `${sectionDirName}/${filename}`;
+
+                                // Create image card directly (no frontmatter to parse)
+                                const card = {
+                                    id: `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                    template: 'image',
+                                    type: 'image',
+                                    title: filename,  // Full filename with extension
+                                    path: relativePath,  // Relative path for referencing
+                                    filesize: formatFileSize(file.size),
+                                    src: dataUrl,
+                                    _subdir: subdir,  // Track subdirectory
+                                    _source: {
+                                        filename,
+                                        format: filename.toLowerCase().endsWith('.svg') ? 'text-image' : 'binary-image',
+                                        section: sectionDirName,
+                                        subdir: subdir,
+                                        extension: filename.match(/\.[^.]+$/)?.[0]?.toLowerCase() || ''
+                                    },
+                                    _fileModified: file.lastModified,
+                                    modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
+                                };
+                                items.push(card);
+                                console.log(`[Filesystem] Loaded image: ${subdir ? subdir + '/' : ''}${filename}`);
+                                continue;
+                            }
+
                             // Use generic loadCard function
                             const card = loadCard(filename, content, sectionDirName, companionData);
                             if (card) {
@@ -6442,12 +6692,25 @@ sections:
                                 if (companionData.thumbnail) {
                                     card.thumbnail = companionData.thumbnail;
                                 }
-                                // Store file modified time for sorting
+                                // Store subdirectory and file modified time
+                                card._subdir = subdir;
+                                if (card._source) {
+                                    card._source.subdir = subdir;
+                                }
                                 card._fileModified = file.lastModified;
                                 items.push(card);
                             }
                         } catch (e) {
                             console.error(`[Filesystem] Error reading ${filename}:`, e);
+                        }
+                    }
+
+                    // Third pass: recursively load from subdirectories (one level only)
+                    for (const [subdirName, subdirHandle] of Object.entries(subdirs)) {
+                        const subdirItems = await loadSectionItems(subdirHandle, sectionDirName, subdirName);
+                        items.push(...subdirItems);
+                        if (subdirItems.length > 0) {
+                            console.log(`[Filesystem] Loaded ${subdirItems.length} items from ${sectionDirName}/${subdirName}/`);
                         }
                     }
 
@@ -6493,11 +6756,17 @@ sections:
                 const matchedSettings = new Set();
 
                 for (const [dirName, { handle }] of discoveredSections) {
+                    // Special defaults for known directories
+                    const knownDirectoryDefaults = {
+                        'assets': { name: 'Assets', visible: false }
+                    };
+                    const defaults = knownDirectoryDefaults[dirName] || { name: dirName, visible: true };
+
                     const section = {
                         id: 'section-' + dirName,  // Stable ID based on directory name
-                        name: dirName,  // Default to directory name
+                        name: defaults.name,  // Default to directory name (or known name)
                         items: [],
-                        visible: true,  // Default visible
+                        visible: defaults.visible,  // Default visible (or known default)
                         _dirName: dirName  // Store for filesystem operations
                     };
 
@@ -6512,7 +6781,7 @@ sections:
                         matchedSettings.add(settingsRecord);
                         if (typeof settingsRecord === 'object') {
                             // Use display name from settings
-                            section.name = settingsRecord.name || dirName;
+                            section.name = settingsRecord.name || defaults.name;
                             section.visible = settingsRecord.visible !== false;
                             section._settingsIndex = index;
                         }
@@ -6946,16 +7215,37 @@ sections:
                 return;
             }
 
-            // System notes are handled specially (saved at root with raw content)
+            // System notes are handled specially (saved with raw content)
             if (sectionId === '_system' && card.system) {
-                const filename = card.filename || (card.title + '.md');
-                const fileHandle = await notebookDirHandle.getFileHandle(filename, { create: true });
+                const baseFilename = card.filename
+                    ? card.filename.split('/').pop()  // Get just the filename part if path included
+                    : (card.title + '.md');
+
+                let targetDir, savedPath;
+
+                // Handle location selection: 'root', '.notebook', '.notebook/templates', or null
+                if (card._subdir === '.notebook/templates') {
+                    // Save to .notebook/templates/ directory
+                    targetDir = await getNotebookTemplatesDir(notebookDirHandle, true);
+                    savedPath = `.notebook/templates/${baseFilename}`;
+                } else if (card._subdir === '.notebook') {
+                    // Save to .notebook/ directory
+                    targetDir = await getNotebookConfigDir(notebookDirHandle, true);
+                    savedPath = `.notebook/${baseFilename}`;
+                } else {
+                    // Save to root (includes 'root' value and null/undefined)
+                    targetDir = notebookDirHandle;
+                    savedPath = baseFilename;
+                }
+
+                const fileHandle = await targetDir.getFileHandle(baseFilename, { create: true });
                 const writable = await fileHandle.createWritable();
                 await writable.write(card.content);
                 await writable.close();
-                card.filename = filename;
-                card.id = 'system-' + filename;
-                recordSave(filename);
+                card.filename = savedPath;
+                card.id = 'system-' + savedPath.replace('/', '-');
+                recordSave(savedPath);
+                console.log('[Filesystem] Saved system note:', savedPath);
                 return;
             }
 
@@ -6982,6 +7272,12 @@ sections:
                 }
                 sectionDir = sectionInfo.handle;
                 sectionPath = sectionInfo.path;
+            }
+
+            // Handle subdirectory if specified
+            if (card._subdir) {
+                sectionDir = await sectionDir.getDirectoryHandle(card._subdir, { create: true });
+                sectionPath = `${sectionPath}/${card._subdir}`;
             }
 
             // Use serializeCard to get the file content and extension
@@ -8357,6 +8653,65 @@ sys.stderr = sys.__stderr__
             }).join('');
         }
 
+        // Helper: render items grouped by subdirectory with subsection headers
+        // getSubdir is a function that extracts subdirectory from an item
+        function renderItemsWithSubsections(items, sectionId, getSubdir = item => item._subdir || null) {
+            if (items.length === 0) {
+                return '<p style="color: var(--text-muted); grid-column: 1/-1;">No items yet. Add a bookmark, note, or code!</p>';
+            }
+
+            // Group items by subdirectory
+            const itemsBySubdir = new Map();
+            items.forEach(item => {
+                const subdir = getSubdir(item);
+                if (!itemsBySubdir.has(subdir)) {
+                    itemsBySubdir.set(subdir, []);
+                }
+                itemsBySubdir.get(subdir).push(item);
+            });
+
+            // Sort items within each group by modified date
+            const sortByModified = (a, b) => {
+                const aTime = a.modified ? new Date(a.modified).getTime() : 0;
+                const bTime = b.modified ? new Date(b.modified).getTime() : 0;
+                return bTime - aTime;
+            };
+
+            // Build HTML with subsection headers
+            let html = '';
+
+            // Render root items first (no subdirectory)
+            const rootItems = itemsBySubdir.get(null) || [];
+            if (rootItems.length > 0) {
+                html += rootItems.sort(sortByModified).map(item => renderCard(sectionId, item)).join('');
+            }
+
+            // Render each subdirectory group with a header
+            // Sort alphabetically, but put 'root' first (for System section)
+            const subdirs = [...itemsBySubdir.keys()].filter(k => k !== null).sort((a, b) => {
+                if (a === 'root') return -1;
+                if (b === 'root') return 1;
+                return a.localeCompare(b);
+            });
+            for (const subdir of subdirs) {
+                const subdirItems = itemsBySubdir.get(subdir);
+                if (subdirItems.length > 0) {
+                    html += `<div class="subsection-header">${escapeHtml(subdir)}</div>`;
+                    html += subdirItems.sort(sortByModified).map(item => renderCard(sectionId, item)).join('');
+                }
+            }
+
+            return html;
+        }
+
+        // Helper: derive subdirectory from system note filename
+        function getSystemSubdir(note) {
+            const filename = note.filename || '';
+            if (filename.startsWith('.notebook/templates/')) return '.notebook/templates';
+            if (filename.startsWith('.notebook/')) return '.notebook';
+            return 'root';  // Root files (CLAUDE.md, README.md, etc.)
+        }
+
         // Render the UI
         function render() {
             // Update header and page title with current title and subtitle
@@ -8405,15 +8760,7 @@ sys.stderr = sys.__stderr__
                         </div>
                     </div>
                     <div class="items-grid ${isCollapsed ? 'collapsed' : ''}">
-                        ${itemCount === 0 ?
-                            '<p style="color: var(--text-muted); grid-column: 1/-1;">No items yet. Add a bookmark, note, or code!</p>' :
-                            [...section.items].sort((a, b) => {
-                                // Sort by modified time descending (most recent first)
-                                const aTime = a.modified ? new Date(a.modified).getTime() : 0;
-                                const bTime = b.modified ? new Date(b.modified).getTime() : 0;
-                                return bTime - aTime;
-                            }).map(item => renderCard(section.id, item)).join('')
-                        }
+                        ${renderItemsWithSubsections(section.items, section.id)}
                     </div>
                 </div>
             `}).join('');
@@ -8438,11 +8785,7 @@ sys.stderr = sys.__stderr__
                         </div>
                     </div>
                     <div class="items-grid ${isCollapsed ? 'collapsed' : ''}">
-                        ${[...data.systemNotes].sort((a, b) => {
-                            const aTime = a.modified ? new Date(a.modified).getTime() : 0;
-                            const bTime = b.modified ? new Date(b.modified).getTime() : 0;
-                            return bTime - aTime;
-                        }).map(note => renderCard('_system', note)).join('')}
+                        ${renderItemsWithSubsections(data.systemNotes, '_system', getSystemSubdir)}
                     </div>
                 </div>
                 `;
