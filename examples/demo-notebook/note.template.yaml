@@ -4,6 +4,8 @@ schema:
   title:
     type: text
     required: true
+  author:
+    type: text
   content:
     type: markdown
     required: true
@@ -22,6 +24,8 @@ editor:
   fields:
     - field: title
       label: Title
+    - field: author
+      label: Author
     - field: content
       label: Content
       multiline: true
@@ -32,5 +36,5 @@ style:
     "--preview-bg": "#f0ebe0"
 ui:
   button_label: Note
-  icon: 😻
+  icon: 📝
   sort_order: 1

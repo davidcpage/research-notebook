@@ -6,20 +6,23 @@ This folder contains a Research Notebook - a collection of notes, code snippets,
 
 ```
 notebook-folder/
-├── settings.yaml           # Notebook metadata (title, subtitle, sections)
-├── theme.css               # Optional: Custom CSS theme
+├── settings.yaml           # Notebook settings (title, subtitle, sections)
+├── theme.css               # Custom CSS theme (optional)
+├── *.template.yaml         # Card type templates (note, code, bookmark)
 ├── README.md               # This file
 ├── CLAUDE.md               # Instructions for Claude Code
-├── sections/
-│   └── section-name/
-│       ├── _section.json   # Section metadata
-│       ├── note-title.md   # Markdown note with YAML frontmatter
-│       ├── code-title.code.py     # Python code with comment frontmatter
-│       ├── code-title.output.html # Code execution output (auto-generated)
-│       └── bookmark.bookmark.json # Bookmark metadata
+├── research/               # Section directory (example)
+│   ├── note-title.md       # Markdown note with YAML frontmatter
+│   ├── code-title.code.py  # Python code with comment frontmatter
+│   └── code-title.output.html  # Code execution output (auto-generated)
+├── references/             # Another section (example)
+│   └── bookmark.bookmark.json  # Bookmark metadata
 └── assets/
-    └── thumbnails/         # Bookmark thumbnail images
+    ├── thumbnails/         # Bookmark thumbnail images
+    └── author-icons/       # Author icon SVGs
 ```
+
+**Note:** Sections are directories at the root level. The directory name becomes the section slug.
 
 ## File Formats
 
@@ -64,7 +67,7 @@ JSON files with URL and metadata:
   "title": "Example Site",
   "url": "https://example.com",
   "description": "Description here",
-  "thumbnail": "../../assets/thumbnails/ghi789.png",
+  "thumbnail": "../assets/thumbnails/ghi789.png",
   "created": "2024-01-15T10:30:00Z",
   "modified": "2024-01-20T14:22:00Z"
 }
@@ -85,14 +88,8 @@ git add .
 git commit -m "Add notes on transformers"
 
 # View history of a specific note
-git log --oneline sections/papers/attention-mechanisms.md
+git log --oneline research/attention-mechanisms.md
 ```
-
-## Internal Links
-
-Notes support wiki-style internal links:
-- `[[Section Name > Item Title]]` - Links to another item
-- Links work across notes, code, and bookmarks
 
 ## Custom Themes
 
@@ -108,6 +105,13 @@ See `theme.css` for documented examples of:
 - Global CSS variable overrides
 - Card-specific styles using `[data-template="note"]` selectors
 - Viewer modal customization
+
+
+## Internal Links
+
+Notes support wiki-style internal links:
+- `[[Section Name > Item Title]]` - Links to another item
+- Links work across notes, code, and bookmarks
 
 ## Opening the Notebook
 

@@ -2,7 +2,10 @@
 id: note-markdown-formatting
 title: Markdown & LaTeX Support
 created: 2024-12-08T09:00:00Z
-modified: 2024-12-08T09:00:00Z
+modified: 2025-12-12T11:09:08.818Z
+sectionId: section-1765184609815
+template: note
+author: Claude Opus
 ---
 
 # Writing Notes

@@ -67,7 +67,7 @@ Card rendering, viewer display, and editing all work automatically via templates
 - `settings.yaml` and `*.template.yaml` are system cards with special templates using `yaml` layout
 - **Theme card**: `theme.css` loaded as system card, saving reloads CSS via `loadThemeCss()`
 - **Auto-creation**: `ensureTemplateFiles()` creates `settings.yaml`, `theme.css`, and default template files for new notebooks. `ensureTemplatesForExistingCards()` creates template files only for card types that have cards but missing templates
-- **Modified indicator**: Template files (note, code, bookmark), README.md, and CLAUDE.md show orange "MODIFIED" badge when they differ from defaults. Viewer shows "Show Diff" button (uses jsdiff library), "Merge Defaults" (templates only), and "Reset to Defaults" buttons. Key functions: `isSystemCardModified()`, `getSystemCardDefaultContent()`, `showSystemCardDiff()`, `resetSystemCardDefaults()`
+- **Modified indicator**: Template files (note, code, bookmark), README.md, CLAUDE.md, and theme.css show orange "MODIFIED" badge when they differ from defaults. Viewer shows "Show Diff" button (uses jsdiff library), "Merge Defaults" (templates only), and "Reset to Defaults" buttons. Key functions: `isSystemCardModified()`, `getSystemCardDefaultContent()`, `showSystemCardDiff()`, `resetSystemCardDefaults()`
 
 ### Theming
 - `theme.css` in notebook root overrides app styles (loads after built-in CSS)

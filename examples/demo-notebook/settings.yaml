@@ -1,10 +1,12 @@
 notebook_title: Research Notebook
 notebook_subtitle: Bookmarks, notes, and connections
 sections:
-  - name: research
+  - name: Research
     visible: true
-  - name: _system
-    visible: true
+default_author: ""
+authors:
+  - name: Claude Opus
+    icon: claude.svg
 extensions:
   .md:
     parser: yaml-frontmatter
@@ -23,4 +25,4 @@ extensions:
   .card.yaml:
     parser: yaml
     defaultTemplate: null
-theme: null
+theme: ""

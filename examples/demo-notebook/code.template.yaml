@@ -4,6 +4,8 @@ schema:
   title:
     type: text
     required: true
+  author:
+    type: text
   code:
     type: code
     language: python
@@ -38,6 +40,8 @@ editor:
   fields:
     - field: title
       label: Title
+    - field: author
+      label: Author
     - field: code
       label: Code
       multiline: true
@@ -49,8 +53,7 @@ editor:
       icon: ▶
 style:
   variables:
-    "--preview-bg": "#f8faf8"
-    "--code-bg": "#f5f5f5"
+    "--card-bg": "#f8faf8"
 ui:
   button_label: Code
   icon: 🐍

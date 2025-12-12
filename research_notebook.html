@@ -2307,6 +2307,14 @@
         let filesystemObserver = null;  // FileSystemObserver instance for watching changes
         let isReloadingFromFilesystem = false;  // Flag to prevent observer triggering during reload
 
+        // Reserved directory names (excluded from section auto-discovery)
+        const RESERVED_DIRECTORIES = new Set([
+            'assets',
+            '.notebook',
+            '.git',
+            'node_modules'
+        ]);
+
         // Author registry (loaded from settings.yaml authors field)
         // Maps author names (lowercase) to icon SVG content
         let authorRegistry = {};
@@ -2503,9 +2511,10 @@
                         sections: {
                             type: 'records',
                             allowDelete: false,
-                            allowAdd: false,
+                            allowAdd: true,
                             schema: {
-                                name: { type: 'text', readOnly: true },
+                                name: { type: 'text', label: 'Name' },
+                                path: { type: 'text', label: 'Path', placeholder: '(auto from name)' },
                                 visible: { type: 'boolean', default: true, label: 'Visible' }
                             }
                         },
@@ -5753,17 +5762,18 @@ notebook-folder/
 ├── *.template.yaml         # Card type templates (note, code, bookmark)
 ├── README.md               # This file
 ├── CLAUDE.md               # Instructions for Claude Code
-├── sections/
-│   └── section-name/
-│       ├── _section.json   # Section metadata
-│       ├── note-title.md   # Markdown note with YAML frontmatter
-│       ├── code-title.code.py     # Python code with comment frontmatter
-│       ├── code-title.output.html # Code execution output (auto-generated)
-│       └── bookmark.bookmark.json # Bookmark metadata
+├── research/               # Section directory (example)
+│   ├── note-title.md       # Markdown note with YAML frontmatter
+│   ├── code-title.code.py  # Python code with comment frontmatter
+│   └── code-title.output.html  # Code execution output (auto-generated)
+├── references/             # Another section (example)
+│   └── bookmark.bookmark.json  # Bookmark metadata
 └── assets/
     ├── thumbnails/         # Bookmark thumbnail images
     └── author-icons/       # Author icon SVGs
 \`\`\`
+
+**Note:** Sections are directories at the root level. The directory name becomes the section slug.
 
 ## File Formats
 
@@ -5808,7 +5818,7 @@ JSON files with URL and metadata:
   "title": "Example Site",
   "url": "https://example.com",
   "description": "Description here",
-  "thumbnail": "../../assets/thumbnails/ghi789.png",
+  "thumbnail": "../assets/thumbnails/ghi789.png",
   "created": "2024-01-15T10:30:00Z",
   "modified": "2024-01-20T14:22:00Z"
 }
@@ -5829,7 +5839,7 @@ git add .
 git commit -m "Add notes on transformers"
 
 # View history of a specific note
-git log --oneline sections/papers/attention-mechanisms.md
+git log --oneline research/attention-mechanisms.md
 \`\`\`
 
 ## Internal Links
@@ -5850,6 +5860,22 @@ Open \`research_notebook.html\` in Chrome/Edge and select this folder when promp
 
 This folder is a Research Notebook that stores notes, code, and bookmarks as plain files. You can read and edit these files directly.
 
+## Directory Structure
+
+Sections are directories at the root level. Each section directory contains cards (notes, code, bookmarks).
+
+\`\`\`
+notebook/
+├── settings.yaml           # Notebook settings
+├── research/               # Section directory
+│   ├── my-note.md
+│   └── analysis.code.py
+├── references/             # Another section
+│   └── paper.bookmark.json
+└── assets/
+    └── thumbnails/         # Auto-generated thumbnails
+\`\`\`
+
 ## Quick Reference
 
 | Type | Extension | Format |
@@ -5863,23 +5889,23 @@ This folder is a Research Notebook that stores notes, code, and bookmarks as pla
 ## Reading Items
 
 \`\`\`bash
-# List all sections
-ls sections/
+# List all sections (directories at root, excluding assets)
+ls -d */
 
 # Read a note
-cat sections/papers/attention-mechanisms.md
+cat research/attention-mechanisms.md
 
 # Read code
-cat sections/ideas/analysis.code.py
+cat ideas/analysis.code.py
 
 # Search across all notes
-grep -r "transformer" sections/ --include="*.md"
+grep -r "transformer" --include="*.md"
 \`\`\`
 
 ## Creating Items
 
 ### New Note
-Create \`sections/{section-name}/{slug}.md\`:
+Create \`{section}/{slug}.md\`:
 
 \`\`\`markdown
 ---
@@ -5893,7 +5919,7 @@ Your markdown content here...
 \`\`\`
 
 ### New Code
-Create \`sections/{section-name}/{slug}.code.py\`:
+Create \`{section}/{slug}.code.py\`:
 
 \`\`\`python
 # ---
@@ -5907,16 +5933,17 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 \`\`\`
 
 ### New Section
-1. Create directory: \`sections/{section-slug}/\`
-2. Create \`sections/{section-slug}/_section.json\`:
+1. Create directory at root: \`mkdir {section-slug}\`
+2. Add to \`settings.yaml\` sections array with name and visible fields
 
-\`\`\`json
-{
-  "name": "Section Display Name",
-  "id": "section-1733329200002"
-}
+Example in settings.yaml:
+\`\`\`yaml
+sections:
+  - name: Research
+    visible: true
+  - name: References
+    visible: true
 \`\`\`
-3. Add section slug to \`settings.yaml\` sections array
 
 ## Editing Items
 
@@ -5931,21 +5958,21 @@ Create \`sections/{section-name}/{slug}.code.py\`:
 - **Timestamps**: ISO format, milliseconds optional (e.g., \`2024-01-15T10:30:00Z\` or \`2024-01-15T10:30:00.000Z\`)
 - **Don't edit**: \`.output.html\` files (auto-generated when code runs)
 - **Internal links**: Use \`[[Section Name > Item Title]]\` syntax in markdown
-- **Thumbnails**: Bookmarks can reference \`../../assets/thumbnails/{id}.png\`
+- **Thumbnails**: Bookmarks can reference \`../assets/thumbnails/{id}.png\`
 
 ## Common Tasks
 
 **Add a note summarizing a paper:**
-> Create a new .md file in sections/papers/ with frontmatter and markdown content
+> Create a new .md file in papers/ with frontmatter and markdown content
 
 **Search for all mentions of a topic:**
-> grep -r "attention" sections/ --include="*.md" --include="*.code.py"
+> grep -r "attention" --include="*.md" --include="*.code.py"
 
 **List all items in a section:**
-> ls sections/papers/
+> ls research/
 
 **Find items modified recently:**
-> find sections/ -name "*.md" -mtime -7
+> find . -name "*.md" -mtime -7
 `;
         }
 
@@ -6157,35 +6184,9 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                     }
                 }
 
-                // Read sections directory
-                let sectionsDir;
-                try {
-                    sectionsDir = await dirHandle.getDirectoryHandle('sections');
-                } catch (e) {
-                    console.log('[Filesystem] No sections directory found');
-                    return loadedData;
-                }
-
-                // Iterate through section directories
-                for await (const [sectionName, sectionHandle] of sectionsDir.entries()) {
-                    if (sectionHandle.kind !== 'directory') continue;
-
-                    const section = {
-                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                        name: sectionName,
-                        items: []
-                    };
-
-                    // Try to read section metadata for display name
-                    try {
-                        const sectionMetaFile = await sectionHandle.getFileHandle('_section.json');
-                        const file = await sectionMetaFile.getFile();
-                        const sectionMeta = JSON.parse(await file.text());
-                        section.name = sectionMeta.name || sectionName;
-                        section.id = sectionMeta.id || section.id;
-                    } catch (e) {
-                        // No metadata file, use directory name
-                    }
+                // Helper function to load cards from a section directory
+                async function loadSectionItems(sectionHandle, sectionDirName) {
+                    const items = [];
 
                     // First pass: collect all files and identify companion files
                     const files = {};
@@ -6261,38 +6262,145 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                             }
 
                             // Use generic loadCard function
-                            const card = loadCard(filename, content, sectionName, companionData);
+                            const card = loadCard(filename, content, sectionDirName, companionData);
                             if (card) {
                                 // Apply thumbnail from companion data if loaded
                                 if (companionData.thumbnail) {
                                     card.thumbnail = companionData.thumbnail;
                                 }
-                                section.items.push(card);
+                                // Store file modified time for sorting
+                                card._fileModified = file.lastModified;
+                                items.push(card);
                             }
                         } catch (e) {
                             console.error(`[Filesystem] Error reading ${filename}:`, e);
                         }
                     }
 
-                    if (section.items.length > 0 || true) {  // Include empty sections too
-                        loadedData.sections.push(section);
-                    }
+                    return items;
                 }
+
+                // Discover section directories at root (excluding reserved names)
+                const discoveredSections = new Map(); // dirName -> { handle }
+
+                for await (const [name, handle] of dirHandle.entries()) {
+                    if (handle.kind !== 'directory') continue;
+                    if (name.startsWith('.')) continue;  // Skip dotfiles/dotdirs
+                    if (RESERVED_DIRECTORIES.has(name)) continue;
+
+                    discoveredSections.set(name, { handle });
+                }
+
+                console.log(`[Filesystem] Discovered ${discoveredSections.size} section directories`);
+
+                // Load sections and match to settings
+                // Filter out _system from settings (it's a virtual section for system notes)
+                const sectionsFromSettings = (notebookSettings?.sections || []).filter(s => {
+                    const name = typeof s === 'string' ? s : s.name;
+                    return name && !name.startsWith('_');
+                });
+
+                // Build lookup maps for matching directories to settings
+                const settingsByPath = new Map(); // path -> settings record
+                const settingsBySlug = new Map(); // slugified name -> settings record
+                sectionsFromSettings.forEach((s, i) => {
+                    if (typeof s === 'object') {
+                        // Use explicit path if provided, otherwise slugified name
+                        const path = s.path || slugify(s.name);
+                        settingsByPath.set(path, { record: s, index: i });
+                        settingsBySlug.set(slugify(s.name), { record: s, index: i });
+                    } else {
+                        settingsBySlug.set(slugify(s), { record: s, index: i });
+                    }
+                });
+
+                // Track which settings entries we've matched
+                const matchedSettings = new Set();
+
+                for (const [dirName, { handle }] of discoveredSections) {
+                    const section = {
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                        name: dirName,  // Default to directory name
+                        items: [],
+                        visible: true,  // Default visible
+                        _dirName: dirName  // Store for filesystem operations
+                    };
+
+                    // Try to match to settings by path first, then by slugified name
+                    let settingsMatch = settingsByPath.get(dirName);
+                    if (!settingsMatch) {
+                        settingsMatch = settingsBySlug.get(slugify(dirName));
+                    }
+
+                    if (settingsMatch) {
+                        const { record: settingsRecord, index } = settingsMatch;
+                        matchedSettings.add(settingsRecord);
+                        if (typeof settingsRecord === 'object') {
+                            // Use display name from settings
+                            section.name = settingsRecord.name || dirName;
+                            section.visible = settingsRecord.visible !== false;
+                            section._settingsIndex = index;
+                        }
+                    }
+
+                    // Load items from the section
+                    section.items = await loadSectionItems(handle, dirName);
+
+                    // Sort items by modified date (newest first)
+                    section.items.sort((a, b) => {
+                        const aTime = a._fileModified || 0;
+                        const bTime = b._fileModified || 0;
+                        return bTime - aTime;
+                    });
+
+                    loadedData.sections.push(section);
+                }
+
+                // Sort sections by settings order, then alphabetically for new ones
+                loadedData.sections.sort((a, b) => {
+                    const aOrder = a._settingsIndex !== undefined ? a._settingsIndex : 999;
+                    const bOrder = b._settingsIndex !== undefined ? b._settingsIndex : 999;
+                    if (aOrder !== bOrder) return aOrder - bOrder;
+                    return (a._dirName || a.name).localeCompare(b._dirName || b.name);
+                });
 
                 console.log(`[Filesystem] Loaded ${loadedData.sections.length} sections`);
 
-                // Apply visibility from settings to loaded sections
-                if (notebookSettings?.sections) {
-                    for (const section of loadedData.sections) {
-                        const sectionSlug = slugify(section.name);
-                        const settingsRecord = notebookSettings.sections.find(s =>
-                            (typeof s === 'string' ? s : s.name) === sectionSlug
-                        );
-                        if (settingsRecord && typeof settingsRecord === 'object') {
-                            section.visible = settingsRecord.visible !== false;
-                        }
-                        // If not found in settings, default to visible (visible: true)
-                    }
+                // Check for sections in settings that don't have directories
+                // (These might be newly added via settings UI - create directories for them)
+                for (const settingsRecord of sectionsFromSettings) {
+                    if (matchedSettings.has(settingsRecord)) continue;
+
+                    const name = typeof settingsRecord === 'string' ? settingsRecord : settingsRecord.name;
+                    if (!name) continue;
+
+                    // Use explicit path if provided, otherwise slugify name
+                    const dirName = (typeof settingsRecord === 'object' && settingsRecord.path)
+                        ? settingsRecord.path
+                        : slugify(name);
+                    console.log(`[Filesystem] Section "${name}" in settings has no directory, will create: ${dirName}/`);
+
+                    // Create empty section - directory will be created on first save
+                    const section = {
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                        name: name,
+                        items: [],
+                        visible: typeof settingsRecord === 'object' ? settingsRecord.visible !== false : true,
+                        _dirName: dirName,
+                        _needsDirectory: true  // Flag to create directory on save
+                    };
+                    loadedData.sections.push(section);
+                }
+
+                // Update the settings card to reflect discovered sections
+                // (The card was created before section discovery, so it may be out of sync)
+                const settingsCard = loadedData.systemNotes.find(n => n.template === 'settings');
+                if (settingsCard) {
+                    settingsCard.sections = loadedData.sections.map(s => ({
+                        name: s.name,
+                        path: s._dirName || slugify(s.name),
+                        visible: s.visible !== false
+                    }));
                 }
 
                 // Create template files for card types that exist but don't have template files
@@ -6316,7 +6424,8 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 notebookSettings = {
                     notebook_title: data.title,
                     notebook_subtitle: data.subtitle,
-                    sections: data.sections.map(s => ({ name: slugify(s.name), visible: s.visible !== false })),
+                    // Save display names (not slugs) - directory mapping is by slugified name
+                    sections: data.sections.map(s => ({ name: s.name, visible: s.visible !== false })),
                     extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
                     theme: notebookSettings?.theme || null
                 };
@@ -6494,7 +6603,8 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 ...notebookSettings,
                 notebook_title: data.title,
                 notebook_subtitle: data.subtitle,
-                sections: data.sections.map(s => ({ name: slugify(s.name), visible: s.visible !== false }))
+                // Save display names (not slugs) - directory mapping is by slugified name
+                sections: data.sections.map(s => ({ name: s.name, visible: s.visible !== false }))
             });
             await saveSettings(notebookDirHandle);
             recordSave('settings.yaml');
@@ -6530,14 +6640,41 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                     const newOrder = [];
                     for (const sectionRecord of card.sections) {
                         const sectionName = typeof sectionRecord === 'string' ? sectionRecord : sectionRecord.name;
-                        // Find section by matching slug
-                        const section = data.sections.find(s => slugify(s.name) === sectionName);
+                        if (!sectionName) continue;
+
+                        // Find section by matching slug or name
+                        const sectionSlug = slugify(sectionName);
+                        let section = data.sections.find(s =>
+                            slugify(s.name) === sectionSlug || s._dirName === sectionSlug
+                        );
+
                         if (section) {
                             // Apply visibility from settings record
                             if (typeof sectionRecord === 'object') {
                                 section.visible = sectionRecord.visible !== false;
                             }
+                            // Update display name if changed
+                            section.name = sectionName;
                             newOrder.push(section);
+                        } else {
+                            // New section added via settings - create it
+                            const newSection = {
+                                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                                name: sectionName,
+                                items: [],
+                                visible: typeof sectionRecord === 'object' ? sectionRecord.visible !== false : true,
+                                _dirName: sectionSlug,
+                                _needsDirectory: true
+                            };
+                            // Create directory immediately
+                            try {
+                                await notebookDirHandle.getDirectoryHandle(sectionSlug, { create: true });
+                                newSection._needsDirectory = false;
+                                console.log(`[Filesystem] Created section directory: ${sectionSlug}/`);
+                            } catch (e) {
+                                console.error('[Filesystem] Error creating section directory:', e);
+                            }
+                            newOrder.push(newSection);
                         }
                     }
                     // Add any sections not in the list (shouldn't happen, but safety)
@@ -6629,9 +6766,27 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             const section = data.sections.find(s => s.id === sectionId);
             if (!section) return;
 
-            const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
-            const sectionSlug = slugify(section.name);
-            const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug, { create: true });
+            // Get or create section directory (new sections go to root, existing preserve location)
+            let sectionDir, sectionPath;
+            if (section._needsDirectory) {
+                // New section - create at root
+                const sectionSlug = slugify(section.name);
+                sectionDir = await notebookDirHandle.getDirectoryHandle(sectionSlug, { create: true });
+                sectionPath = sectionSlug;
+                section._dirName = sectionSlug;
+                section._isLegacy = false;
+                delete section._needsDirectory;
+                console.log(`[Filesystem] Created section directory: ${sectionSlug}/`);
+            } else {
+                // Existing section - use getSectionDirHandle to find it
+                const sectionInfo = await getSectionDirHandle(section, { create: true });
+                if (!sectionInfo) {
+                    console.error('[Filesystem] Cannot get section directory for', section.name);
+                    return;
+                }
+                sectionDir = sectionInfo.handle;
+                sectionPath = sectionInfo.path;
+            }
 
             // Use serializeCard to get the file content and extension
             const { content, extension, format } = serializeCard(card);
@@ -6657,7 +6812,9 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 const assetsDir = await notebookDirHandle.getDirectoryHandle('assets', { create: true });
                 const thumbsDir = await assetsDir.getDirectoryHandle('thumbnails', { create: true });
                 const thumbFilename = `${card.id || baseFilename}.png`;
-                const thumbnailPath = `../../assets/thumbnails/${thumbFilename}`;
+                // Relative path depends on section location
+                const depth = sectionPath.split('/').length;
+                const thumbnailPath = '../'.repeat(depth) + `assets/thumbnails/${thumbFilename}`;
 
                 try {
                     const response = await fetch(card.thumbnail);
@@ -6678,7 +6835,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                     const writable = await fileHandle.createWritable();
                     await writable.write(updatedContent);
                     await writable.close();
-                    recordSave(`sections/${sectionSlug}/${filename}`);
+                    recordSave(`${sectionPath}/${filename}`);
                     return;
                 } catch (e) {
                     console.error('[Filesystem] Error saving thumbnail:', e);
@@ -6691,7 +6848,7 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             const writable = await fileHandle.createWritable();
             await writable.write(content);
             await writable.close();
-            recordSave(`sections/${sectionSlug}/${filename}`);
+            recordSave(`${sectionPath}/${filename}`);
 
             // Handle companion files based on extension registry
             const extConfig = extensionRegistry[extension];
@@ -6704,40 +6861,49 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                         const companionWritable = await companionHandle.createWritable();
                         await companionWritable.write(fieldValue);
                         await companionWritable.close();
-                        recordSave(`sections/${sectionSlug}/${companionFilename}`);
+                        recordSave(`${sectionPath}/${companionFilename}`);
                     }
                 }
             }
         }
 
-        // Create a new section directory with _section.json
+        // Get section directory handle at notebook root
+        // Returns { handle, path } where path is relative to notebook root
+        async function getSectionDirHandle(sectionOrName, options = {}) {
+            if (!filesystemLinked || !notebookDirHandle) return null;
+
+            const section = typeof sectionOrName === 'string'
+                ? data.sections.find(s => s.name === sectionOrName || s.id === sectionOrName)
+                : sectionOrName;
+
+            // Use stored _dirName if available (from filesystem load), otherwise slugify name
+            const sectionSlug = section?._dirName || slugify(section?.name || sectionOrName);
+
+            const handle = await notebookDirHandle.getDirectoryHandle(sectionSlug, options);
+            return { handle, path: sectionSlug };
+        }
+
+        // Create a new section directory at notebook root
         async function createSectionDir(section) {
             if (!filesystemLinked || !notebookDirHandle) return;
 
-            const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections', { create: true });
             const sectionSlug = slugify(section.name);
-            const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug, { create: true });
-
-            const sectionMetaFile = await sectionDir.getFileHandle('_section.json', { create: true });
-            const sectionMetaWritable = await sectionMetaFile.createWritable();
-            await sectionMetaWritable.write(JSON.stringify({
-                name: section.name,
-                id: section.id
-            }, null, 2));
-            await sectionMetaWritable.close();
-            recordSave(`sections/${sectionSlug}/_section.json`);
+            // Create directory at root (not under sections/)
+            await notebookDirHandle.getDirectoryHandle(sectionSlug, { create: true });
+            console.log(`[Filesystem] Created section directory: ${sectionSlug}/`);
+            recordSave(`${sectionSlug}`);
         }
 
-        // Delete a section directory
+        // Delete a section directory at notebook root
         async function deleteSectionDir(sectionName) {
             if (!filesystemLinked || !notebookDirHandle) return;
 
+            const sectionSlug = slugify(sectionName);
+
             try {
-                const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections');
-                const sectionSlug = slugify(sectionName);
-                await sectionsDir.removeEntry(sectionSlug, { recursive: true });
-                // Record that we deleted files in this section (observer will see directory change)
-                recordSave(`sections/${sectionSlug}`);
+                await notebookDirHandle.removeEntry(sectionSlug, { recursive: true });
+                recordSave(sectionSlug);
+                console.log(`[Filesystem] Deleted section directory: ${sectionSlug}/`);
             } catch (e) {
                 console.error('[Filesystem] Error deleting section dir:', e);
             }
@@ -6751,9 +6917,9 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 const section = data.sections.find(s => s.id === sectionId);
                 if (!section) return;
 
-                const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections');
-                const sectionSlug = slugify(section.name);
-                const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug);
+                const sectionInfo = await getSectionDirHandle(section);
+                if (!sectionInfo) return;
+                const { handle: sectionDir, path: sectionPath } = sectionInfo;
 
                 // Support both legacy type field and new template field (Phase 3)
                 const itemType = item.template || item.type;
@@ -6763,29 +6929,29 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 if (itemType === 'note') {
                     const filename = item._filename || `${slugify(item.title)}.md`;
                     await sectionDir.removeEntry(filename);
-                    recordSave(`sections/${sectionSlug}/${filename}`);
+                    recordSave(`${sectionPath}/${filename}`);
                 } else if (itemType === 'code') {
                     const baseFilename = item._filename || slugify(item.title);
                     const filename = `${baseFilename}.code.py`;
                     await sectionDir.removeEntry(filename);
-                    recordSave(`sections/${sectionSlug}/${filename}`);
+                    recordSave(`${sectionPath}/${filename}`);
                     try {
                         const outputFilename = `${baseFilename}.output.html`;
                         await sectionDir.removeEntry(outputFilename);
-                        recordSave(`sections/${sectionSlug}/${outputFilename}`);
+                        recordSave(`${sectionPath}/${outputFilename}`);
                     } catch (e) { /* output might not exist */ }
                 } else if (itemType === 'bookmark') {
                     const baseFilename = item._filename || slugify(item.title);
                     const filename = `${baseFilename}.bookmark.json`;
                     await sectionDir.removeEntry(filename);
-                    recordSave(`sections/${sectionSlug}/${filename}`);
+                    recordSave(`${sectionPath}/${filename}`);
                 }
             } catch (e) {
                 console.error('[Filesystem] Error deleting item file:', e);
             }
         }
 
-        // Rename a section directory
+        // Rename a section directory at notebook root
         async function renameSectionDir(oldName, newName, section) {
             if (!filesystemLinked || !notebookDirHandle) return;
 
@@ -6794,11 +6960,16 @@ Create \`sections/{section-name}/{slug}.code.py\`:
             if (oldSlug === newSlug) return; // No actual rename needed
 
             try {
-                const sectionsDir = await notebookDirHandle.getDirectoryHandle('sections');
+                // Find the old directory
+                const oldInfo = await getSectionDirHandle(section);
+                if (!oldInfo) {
+                    console.error('[Filesystem] Cannot find section to rename:', oldName);
+                    return;
+                }
+                const { handle: oldDir, path: oldPath } = oldInfo;
 
-                // Create new directory and copy files
-                const oldDir = await sectionsDir.getDirectoryHandle(oldSlug);
-                const newDir = await sectionsDir.getDirectoryHandle(newSlug, { create: true });
+                // Create new directory
+                const newDir = await notebookDirHandle.getDirectoryHandle(newSlug, { create: true });
 
                 // Copy all files from old to new
                 for await (const [name, handle] of oldDir.entries()) {
@@ -6808,23 +6979,18 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                         const writable = await newFile.createWritable();
                         await writable.write(await file.arrayBuffer());
                         await writable.close();
-                        recordSave(`sections/${newSlug}/${name}`);
+                        recordSave(`${newSlug}/${name}`);
                     }
                 }
 
-                // Update _section.json with new name
-                const sectionMetaFile = await newDir.getFileHandle('_section.json', { create: true });
-                const sectionMetaWritable = await sectionMetaFile.createWritable();
-                await sectionMetaWritable.write(JSON.stringify({
-                    name: section.name,
-                    id: section.id
-                }, null, 2));
-                await sectionMetaWritable.close();
-                recordSave(`sections/${newSlug}/_section.json`);
-
                 // Delete old directory
-                await sectionsDir.removeEntry(oldSlug, { recursive: true });
-                recordSave(`sections/${oldSlug}`);
+                await notebookDirHandle.removeEntry(oldSlug, { recursive: true });
+                recordSave(oldPath);
+
+                // Update section's internal tracking
+                section._dirName = newSlug;
+
+                console.log(`[Filesystem] Renamed section: ${oldPath}/ -> ${newSlug}/`);
             } catch (e) {
                 console.error('[Filesystem] Error renaming section dir:', e);
             }
@@ -6850,13 +7016,15 @@ Create \`sections/{section-name}/{slug}.code.py\`:
                 notebookDirHandle = handle;
                 filesystemLinked = true;
 
-                // Check if directory has existing content
+                // Check if directory has existing content (section directories at root)
                 let hasContent = false;
-                try {
-                    await handle.getDirectoryHandle('sections');
-                    hasContent = true;
-                } catch (e) {
-                    // No sections directory
+                for await (const [name, entry] of handle.entries()) {
+                    if (entry.kind === 'directory' &&
+                        !name.startsWith('.') &&
+                        !RESERVED_DIRECTORIES.has(name)) {
+                        hasContent = true;
+                        break;
+                    }
                 }
 
                 if (hasContent) {
