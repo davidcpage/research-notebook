@@ -4,7 +4,7 @@ title: Claude Code Session Card Type
 author: Claude
 created: 2024-12-13T10:00:00Z
 modified: 2024-12-13T10:00:00Z
-tags: [implementation, planning, sessions, feature]
+tags: [future]
 ---
 
 # Claude Code Session Card Type

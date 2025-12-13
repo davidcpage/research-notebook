@@ -1,5 +1,5 @@
-notebook_title: Research Notebook
-notebook_subtitle: Bookmarks, notes, and connections
+notebook_title: Building the Notebook
+notebook_subtitle: Architecture, features, and session logs
 sections:
   - name: Planning
     visible: true

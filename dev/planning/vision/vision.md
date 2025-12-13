@@ -4,7 +4,7 @@ title: Research Notebook - Vision & Direction
 author: Claude
 created: 2024-12-01T09:00:00Z
 modified: 2024-12-05T14:00:00Z
-tags: [vision, architecture, philosophy]
+tags: [ongoing]
 ---
 
 # Research Notebook: Vision & Direction

@@ -366,5 +366,27 @@ authors:
 Icon files are stored in `assets/author-icons/` as SVG files. Matching is exact (case-insensitive).
 New notebooks include Claude configured by default with `assets/author-icons/claude.svg`.
 
+### Tags
+Cards support an optional `tags` field for classification:
+- Display as small badges below card title and in viewer title bar
+- Status tags get semantic colors: `completed` (sage), `ongoing` (terracotta), `future` (blue)
+- Other tags display in neutral grey
+- Editor shows comma-separated input field
+
+```yaml
+# In frontmatter
+tags: [completed, architecture]
+```
+
+**CSS variables** (customizable in theme.css):
+```css
+--tag-completed-bg: #8a9a7a;
+--tag-ongoing-bg: #c4956a;
+--tag-future-bg: #6a9db8;
+--tag-default-bg: #6b7280;
+```
+
+**Key functions**: `normalizeTags()` (handles array/string/YAML formats), `renderTagBadges()`
+
 ### Known Gotcha: System Notes Leak
 When creating a new notebook folder, always clear `data.systemNotes = []` in addition to `data.sections`. Otherwise, system notes from the previously open notebook get copied to the new folder.

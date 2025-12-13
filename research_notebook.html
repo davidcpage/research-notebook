@@ -658,6 +658,56 @@
             z-index: 15;
         }
 
+        /* Tag Badges */
+        .tag-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            margin-top: 4px;
+        }
+        .tag-badge {
+            font-size: 9px;
+            font-weight: 500;
+            padding: 1px 5px;
+            border-radius: 2px;
+            background: var(--tag-default-bg, #6b7280);
+            color: var(--tag-default-text, white);
+            text-transform: lowercase;
+            letter-spacing: 0.3px;
+        }
+        /* Status tag colors - warm earth tones */
+        .tag-badge[data-tag="completed"],
+        .tag-badge[data-tag="done"],
+        .tag-badge[data-tag="complete"] {
+            background: var(--tag-completed-bg, #8a9a7a);  /* sage */
+        }
+        .tag-badge[data-tag="ongoing"],
+        .tag-badge[data-tag="in-progress"],
+        .tag-badge[data-tag="active"] {
+            background: var(--tag-ongoing-bg, #c4956a);  /* terracotta/ochre */
+        }
+        .tag-badge[data-tag="future"],
+        .tag-badge[data-tag="todo"],
+        .tag-badge[data-tag="planned"],
+        .tag-badge[data-tag="ideas"] {
+            background: var(--tag-future-bg, #6a9db8);  /* warmer sky blue */
+        }
+        /* Viewer tag badges - in title bar */
+        .viewer-tags {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        .viewer-tags:empty {
+            display: none;
+        }
+        .viewer-tags .tag-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+        }
+
         /* Template Diff Modal */
         .diff-body {
             padding: 0;
@@ -1058,8 +1108,10 @@
             font-family: 'Playfair Display', serif;
             font-size: 1.25rem;
             font-weight: 600;
-            flex: 1;
             margin: 0;
+        }
+        .modal.viewer .modal-header .modal-close {
+            margin-left: auto;
         }
 
         .viewer-content {
@@ -1579,6 +1631,13 @@
             text-transform: uppercase;
             color: var(--text-secondary);
             margin-bottom: 0.5rem;
+        }
+
+        .field-hint {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.35rem;
         }
 
         .form-group input,
@@ -2281,6 +2340,7 @@
         <div class="modal viewer" data-template="">
             <div class="modal-header">
                 <h2 id="viewerTitle">Title</h2>
+                <span id="viewerTags" class="viewer-tags"></span>
                 <button class="modal-close" onclick="closeViewer()">×</button>
             </div>
             <div class="viewer-content" id="viewerContent"></div>
@@ -3556,18 +3616,31 @@
                 parse(content) {
                     const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
                     if (match) {
-                        // Parse frontmatter as simple key-value (not full YAML to avoid issues)
-                        const frontmatter = {};
-                        match[1].split('\n').forEach(line => {
-                            const m = line.match(/^(\w+):\s*(.*)$/);
-                            if (m) {
-                                frontmatter[m[1]] = m[2];
-                            }
-                        });
-                        return {
-                            frontmatter,
-                            body: match[2].trim() || null
-                        };
+                        // Use js-yaml for proper YAML parsing (handles quotes, arrays, etc.)
+                        try {
+                            const frontmatter = jsyaml.load(match[1]) || {};
+                            return {
+                                frontmatter,
+                                body: match[2].trim() || null
+                            };
+                        } catch (e) {
+                            console.warn('[Parser] YAML parse error, falling back to simple parse:', e);
+                            // Fallback to simple key-value parsing
+                            const frontmatter = {};
+                            match[1].split('\n').forEach(line => {
+                                const m = line.match(/^(\w+):\s*(.*)$/);
+                                if (m) {
+                                    let value = m[2];
+                                    // Strip quotes if present
+                                    if ((value.startsWith('"') && value.endsWith('"')) ||
+                                        (value.startsWith("'") && value.endsWith("'"))) {
+                                        value = value.slice(1, -1);
+                                    }
+                                    frontmatter[m[1]] = value;
+                                }
+                            });
+                            return { frontmatter, body: match[2].trim() || null };
+                        }
                     }
                     // No frontmatter, entire content is body
                     return { frontmatter: {}, body: content };
@@ -3597,6 +3670,11 @@
                             const match = line.match(/^# (\w+):\s*(.*)$/);
                             if (match) {
                                 let value = match[2];
+                                // Strip quotes if present
+                                if ((value.startsWith('"') && value.endsWith('"')) ||
+                                    (value.startsWith("'") && value.endsWith("'"))) {
+                                    value = value.slice(1, -1);
+                                }
                                 // Convert boolean strings
                                 if (value === 'true') value = true;
                                 else if (value === 'false') value = false;
@@ -3634,6 +3712,20 @@
         // ===== Serializers =====
         // Serialize card data back to file content
 
+        // Format a value for YAML output (quote strings with special chars)
+        function formatYamlValue(value) {
+            if (value === null || value === undefined) return '';
+            if (typeof value === 'boolean' || typeof value === 'number') return String(value);
+            if (Array.isArray(value)) return '[' + value.map(v => formatYamlValue(v)).join(', ') + ']';
+            const str = String(value);
+            // Quote if contains YAML special chars or could be misinterpreted
+            if (/[:#\[\]{}|>&*!?,]/.test(str) || /^['"]/.test(str) || str.trim() !== str) {
+                // Use double quotes with escaping
+                return '"' + str.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+            }
+            return str;
+        }
+
         const serializers = {
             // Serialize to markdown with YAML frontmatter
             'yaml-frontmatter': {
@@ -3641,7 +3733,7 @@
                     const lines = ['---'];
                     for (const [key, value] of Object.entries(frontmatter)) {
                         if (value !== undefined && value !== null) {
-                            lines.push(`${key}: ${value}`);
+                            lines.push(`${key}: ${formatYamlValue(value)}`);
                         }
                     }
                     lines.push('---', '');
@@ -3658,7 +3750,7 @@
                     const lines = ['# ---'];
                     for (const [key, value] of Object.entries(frontmatter)) {
                         if (value !== undefined && value !== null) {
-                            lines.push(`# ${key}: ${value}`);
+                            lines.push(`# ${key}: ${formatYamlValue(value)}`);
                         }
                     }
                     lines.push('# ---', '');
@@ -3840,6 +3932,30 @@
             return '';
         }
 
+        // Normalize tags to array (handles array, string, or YAML-style "[a, b, c]" string)
+        function normalizeTags(tags) {
+            if (!tags) return [];
+            if (Array.isArray(tags)) return tags;
+            let str = String(tags).trim();
+            // Handle YAML-style array string: "[tag1, tag2, tag3]"
+            if (str.startsWith('[') && str.endsWith(']')) {
+                str = str.slice(1, -1);
+            }
+            return str.split(',').map(t => t.trim()).filter(t => t);
+        }
+
+        // Render tag badges (traffic light colors for status tags)
+        // Set noWrapper=true when inserting into an existing container element
+        function renderTagBadges(card, containerClass = 'tag-badges', noWrapper = false) {
+            const tags = normalizeTags(card.tags);
+            if (tags.length === 0) return '';
+            const badges = tags.map(tag => {
+                const normalizedTag = tag.toLowerCase().trim();
+                return `<span class="tag-badge" data-tag="${escapeHtml(normalizedTag)}">${escapeHtml(tag)}</span>`;
+            }).join('');
+            return noWrapper ? badges : `<div class="${containerClass}">${badges}</div>`;
+        }
+
         function renderCard(sectionId, card) {
             const template = templateRegistry[card.template || card.type];
             if (!template) {
@@ -3862,6 +3978,7 @@
             const isModified = isTemplateModified(card);
             const modifiedClass = isModified ? ' template-modified' : '';
             const modifiedBadge = isModified ? '<span class="modified-badge">MODIFIED</span>' : '';
+            const tagBadges = renderTagBadges(card);
 
             return `
                 <div class="card${modifiedClass}"
@@ -3873,6 +3990,7 @@
                     <div class="card-preview">${preview}</div>
                     <div class="card-content">
                         <h3 class="card-title">${titleHtml}</h3>
+                        ${tagBadges}
                     </div>
                     <div class="card-meta">
                         ${meta}
@@ -4130,6 +4248,9 @@
 
             // Set title
             document.getElementById('viewerTitle').textContent = card.title || 'Untitled';
+
+            // Set tags
+            document.getElementById('viewerTags').innerHTML = renderTagBadges(card, '', true);
 
             // Render content based on viewer layout, with author badge inside content area
             const contentEl = document.getElementById('viewerContent');
@@ -4901,6 +5022,19 @@
                 const value = card ? card[fieldConfig.field] : (fieldDef?.default || '');
                 const fieldEl = renderEditorField(fieldConfig, fieldDef, value);
                 bodyEl.appendChild(fieldEl);
+            }
+
+            // Universal tags field (for all card types except system cards like settings)
+            if (!['settings', 'template'].includes(templateName)) {
+                const tagsGroup = document.createElement('div');
+                tagsGroup.className = 'form-group';
+                const tagsValue = normalizeTags(card?.tags).join(', ');
+                tagsGroup.innerHTML = `
+                    <label for="editorTags">Tags</label>
+                    <input type="text" id="editorTags" value="${escapeHtml(tagsValue)}" placeholder="e.g., ongoing, feature, architecture">
+                    <span class="field-hint">Comma-separated. Status tags (completed, ongoing, future) get traffic light colors.</span>
+                `;
+                bodyEl.appendChild(tagsGroup);
             }
 
             // Handle output display for code templates
@@ -5832,6 +5966,17 @@
             }
 
             if (hasError) return;
+
+            // Parse tags from universal tags field
+            const tagsInput = document.getElementById('editorTags');
+            if (tagsInput) {
+                const tagsValue = tagsInput.value.trim();
+                if (tagsValue) {
+                    cardData.tags = tagsValue.split(',').map(t => t.trim()).filter(t => t);
+                } else {
+                    delete cardData.tags;
+                }
+            }
 
             // Get selected section (may have changed)
             const sectionSelect = document.getElementById('editorSection');
