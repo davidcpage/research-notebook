@@ -2466,8 +2466,8 @@
         // ========== SECTION: TEMPLATE_SYSTEM ==========
         // Template and extension registry infrastructure for unified card handling
         // Phase 1 (Loading): loadExtensionRegistry, loadTemplates, getDefaultExtensionRegistry,
-        //            getDefaultTemplates, getTemplateFileContent, getExtensionRegistryContent,
-        //            ensureTemplateFiles, parsers, serializers, loadCard, serializeCard
+        //            getDefaultTemplates, getTemplateFileContent, ensureTemplateFiles,
+        //            parsers, serializers, loadCard, serializeCard
         // Phase 2 (Rendering): renderCard, renderCardPreview, renderCardTitle, renderCardMeta,
         //            renderDocumentPreview, renderImagePreview, renderSplitPanePreview, renderFieldsPreview,
         //            openViewer, renderViewerContent, renderViewerDocument, renderViewerImage,
@@ -2476,7 +2476,7 @@
         //            loadThemeCss, injectTemplateStyles
 
         // Extension registry - maps file extensions to parsing behavior
-        // Loaded from extensions.yaml or uses defaults
+        // Loaded from settings.yaml or uses defaults
         let extensionRegistry = null;
 
         // Template registry - maps template names to their definitions
@@ -2922,17 +2922,6 @@
             });
         }
 
-        // Generate YAML content for extensions.yaml (legacy, for migration)
-        function getExtensionRegistryContent() {
-            const registry = getDefaultExtensionRegistry();
-            return jsyaml.dump({ extensions: registry }, {
-                indent: 2,
-                lineWidth: -1,
-                quotingType: '"',
-                forceQuotes: false
-            });
-        }
-
         // Generate default theme.css content (minimal starter for new notebooks)
         function getDefaultThemeContent() {
             return `/*
@@ -3168,28 +3157,11 @@
 
         // Load extension registry from settings (or use defaults)
         async function loadExtensionRegistry(dirHandle) {
-            // If settings already loaded, use extensions from there
+            // Use extensions from settings if available, otherwise use defaults
             if (notebookSettings && notebookSettings.extensions) {
                 extensionRegistry = notebookSettings.extensions;
                 console.log('[Templates] Using extensions from settings');
-                return extensionRegistry;
-            }
-
-            // Fallback: load from filesystem or defaults (legacy path)
-            if (!dirHandle) {
-                extensionRegistry = getDefaultExtensionRegistry();
-                return extensionRegistry;
-            }
-
-            try {
-                const extFile = await dirHandle.getFileHandle('extensions.yaml');
-                const file = await extFile.getFile();
-                const content = await file.text();
-                const parsed = jsyaml.load(content);
-                extensionRegistry = parsed.extensions || getDefaultExtensionRegistry();
-                console.log('[Templates] Loaded extensions.yaml (legacy)');
-            } catch (e) {
-                // File doesn't exist, use defaults
+            } else {
                 extensionRegistry = getDefaultExtensionRegistry();
                 console.log('[Templates] Using default extension registry');
             }
@@ -6514,7 +6486,6 @@ sections:
                     if (filename === 'settings.yaml') continue;
                     if (filename === 'theme.css') continue;
                     if (filename.endsWith('.template.yaml')) continue;
-                    if (filename === 'notebook.json') continue;  // Legacy
 
                     try {
                         const file = await fileHandle.getFile();
@@ -6909,83 +6880,12 @@ sections:
                     await claudeWritable.close();
                 }
 
-                // Create/get sections directory
-                const sectionsDir = await dirHandle.getDirectoryHandle('sections', { create: true });
-
                 // Create assets/thumbnails directory
                 const assetsDir = await dirHandle.getDirectoryHandle('assets', { create: true });
-                const thumbsDir = await assetsDir.getDirectoryHandle('thumbnails', { create: true });
+                await assetsDir.getDirectoryHandle('thumbnails', { create: true });
 
-                // Write each section
-                for (const section of data.sections) {
-                    const sectionSlug = slugify(section.name);
-                    const sectionDir = await sectionsDir.getDirectoryHandle(sectionSlug, { create: true });
-
-                    // Write section metadata
-                    const sectionMetaFile = await sectionDir.getFileHandle('_section.json', { create: true });
-                    const sectionMetaWritable = await sectionMetaFile.createWritable();
-                    await sectionMetaWritable.write(JSON.stringify({
-                        name: section.name,
-                        id: section.id
-                    }, null, 2));
-                    await sectionMetaWritable.close();
-
-                    // Write each item using generic serialization
-                    for (const item of section.items) {
-                        const titleSlug = slugify(item.title);
-                        const { content, extension, format } = serializeCard(item);
-
-                        // Special handling for bookmarks: save thumbnail to assets folder
-                        if ((item.type === 'bookmark' || item.template === 'bookmark') && item.thumbnail && item.thumbnail.startsWith('data:')) {
-                            const thumbFilename = `${item.id || titleSlug}.png`;
-                            const thumbnailPath = `../../assets/thumbnails/${thumbFilename}`;
-
-                            try {
-                                const response = await fetch(item.thumbnail);
-                                const blob = await response.blob();
-                                const thumbHandle = await thumbsDir.getFileHandle(thumbFilename, { create: true });
-                                const thumbWritable = await thumbHandle.createWritable();
-                                await thumbWritable.write(blob);
-                                await thumbWritable.close();
-
-                                // Update content to use path instead of data URL
-                                const bookmarkJson = JSON.parse(content);
-                                bookmarkJson.thumbnail = thumbnailPath;
-                                const updatedContent = JSON.stringify(bookmarkJson, null, 2);
-
-                                const filename = `${titleSlug}${extension}`;
-                                const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
-                                const writable = await fileHandle.createWritable();
-                                await writable.write(updatedContent);
-                                await writable.close();
-                            } catch (e) {
-                                console.error('[Filesystem] Error saving bookmark with thumbnail:', e);
-                            }
-                        } else {
-                            // Write main card file
-                            const filename = `${titleSlug}${extension}`;
-                            const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
-                            const writable = await fileHandle.createWritable();
-                            await writable.write(content);
-                            await writable.close();
-                        }
-
-                        // Handle companion files based on extension registry
-                        const extConfig = extensionRegistry[extension];
-                        if (extConfig?.companionFiles) {
-                            for (const companion of extConfig.companionFiles) {
-                                const fieldValue = item[companion.field];
-                                if (fieldValue) {
-                                    const companionFilename = `${titleSlug}${companion.suffix}`;
-                                    const companionHandle = await sectionDir.getFileHandle(companionFilename, { create: true });
-                                    const companionWritable = await companionHandle.createWritable();
-                                    await companionWritable.write(fieldValue);
-                                    await companionWritable.close();
-                                }
-                            }
-                        }
-                    }
-                }
+                // Note: Section directories are created by createSectionDir() after this function
+                // Card files are saved incrementally by saveCardFile()
 
                 // Write system notes (text files at root)
                 if (data.systemNotes) {
@@ -7260,7 +7160,6 @@ sections:
                 sectionDir = await notebookDirHandle.getDirectoryHandle(sectionSlug, { create: true });
                 sectionPath = sectionSlug;
                 section._dirName = sectionSlug;
-                section._isLegacy = false;
                 delete section._needsDirectory;
                 console.log(`[Filesystem] Created section directory: ${sectionSlug}/`);
             } else {
@@ -7679,7 +7578,7 @@ sections:
                     return false;
                 }
 
-                // Relevant: .md, .code.py, .bookmark.json, settings.yaml, _section.json, .output.html
+                // Relevant: .md, .code.py, .bookmark.json, settings.yaml, .output.html
                 // Also include directory changes (for new sections)
                 if (record.changedHandle?.kind === 'directory') return true;
                 if (filename.endsWith('.md')) return true;
@@ -7687,8 +7586,6 @@ sections:
                 if (filename.endsWith('.output.html')) return true;
                 if (filename.endsWith('.bookmark.json')) return true;
                 if (filename === 'settings.yaml') return true;
-                if (filename === 'notebook.json') return true;  // Legacy
-                if (filename === '_section.json') return true;
                 return false;
             });
 
