@@ -3830,9 +3830,11 @@
                 }
             }
 
-            // Generate ID if missing
+            // Ensure ID exists and is always a string (YAML may parse numeric IDs as numbers)
             if (!frontmatter.id) {
                 frontmatter.id = Date.now().toString();
+            } else {
+                frontmatter.id = String(frontmatter.id);
             }
 
             // For backwards compatibility, set 'type' field based on template
@@ -4223,13 +4225,15 @@
         function openViewer(sectionId, itemId) {
             let card;
             const isSystemNote = sectionId === '_system';
+            // Convert itemId to string for comparison (YAML may parse numeric IDs as numbers)
+            const itemIdStr = String(itemId);
 
             if (isSystemNote) {
-                card = data.systemNotes?.find(n => n.id === itemId);
+                card = data.systemNotes?.find(n => String(n.id) === itemIdStr);
             } else {
                 const section = data.sections.find(s => s.id === sectionId);
                 if (section) {
-                    card = section.items.find(i => i.id === itemId);
+                    card = section.items.find(i => String(i.id) === itemIdStr);
                 }
             }
 
