@@ -83,6 +83,16 @@
             .hljs-link{text-decoration:underline}
         }
 
+        @layer reset {
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+        }
+
+        @layer base {
+
         :root {
             --bg-primary: #f8f6f3;
             --bg-secondary: #ffffff;
@@ -103,12 +113,6 @@
             /* Code theme colors */
             --code-bg: #1a3a52;
             --code-text: #e0e6ed;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
         }
 
         body {
@@ -162,6 +166,10 @@
             letter-spacing: 0.05em;
             text-transform: uppercase;
         }
+
+        } /* end @layer base */
+
+        @layer components {
 
         .toolbar {
             max-width: 1400px;
@@ -1004,6 +1012,10 @@
             color: var(--text-muted);
         }
 
+        } /* end @layer components (card layouts) */
+
+        @layer templates {
+
         /* Note template: define colors once, used by both card and viewer */
         .card[data-template="note"],
         .modal.viewer[data-template="note"] {
@@ -1098,6 +1110,10 @@
             color: var(--template-code-text);
             font-size: 0.65rem;
         }
+
+        } /* end @layer templates (card templates) */
+
+        @layer components {
 
         /* ========== Generic Viewer Styles (Phase 2 Template System) ========== */
         .modal.viewer {
@@ -1195,7 +1211,7 @@
         .viewer-markdown pre { background: #fff; padding: 1rem; overflow-x: auto; margin: 0.875rem 0; border-radius: 4px; max-width: 100%; border: 1px solid #e8e4dc; }
         .viewer-markdown pre code { background: none; padding: 0; }
         /* Override highlight.js dark theme for markdown content (use light background)
-           No !important needed - hljs is in @layer vendors, these are unlayered (higher precedence) */
+           hljs is in @layer vendors, these are in @layer components (higher precedence) */
         .preview-content .hljs,
         .viewer-markdown .hljs {
             background: transparent;
@@ -1444,6 +1460,10 @@
             color: var(--text-secondary);
         }
 
+        } /* end @layer components (viewer layouts) */
+
+        @layer templates {
+
         /* Template-specific viewer styles */
         .modal.viewer[data-template="note"] {
             background: var(--template-bg);
@@ -1517,8 +1537,12 @@
             color: var(--template-code-text);
         }
 
+        } /* end @layer templates (viewer templates) */
+
+        @layer components {
+
         /* Override highlight.js in generic viewer
-           No !important needed - hljs is in @layer vendors, these are unlayered (higher precedence) */
+           hljs is in @layer vendors, these are in @layer components (higher precedence) */
         .viewer-split-right .hljs,
         .viewer-code-only .hljs {
             background: transparent;
@@ -2161,7 +2185,9 @@
             }
         }
 
-        /* Print styles for exporting viewer content */
+        } /* end @layer components */
+
+        /* Print styles - intentionally unlayered (uses !important to override everything) */
         @media print {
             /* Hide everything except the viewer modal */
             body > *:not(.modal-overlay) {
