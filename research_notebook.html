@@ -919,8 +919,9 @@
         .preview-split-left {
             padding: 1rem;
             overflow: hidden;
+            height: 100%;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
             border-right: 1px solid var(--border);
         }
@@ -928,6 +929,7 @@
         .preview-split-right {
             padding: 0.75rem;
             overflow: hidden;
+            height: 100%;
             position: relative;
             background: inherit;
         }
@@ -1127,6 +1129,7 @@
         .viewer-content:has(.viewer-split-pane),
         .viewer-content:has(.viewer-code-only) {
             padding: 0;
+            overflow: hidden;
         }
 
         .viewer-backlinks {
@@ -1318,15 +1321,16 @@
         .viewer-split-pane {
             display: flex;
             min-height: 300px;
+            height: 100%;
             width: 100%;
         }
 
         .viewer-split-left {
             flex: 0 0 60%;
             padding: 2rem;
-            overflow: auto;
+            overflow: hidden;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
             border-right: 1px solid var(--border);
         }
@@ -1335,6 +1339,7 @@
             flex: 1;
             padding: 1.5rem;
             overflow: auto;
+            max-height: calc(90vh - 120px);
             background: var(--code-bg);
         }
 
