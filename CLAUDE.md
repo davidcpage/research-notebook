@@ -227,6 +227,27 @@ The `.md-content` class provides shared typography for all rendered markdown:
 - **Usage**: Elements get both classes, e.g. `class="md-content preview-content"`
 - **Overrides**: Context-specific classes add only their unique rules (smaller spacing for previews, different backgrounds for descriptions)
 
+### CSS Cascade Layers
+The app uses CSS cascade layers for predictable style precedence:
+
+```css
+@layer reset, vendors, base, components, templates, theme;
+```
+
+| Layer | Purpose | When to use |
+|-------|---------|-------------|
+| `reset` | Universal selector, box-sizing | Rarely - only for normalizations |
+| `vendors` | Third-party CSS (highlight.js) | When inlining vendor styles |
+| `base` | CSS variables, typography, body | Foundation styles |
+| `components` | Cards, modals, buttons, forms | UI element styles |
+| `templates` | Card type styling | Template-specific rules |
+| `theme` | User theme.css | Loaded dynamically |
+| *(unlayered)* | Print styles | Print media queries |
+
+**Key insight**: Unlayered styles beat all layers regardless of specificity. This means:
+- theme.css (in `@layer theme`) overrides all built-in styles without `!important`
+- Print styles (unlayered) override theme backgrounds for clean white printing
+
 ---
 
 ## Pyodide (Python Execution)
