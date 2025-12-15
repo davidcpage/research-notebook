@@ -56,11 +56,33 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
     <!-- jsdiff for template diff display -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
-    <!-- Highlight.js for syntax highlighting -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <!-- Highlight.js for syntax highlighting (CSS inlined in @layer vendors below) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
     <style>
+        /* CSS Cascade Layers - establishes explicit precedence order.
+           Unlayered styles (theme.css) always win over layered styles. */
+        @layer reset, vendors, base, components, templates;
+
+        /* Highlight.js atom-one-dark theme v11.9.0 (inlined for layer control)
+           Source: https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css */
+        @layer vendors {
+            pre code.hljs{display:block;overflow-x:auto;padding:1em}
+            code.hljs{padding:3px 5px}
+            .hljs{color:#abb2bf;background:#282c34}
+            .hljs-comment,.hljs-quote{color:#5c6370;font-style:italic}
+            .hljs-doctag,.hljs-formula,.hljs-keyword{color:#c678dd}
+            .hljs-deletion,.hljs-name,.hljs-section,.hljs-selector-tag,.hljs-subst{color:#e06c75}
+            .hljs-literal{color:#56b6c2}
+            .hljs-addition,.hljs-attribute,.hljs-meta .hljs-string,.hljs-regexp,.hljs-string{color:#98c379}
+            .hljs-attr,.hljs-number,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-pseudo,.hljs-template-variable,.hljs-type,.hljs-variable{color:#d19a66}
+            .hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-id,.hljs-symbol,.hljs-title{color:#61aeee}
+            .hljs-built_in,.hljs-class .hljs-title,.hljs-title.class_{color:#e6c07b}
+            .hljs-emphasis{font-style:italic}
+            .hljs-strong{font-weight:700}
+            .hljs-link{text-decoration:underline}
+        }
+
         :root {
             --bg-primary: #f8f6f3;
             --bg-secondary: #ffffff;
@@ -875,8 +897,8 @@
         .preview-code code {
             font-family: inherit;
             font-size: inherit;
-            background: transparent !important;
-            padding: 0;
+            background: transparent;
+            padding: 0;  /* Override hljs padding:1em */
             color: var(--code-text);
         }
 
@@ -960,8 +982,9 @@
         .split-code code {
             font-family: inherit;
             font-size: inherit;
-            background: transparent !important;
+            background: transparent;
             color: inherit;
+            padding: 0;  /* Override hljs padding:1em */
         }
 
         /* Fields preview */
@@ -1171,11 +1194,12 @@
         .viewer-markdown code { font-family: 'Consolas', 'Monaco', monospace; background: #fff; padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.9em; }
         .viewer-markdown pre { background: #fff; padding: 1rem; overflow-x: auto; margin: 0.875rem 0; border-radius: 4px; max-width: 100%; border: 1px solid #e8e4dc; }
         .viewer-markdown pre code { background: none; padding: 0; }
-        /* Override highlight.js dark theme for markdown content (use light background) */
+        /* Override highlight.js dark theme for markdown content (use light background)
+           No !important needed - hljs is in @layer vendors, these are unlayered (higher precedence) */
         .preview-content .hljs,
         .viewer-markdown .hljs {
-            background: transparent !important;
-            color: var(--text-primary) !important;
+            background: transparent;
+            color: var(--text-primary);
         }
         .viewer-markdown blockquote { border-left: 3px solid var(--accent); padding-left: 1rem; margin: 0.875rem 0; color: var(--text-secondary); font-style: italic; }
         .viewer-markdown a { color: var(--accent); text-decoration: none; }
@@ -1354,9 +1378,10 @@
         }
 
         .viewer-split-right code {
-            background: transparent !important;
+            background: transparent;
             color: var(--code-text);
             font-family: inherit;
+            padding: 0;  /* Override hljs padding:1em */
         }
 
         .viewer-output-content {
@@ -1388,8 +1413,9 @@
         }
 
         .viewer-code-only code {
-            background: transparent !important;
+            background: transparent;
             color: var(--code-text);
+            padding: 0;  /* Override hljs padding:1em */
         }
 
         /* Sections viewer layout */
@@ -1491,11 +1517,12 @@
             color: var(--template-code-text);
         }
 
-        /* Override highlight.js in generic viewer */
+        /* Override highlight.js in generic viewer
+           No !important needed - hljs is in @layer vendors, these are unlayered (higher precedence) */
         .viewer-split-right .hljs,
         .viewer-code-only .hljs {
-            background: transparent !important;
-            color: var(--code-text) !important;
+            background: transparent;
+            color: var(--code-text);
         }
 
         /* Internal Links */
@@ -4049,7 +4076,7 @@
                 return `<pre class="preview-code">${escapeHtml(yamlStr.substring(0, 400))}</pre>`;
             } else if (fieldType === 'code') {
                 // Code fields: monospace with language class (check before 'content' field name)
-                const codePreview = escapeHtml(content.substring(0, 400));
+                const codePreview = escapeHtml(content.substring(0, 800));
                 return `<pre class="preview-code"><code class="language-${fieldDef?.language || 'python'}">${codePreview || 'No code'}</code></pre>`;
             } else if (fieldType === 'markdown' || field === 'content') {
                 // Use existing renderNotePreview for markdown
@@ -4104,7 +4131,7 @@
                 // Render as code preview for code template
                 const leftFieldDef = template.schema?.[fallbackField];
                 if (leftFieldDef?.type === 'code') {
-                    const codePreview = escapeHtml(fallbackContent.substring(0, 400));
+                    const codePreview = escapeHtml(fallbackContent.substring(0, 800));
                     return `<pre class="preview-code"><code class="language-${leftFieldDef?.language || 'python'}">${codePreview}</code></pre>`;
                 }
                 return `<div class="preview-text">${escapeHtml(fallbackContent.substring(0, 300))}</div>`;
@@ -4127,7 +4154,7 @@
 
             let rightHtml = '';
             if (rightFieldDef?.type === 'code') {
-                const codePreview = escapeHtml((rightContent || '').substring(0, 400));
+                const codePreview = escapeHtml((rightContent || '').substring(0, 800));
                 rightHtml = `<pre class="split-code"><code class="language-${rightFieldDef?.language || 'python'}">${codePreview}</code></pre>`;
             } else {
                 rightHtml = `<div class="split-content">${escapeHtml((rightContent || '').substring(0, 300))}</div>`;
