@@ -61,8 +61,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
     <style>
         /* CSS Cascade Layers - establishes explicit precedence order.
-           Unlayered styles (theme.css) always win over layered styles. */
-        @layer reset, vendors, base, components, templates;
+           theme.css loads into @layer theme. Unlayered styles (print) win over all layers. */
+        @layer reset, vendors, base, components, templates, theme;
 
         /* Highlight.js atom-one-dark theme v11.9.0 (inlined for layer control)
            Source: https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css */
@@ -170,6 +170,33 @@
         } /* end @layer base */
 
         @layer components {
+
+        /* Shared markdown typography - base styles for rendered markdown content */
+        .md-content {
+            line-height: 1.7;
+            font-size: 0.925rem;
+            color: var(--text-secondary);
+        }
+        .md-content h1 { font-family: 'Playfair Display', serif; font-size: 1.5rem; margin-bottom: 0.75rem; color: var(--text-primary); }
+        .md-content h2 { font-family: 'Playfair Display', serif; font-size: 1.25rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .md-content h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; margin: 1rem 0 0.5rem; color: var(--text-primary); }
+        .md-content p { margin-bottom: 0.875rem; }
+        .md-content ul, .md-content ol { margin: 0.875rem 0; padding-left: 1.5rem; }
+        .md-content li { margin-bottom: 0.375rem; }
+        .md-content code { font-family: 'Consolas', 'Monaco', monospace; background: #fff; padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.9em; }
+        .md-content pre { background: #fff; padding: 0.75rem; overflow-x: auto; margin: 0.875rem 0; border-radius: 4px; border: 1px solid #e8e4dc; }
+        .md-content pre code { background: none; padding: 0; }
+        .md-content blockquote { border-left: 3px solid var(--accent); padding-left: 1rem; margin: 0.875rem 0; color: var(--text-secondary); font-style: italic; }
+        .md-content a { color: var(--accent); text-decoration: none; }
+        .md-content a:hover { text-decoration: underline; }
+        .md-content img { max-width: 100%; height: auto; border-radius: 4px; margin: 0.5rem 0; }
+        .md-content table { border-collapse: collapse; margin: 0.875rem 0; width: 100%; font-size: 0.9em; }
+        .md-content table th,
+        .md-content table td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; }
+        .md-content table th { background: var(--bg-primary); font-weight: 600; }
+        .md-content table tr:nth-child(even) { background: #fafafa; }
+        /* Override highlight.js dark theme for markdown content */
+        .md-content .hljs { background: transparent; color: var(--text-primary); }
 
         .toolbar {
             max-width: 1400px;
@@ -852,28 +879,15 @@
             padding: 18px 24px;
         }
 
+        /* Card preview overrides - inherits from .md-content */
         .preview-content {
-            font-size: 0.925rem;
-            color: var(--text-secondary);
-            line-height: 1.7;
             overflow: hidden;
         }
-
-        .preview-content h1 { font-family: 'Playfair Display', serif; font-size: 1.5rem; margin-bottom: 0.75rem; color: var(--text-primary); }
-        .preview-content h2 { font-family: 'Playfair Display', serif; font-size: 1.25rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
-        .preview-content h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; margin: 1rem 0 0.5rem; color: var(--text-primary); }
-        .preview-content p { margin-bottom: 0.875rem; }
-        .preview-content ul, .preview-content ol { margin: 0.875rem 0; padding-left: 1.5rem; }
-        .preview-content li { margin-bottom: 0.375rem; }
-        .preview-content code { font-family: 'Consolas', 'Monaco', monospace; background: #fff; padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.9em; }
-        .preview-content pre { background: #fff; padding: 0.75rem; overflow-x: auto; margin: 0.5rem 0; border-radius: 4px; border: 1px solid #e8e4dc; }
-        .preview-content pre code { background: none; padding: 0; }
-        .preview-content blockquote { border-left: 3px solid var(--accent); padding-left: 1rem; margin: 0.875rem 0; color: var(--text-secondary); font-style: italic; }
-        .preview-content table { border-collapse: collapse; margin: 0.5rem 0; width: 100%; font-size: 0.85em; }
+        /* Compact preview: smaller pre/table spacing */
+        .preview-content pre { padding: 0.75rem; margin: 0.5rem 0; }
+        .preview-content table { margin: 0.5rem 0; font-size: 0.85em; }
         .preview-content table th,
-        .preview-content table td { border: 1px solid var(--border); padding: 0.25rem 0.5rem; text-align: left; }
-        .preview-content table th { background: var(--bg-primary); font-weight: 600; }
-        .preview-content table tr:nth-child(even) { background: #fafafa; }
+        .preview-content table td { padding: 0.25rem 0.5rem; }
 
         .preview-page::after {
             content: '';
@@ -1194,38 +1208,8 @@
             gap: 0.5rem;
         }
 
-        /* Viewer content layouts */
-        .viewer-markdown {
-            line-height: 1.7;
-            font-size: 0.925rem;
-            color: var(--text-secondary);
-        }
-
-        .viewer-markdown h1 { font-family: 'Playfair Display', serif; font-size: 1.5rem; margin-bottom: 0.75rem; color: var(--text-primary); }
-        .viewer-markdown h2 { font-family: 'Playfair Display', serif; font-size: 1.25rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
-        .viewer-markdown h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; margin: 1rem 0 0.5rem; color: var(--text-primary); }
-        .viewer-markdown p { margin-bottom: 0.875rem; }
-        .viewer-markdown ul, .viewer-markdown ol { margin: 0.875rem 0; padding-left: 1.5rem; }
-        .viewer-markdown li { margin-bottom: 0.375rem; }
-        .viewer-markdown code { font-family: 'Consolas', 'Monaco', monospace; background: #fff; padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.9em; }
-        .viewer-markdown pre { background: #fff; padding: 1rem; overflow-x: auto; margin: 0.875rem 0; border-radius: 4px; max-width: 100%; border: 1px solid #e8e4dc; }
-        .viewer-markdown pre code { background: none; padding: 0; }
-        /* Override highlight.js dark theme for markdown content (use light background)
-           hljs is in @layer vendors, these are in @layer components (higher precedence) */
-        .preview-content .hljs,
-        .viewer-markdown .hljs {
-            background: transparent;
-            color: var(--text-primary);
-        }
-        .viewer-markdown blockquote { border-left: 3px solid var(--accent); padding-left: 1rem; margin: 0.875rem 0; color: var(--text-secondary); font-style: italic; }
-        .viewer-markdown a { color: var(--accent); text-decoration: none; }
-        .viewer-markdown a:hover { text-decoration: underline; }
-        .viewer-markdown img { max-width: 100%; height: auto; border-radius: 4px; margin: 0.5rem 0; }
-        .viewer-markdown table { border-collapse: collapse; margin: 0.875rem 0; width: 100%; font-size: 0.9em; }
-        .viewer-markdown table th,
-        .viewer-markdown table td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; }
-        .viewer-markdown table th { background: var(--bg-primary); font-weight: 600; }
-        .viewer-markdown table tr:nth-child(even) { background: #fafafa; }
+        /* Viewer content layouts - inherits from .md-content */
+        .viewer-markdown pre { padding: 1rem; max-width: 100%; }
 
         .viewer-text {
             margin: 0;
@@ -1333,28 +1317,23 @@
             text-decoration: underline;
         }
 
+        /* Bookmark description - inherits from .md-content with compact variant styling */
         .viewer-description {
-            line-height: 1.7;
-            color: var(--text-secondary);
-            font-size: 0.925rem;
             padding: 0.5rem 0.75rem;
             background: var(--bg-primary);
             border-radius: 6px;
             border: 1px solid var(--border);
         }
+        /* Tighter spacing for descriptions */
         .viewer-description p { margin: 0 0 0.75rem 0; }
         .viewer-description p:last-child { margin-bottom: 0; }
         .viewer-description ul, .viewer-description ol { margin: 0.75rem 0; padding-left: 1.75rem; }
-        .viewer-description li { margin-bottom: 0.375rem; }
         .viewer-description li:last-child { margin-bottom: 0; }
-        .viewer-description code { font-family: 'Consolas', 'Monaco', monospace; background: var(--bg-secondary); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.9em; }
-        .viewer-description blockquote { border-left: 3px solid var(--accent); padding-left: 1rem; margin: 0.75rem 0; color: var(--text-muted); font-style: italic; }
-        .viewer-description a { color: var(--accent); text-decoration: none; }
-        .viewer-description a:hover { text-decoration: underline; }
-        .viewer-description table { border-collapse: collapse; margin: 0.75rem 0; width: 100%; font-size: 0.9em; }
-        .viewer-description table th,
-        .viewer-description table td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; }
-        .viewer-description table th { background: var(--bg-secondary); font-weight: 600; }
+        /* Different backgrounds for description context */
+        .viewer-description code { background: var(--bg-secondary); }
+        .viewer-description blockquote { margin: 0.75rem 0; color: var(--text-muted); }
+        .viewer-description table { margin: 0.75rem 0; }
+        .viewer-description table th { background: var(--bg-secondary); }
         .viewer-description table tr:nth-child(even) { background: var(--bg-secondary); }
 
         /* Split pane viewer layout */
@@ -2268,14 +2247,21 @@
                 display: none !important;
             }
 
-            /* Remove modal frame/border */
+            /* Remove modal frame/border and backgrounds for clean print.
+               These are unlayered so they beat @layer theme (theme.css) automatically. */
             .modal.viewer {
                 border: none !important;
                 border-radius: 0 !important;
+                background: white;
             }
 
             .modal-header {
                 border-bottom: none !important;
+                background: white;
+            }
+
+            .viewer-content {
+                background: white;
             }
 
             /* Ensure content flows across pages */
@@ -3432,12 +3418,13 @@
                     const file = await themeFile.getFile();
                     const content = await file.text();
 
-                    // Create and inject style element
+                    // Create and inject style element, wrapped in @layer theme
+                    // This allows print styles (unlayered) to override theme backgrounds
                     const style = document.createElement('style');
                     style.id = 'theme-css';
-                    style.textContent = content;
+                    style.textContent = `@layer theme {\n${content}\n}`;
                     document.head.appendChild(style);
-                    console.log('[Theme] Loaded .notebook/theme.css');
+                    console.log('[Theme] Loaded .notebook/theme.css into @layer theme');
                 } catch (e) {
                     // File doesn't exist, that's fine (theme is optional)
                     console.log('[Theme] No theme.css found (optional)');
@@ -4110,7 +4097,7 @@
                 if (!previewHtml) {
                     return `<div class="preview-placeholder">${placeholder}</div>`;
                 }
-                return `<div class="preview-page">${authorBadge}<div class="preview-scaler"><div class="preview-content">${previewHtml}</div></div></div>`;
+                return `<div class="preview-page">${authorBadge}<div class="preview-scaler"><div class="md-content preview-content">${previewHtml}</div></div></div>`;
             } else if (typeof content === 'object') {
                 // Handle any object that slipped through
                 const str = JSON.stringify(content, null, 2);
@@ -4413,7 +4400,7 @@
             } else if (fieldType === 'code') {
                 return `<div class="viewer-code"><pre><code class="language-${fieldDef?.language || 'python'}">${escapeHtml(content)}</code></pre></div>`;
             } else {
-                return `<div class="viewer-markdown">${renderMarkdownWithLinks(content)}</div>`;
+                return `<div class="md-content viewer-markdown">${renderMarkdownWithLinks(content)}</div>`;
             }
         }
 
@@ -4470,7 +4457,7 @@
             }
 
             if (content) {
-                html += `<div class="viewer-description">${renderMarkdownWithLinks(content)}</div>`;
+                html += `<div class="md-content viewer-description">${renderMarkdownWithLinks(content)}</div>`;
             }
 
             html += '</div>';

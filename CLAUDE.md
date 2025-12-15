@@ -70,7 +70,8 @@ Card rendering, viewer display, and editing all work automatically via templates
 - **Modified indicator**: Template files (note, code, bookmark), README.md, CLAUDE.md, and theme.css show orange "MODIFIED" badge when they differ from defaults. Viewer shows "Show Diff" button (uses jsdiff library), "Merge Defaults" (templates only), and "Reset to Defaults" buttons. Key functions: `isSystemCardModified()`, `getSystemCardDefaultContent()`, `showSystemCardDiff()`, `resetSystemCardDefaults()`
 
 ### Theming
-- `.notebook/theme.css` overrides app styles (loads after built-in CSS)
+- `.notebook/theme.css` loads into `@layer theme` (highest layer, overrides all built-in styles)
+- Print styles are unlayered, so they beat theme backgrounds (clean white print by default)
 - New notebooks get a minimal starter `theme.css` with documented variables
 - Full reference: `/theme.css` in repo root documents all customizable selectors
 - Demo theme: `examples/demo-notebook/.notebook/theme.css` shows elaborate theming with textures
@@ -218,6 +219,13 @@ Templates define CSS custom properties that both card and viewer inherit, ensuri
 - Split pane: Output (60%, left) + code context (40%, right)
 - Code-only view when no output exists
 - `showOutput` field toggles between views
+
+### Markdown Content Pattern
+The `.md-content` class provides shared typography for all rendered markdown:
+- **Base styles**: headings, paragraphs, lists, code, blockquotes, links, images, tables
+- **Used by**: `.preview-content` (card previews), `.viewer-markdown` (viewers), `.viewer-description` (bookmark descriptions)
+- **Usage**: Elements get both classes, e.g. `class="md-content preview-content"`
+- **Overrides**: Context-specific classes add only their unique rules (smaller spacing for previews, different backgrounds for descriptions)
 
 ---
 
