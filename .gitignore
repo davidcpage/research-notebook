@@ -7,3 +7,4 @@ node_modules/
 # Notebook exports
 *_notebook*.json
 my_notebook*.json
+.claude/skills/

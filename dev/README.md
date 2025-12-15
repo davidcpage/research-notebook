@@ -1,4 +1,4 @@
-# Research Notebook
+# Building the Notebook
 
 This folder contains a Research Notebook - a collection of notes, code snippets, and bookmarks stored as plain files.
 
