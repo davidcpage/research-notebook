@@ -8,7 +8,7 @@ sections:
     visible: false
     path: assets
   - name: System
-    visible: false
+    visible: true
     path:
       - .
       - .notebook

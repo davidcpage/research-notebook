@@ -4,10 +4,22 @@ title: Claude Code Session Card Type
 author: Claude
 created: 2024-12-13T10:00:00Z
 modified: 2024-12-13T10:00:00Z
-tags: [future]
+tags: [abandoned]
 ---
 
 # Claude Code Session Card Type
+
+> **Status (2024-12-16): ABANDONED**
+>
+> This feature has been abandoned. After extended discussion, we determined that sessions (and issues) are **process logs**, not **artifacts**. Notebooks are for lasting artifacts (notes, design docs, research). Process tracking belongs in CLI/TUI tools, not the notebook.
+>
+> See [[Notebook as Repository Development Companion]] for the full decision rationale.
+>
+> Related closed issues: #001, #002, #003, #004, #005
+
+---
+
+*The design below is preserved for historical reference.*
 
 A new card type for displaying Claude Code conversation transcripts with a TUI aesthetic, collapsible detail levels, and drill-down navigation.
 
