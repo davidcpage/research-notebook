@@ -2,7 +2,7 @@
 .DS_Store
 
 # Local state (not shared across users)
-.memory/.prefix-hint-shown
+.sessions/.prefix-hint-shown
 
 # Node
 node_modules/
