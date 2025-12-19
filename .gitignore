@@ -1,6 +1,9 @@
 # macOS
 .DS_Store
 
+# Local state (not shared across users)
+.memory/.prefix-hint-shown
+
 # Node
 node_modules/
 

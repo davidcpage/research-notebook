@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(issues:*)",
+      "Bash(sessions:*)",
+      "Bash(adr:*)"
+    ]
+  }
+}
