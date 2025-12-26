@@ -640,7 +640,6 @@ const SETTINGS_SCHEMA = {
     notebook_title: { default: 'Research Notebook' },
     notebook_subtitle: { default: 'Bookmarks, notes, and connections' },
     sections: { default: [
-        { name: 'research', visible: true },
         { name: 'Assets', path: 'assets', visible: false },
         { name: 'System', path: '.', visible: false }
     ] },
@@ -670,7 +669,7 @@ function buildSettingsObject(parsed = {}) {
 }
 
 // Generate default settings.yaml content
-function getDefaultSettingsContent(title = 'Research Notebook', subtitle = 'Bookmarks, notes, and connections', sections = ['research']) {
+function getDefaultSettingsContent(title = 'Research Notebook', subtitle = 'Bookmarks, notes, and connections', sections = []) {
     const settings = buildSettingsObject({
         notebook_title: title,
         notebook_subtitle: subtitle,
@@ -5128,7 +5127,7 @@ async function linkNotebookFolder() {
         notebookDirHandle = handle;
         filesystemLinked = true;
 
-        // Check if directory has existing content (section directories at root)
+        // Check if directory has existing content (sections or .notebook/settings.yaml)
         let hasContent = false;
         for await (const [name, entry] of handle.entries()) {
             if (entry.kind === 'directory' &&
@@ -5136,6 +5135,16 @@ async function linkNotebookFolder() {
                 !RESERVED_DIRECTORIES.has(name)) {
                 hasContent = true;
                 break;
+            }
+        }
+        // Also check for existing .notebook/settings.yaml (existing notebook without sections)
+        if (!hasContent) {
+            try {
+                const configDir = await handle.getDirectoryHandle('.notebook');
+                await configDir.getFileHandle('settings.yaml');
+                hasContent = true;  // Has settings.yaml, so it's an existing notebook
+            } catch (e) {
+                // No .notebook/settings.yaml, truly a new folder
             }
         }
 
@@ -5147,16 +5156,10 @@ async function linkNotebookFolder() {
             render();
             showToast(`📁 Linked to folder (loaded ${data.sections.length} sections)`);
         } else {
-            // New notebook: create default section and all system files including templates
-            const defaultSection = {
-                id: 'section-' + Date.now(),
-                name: 'Research',
-                items: []
-            };
-            data.sections = [defaultSection];
+            // New notebook: start empty, user adds sections via Add Section button
+            data.sections = [];
             data.systemNotes = [];  // Clear system notes from previous notebook
             await saveToFilesystem(handle);
-            await createSectionDir(defaultSection);  // Create section directory
             await ensureTemplateFiles(handle);  // Create template files for new notebooks
             // Reload to pick up the newly created system notes
             const fsData = await loadFromFilesystem(handle);

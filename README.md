@@ -1,6 +1,6 @@
 # Research Notebook
 
-A browser-based research management tool that combines bookmarks, markdown notes, and executable Python code in a single portable HTML file.
+A browser-based research management tool that combines bookmarks, markdown notes, and executable Python code with file-based storage.
 
 ## Features
 
@@ -14,9 +14,19 @@ A browser-based research management tool that combines bookmarks, markdown notes
 
 ## Getting Started
 
-1. Open `research_notebook.html` in Chrome or Edge
+1. Open `index.html` in Chrome or Edge
 2. Select a folder to store your notebook
 3. Start creating sections, notes, bookmarks, and code cells
+
+## Application Structure
+
+```
+repo/
+├── index.html          # HTML shell (210 lines)
+├── css/app.css         # Application styles (~2800 lines)
+├── js/app.js           # Application logic (~6500 lines)
+└── examples/           # Example notebooks with different themes
+```
 
 ## Design Philosophy
 
@@ -26,15 +36,19 @@ The notebook stores data as plain files in a folder structure designed for easy 
 
 ```
 notebook-folder/
-├── notebook.json           # Title, subtitle, section order
-├── README.md               # Auto-generated, editable
-├── CLAUDE.md               # Auto-generated, for Claude Code
-├── .gitignore              # Auto-generated
-├── sections/
-│   └── section-name/
-│       ├── note-title.md           # Markdown with YAML frontmatter
-│       ├── code-title.code.py      # Python with comment frontmatter
-│       └── bookmark.bookmark.json  # Bookmark metadata
+├── .notebook/              # Configuration directory
+│   ├── settings.yaml       # Notebook settings
+│   ├── theme.css           # Custom theme
+│   └── templates/          # Card templates
+│       ├── note.yaml
+│       ├── code.yaml
+│       └── bookmark.yaml
+├── CLAUDE.md               # For Claude Code
+├── README.md               # Notebook readme
+├── research/               # Section directories
+│   ├── note-title.md
+│   ├── code-title.code.py
+│   └── bookmark.bookmark.json
 └── assets/thumbnails/      # Bookmark thumbnails
 ```
 
@@ -42,11 +56,11 @@ This means:
 - **Claude Code can read and edit your notes directly** as markdown/Python files
 - **Git-friendly**: Meaningful diffs, version history per item
 - **Portable**: Standard formats editable in any text editor
-- **System notes**: Config files like `.gitignore` appear in the notebook UI
+- **System notes**: Config files appear in the notebook UI
 
 ### LLM-Navigable Codebase
 
-The single-file application (`research_notebook.html`, ~5000 lines) is structured for LLM navigation:
+The application code (`js/app.js`, ~6500 lines) is structured for LLM navigation:
 
 - **Section markers**: `// ========== SECTION: NAME ==========` divide the code
 - **Inline comments**: Each function has a descriptive comment above it
@@ -60,7 +74,7 @@ The single-file application (`research_notebook.html`, ~5000 lines) is structure
 
 ## Theming
 
-Each notebook includes a `theme.css` file you can edit to customize colors and styling:
+Each notebook includes a `.notebook/theme.css` file you can edit to customize colors and styling:
 
 ```css
 :root {
@@ -70,7 +84,7 @@ Each notebook includes a `theme.css` file you can edit to customize colors and s
 }
 ```
 
-See `theme.css` in the repo root for a full reference of all customizable CSS variables and selectors. The `examples/demo-notebook/theme.css` shows a more elaborate theme with textures.
+See `theme.css` in the repo root for a full reference of all customizable CSS variables and selectors. The `examples/demo-notebook/.notebook/theme.css` shows a more elaborate theme with textures.
 
 ## Requirements
 

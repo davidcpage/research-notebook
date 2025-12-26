@@ -2,9 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Navigating the Large Single-File Application
+## Navigating the Application
 
-**IMPORTANT**: `research_notebook.html` is a 5000+ line single-file application that cannot be read in full in one context window.
+**Structure**: The app is split into three files:
+- `index.html` - HTML shell (~210 lines)
+- `css/app.css` - All styles (~2800 lines)
+- `js/app.js` - All JavaScript (~6500 lines)
 
 ### How to Navigate
 
@@ -14,10 +17,10 @@ Run `/start` or `python3 generate_index.py --sections` to see section layout wit
 
 **IMPORTANT**: Before launching Explore agents, use `generate_index.py` and targeted Grep/Read. This codebase is well-documented - CLAUDE.md covers architecture, and `generate_index.py --search TERM` quickly finds function locations. Explore agents are expensive (~100k tokens) and often redundant here.
 
-Key sections: HTML_HEAD (CSS), HTML_BODY_AND_MODALS, STATE_AND_CONFIG, TEMPLATE_SYSTEM, GENERIC_EDITOR,
+Key sections in js/app.js: STATE_AND_CONFIG, TEMPLATE_SYSTEM, GENERIC_EDITOR,
 DATA_PERSISTENCE, FILESYSTEM_STORAGE, PYODIDE_RUNTIME, INTERNAL_LINKING, RENDER_FUNCTIONS, EVENT_HANDLERS_AND_INIT
 
-Section markers: `// ========== SECTION: NAME ==========` (JS) or `<!-- ========== SECTION: NAME ========== -->` (HTML)
+Section markers: `// ========== SECTION: NAME ==========`
 
 Add a comment above new functions describing their purpose (parsed by generate_index.py).
 
@@ -29,7 +32,7 @@ To find CSS or modify rendering for a card type, trace from template to render f
 2. Note the `card.layout` and `viewer.layout` values (e.g., `image`, `document`, `split-pane`)
 3. Search for render function: `render{Layout}Preview` for cards, `render{Layout}Viewer` for viewers
 4. The render function shows exact HTML structure and CSS class names
-5. Search for those classes in HTML_HEAD section for styling
+5. Search for those classes in `css/app.css` for styling
 
 Example: Bookmark uses `layout: 'image'` → `renderImagePreview()` / `renderImageViewer()` → classes like `.viewer-image-container`, `.viewer-thumbnail`, `.viewer-url`, `.viewer-description`
 
@@ -38,10 +41,10 @@ Example: Bookmark uses `layout: 'image'` → `renderImagePreview()` / `renderIma
 ## Common Tasks
 
 ### Adding a new modal
-1. Add HTML in HTML_BODY_AND_MODALS section
-2. Add CSS in HTML_HEAD section
-3. Add open/close/save functions in new or appropriate section
-4. Add Enter key handler in EVENT_HANDLERS_AND_INIT
+1. Add HTML in `index.html` (body section)
+2. Add CSS in `css/app.css`
+3. Add open/close/save functions in appropriate section of `js/app.js`
+4. Add Enter key handler in EVENT_HANDLERS_AND_INIT section
 
 ### Modifying data structure
 1. Update `data` structure in STATE_AND_CONFIG
@@ -101,8 +104,14 @@ The `image` template supports image files (.png, .jpg, .jpeg, .gif, .webp, .svg)
 
 ## Architecture
 
-### Single-File Structure
-- All CSS, HTML, and JavaScript in `research_notebook.html`
+### Multi-File Structure
+```
+repo/
+├── index.html          # HTML shell with CDN imports (~210 lines)
+├── css/app.css         # All application styles (~2800 lines)
+├── js/app.js           # All application JavaScript (~6500 lines)
+└── examples/           # Example notebooks
+```
 - External CDN dependencies: PDF.js, Marked.js, KaTeX, Pyodide, Highlight.js, CodeMirror 6
 
 ### Data Model
@@ -268,7 +277,7 @@ CodeMirror 6 provides syntax highlighting in editor fields for code, YAML, CSS, 
 ### Architecture
 - **Loaded via ES modules** using import maps (no build step required)
 - **Lazy loading**: CodeMirror modules load on first editor open, then cached
-- **Import map**: Defined in HTML_HEAD, maps `@codemirror/*` packages to esm.sh CDN
+- **Import map**: Defined in `index.html`, maps `@codemirror/*` packages to esm.sh CDN
 - **Theming**: One Dark theme for code/YAML/CSS, custom light theme for Markdown
 
 ### Key Functions (GENERIC_EDITOR section)
@@ -291,8 +300,8 @@ CodeMirror 6 provides syntax highlighting in editor fields for code, YAML, CSS, 
 - **Two modes**: Full editor with Write/Preview tabs (notes), compact editor without tabs (bookmark descriptions)
 
 ### Adding a New Language
-1. Add package to import map in HTML_HEAD (e.g., `"@codemirror/lang-javascript": "https://esm.sh/*@codemirror/lang-javascript@6.x.x"`)
-2. Add import in `loadCodeMirror()`
+1. Add package to import map in `index.html` (e.g., `"@codemirror/lang-javascript": "https://esm.sh/*@codemirror/lang-javascript@6.x.x"`)
+2. Add import in `loadCodeMirror()` in `js/app.js`
 3. Add case in `createCodeMirrorEditor()` switch statement
 4. Set `language` property in template's editor field config
 
@@ -305,7 +314,7 @@ CodeMirror 6 provides syntax highlighting in editor fields for code, YAML, CSS, 
 ## Development Guidelines
 
 ### Testing
-- Open `research_notebook.html` directly in browser (no build/server needed)
+- Open `index.html` directly in browser (no build/server needed)
 - Data in IndexedDB: Database `ResearchNotebookDB`, Store `notebook`
 - View in DevTools → Application → IndexedDB
 

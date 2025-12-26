@@ -1,0 +1,113 @@
+/*
+ * Dev Notebook Theme: "Terminal"
+ * Dark, code-focused aesthetic
+ */
+
+:root {
+    /* Dark terminal palette */
+    --bg-primary: #1e1e1e;
+    --bg-secondary: #252526;
+    --bg-accent: #2d2d2d;
+    --text-primary: #d4d4d4;
+    --text-secondary: #9cdcfe;
+    --text-muted: #6a9955;
+    --border: #3c3c3c;
+    --border-dark: #505050;
+    --accent: #569cd6;
+    --accent-hover: #4fc1ff;
+    --shadow: rgba(0, 0, 0, 0.3);
+    --note-bg: #252526;
+    --note-border: #3c3c3c;
+    --link-color: #4ec9b0;
+    --link-hover: #9cdcfe;
+
+    /* Code colors */
+    --code-bg: #1e1e1e;
+    --code-text: #d4d4d4;
+}
+
+/* Header - keep dark but adjust colors */
+header {
+    background: #2d2d2d;
+}
+
+header::before {
+    background:
+        radial-gradient(circle at 20% 50%, rgba(86, 156, 214, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(78, 201, 176, 0.1) 0%, transparent 40%);
+}
+
+/* Monospace headers for terminal feel */
+header h1, header h2 {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-weight: normal;
+}
+
+/* Button overrides for dark theme */
+.btn-secondary {
+    background: #3c3c3c;
+    color: #d4d4d4;
+    border-color: #505050;
+}
+
+.btn-secondary:hover {
+    background: #4a4a4a;
+    border-color: #6a6a6a;
+}
+
+.btn-note {
+    background: #2d3748;
+    color: #d4d4d4;
+    border-color: #4a5568;
+}
+
+.btn-note:hover {
+    background: #3d4a5c;
+    border-color: #569cd6;
+}
+
+.btn-code {
+    background: #1e3a1e;
+    color: #d4d4d4;
+    border-color: #2d5a2d;
+}
+
+.btn-code:hover {
+    background: #2d4a2d;
+    border-color: #4ec9b0;
+}
+
+/* Note cards - dark style */
+.card[data-template="note"] {
+    --template-border: #3c3c3c;
+    --template-bg: #252526;
+    --template-preview-bg: #1e1e1e;
+    --template-title-text: #9cdcfe;
+    --template-meta-text: #6a9955;
+}
+
+/* Section styling */
+.section-header h3 {
+    color: var(--text-primary);
+}
+
+/* Modal backgrounds */
+.modal-content {
+    background: #252526;
+    color: #d4d4d4;
+}
+
+.modal-header {
+    border-color: #3c3c3c;
+}
+
+/* Input fields */
+input, textarea, select {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border-color: #3c3c3c;
+}
+
+input:focus, textarea:focus, select:focus {
+    border-color: #569cd6;
+}
