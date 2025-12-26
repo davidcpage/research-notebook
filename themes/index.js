@@ -51,7 +51,8 @@ export async function loadTheme(themeId) {
         throw new Error(`Unknown theme: ${themeId}`);
     }
 
-    // Dynamic import - works with file:// protocol in modern browsers
+    // NOTE: Dynamic import does NOT work with file:// protocol (CORS error)
+    // This module is currently unused - see multi-file-architecture ADR
     const module = await import(`./${themeId}.js`);
     return module;
 }

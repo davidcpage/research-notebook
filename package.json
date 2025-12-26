@@ -1,0 +1,29 @@
+{
+  "name": "notebook",
+  "version": "1.0.0",
+  "description": "File-based notebook for notes, code, and bookmarks - works with Claude Code",
+  "type": "module",
+  "bin": {
+    "notebook": "./cli.js"
+  },
+  "scripts": {
+    "start": "node cli.js"
+  },
+  "keywords": [
+    "notebook",
+    "markdown",
+    "research",
+    "claude",
+    "llm",
+    "notes",
+    "code"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anthropics/research-notebook"
+  }
+}

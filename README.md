@@ -84,7 +84,7 @@ Each notebook includes a `.notebook/theme.css` file you can edit to customize co
 }
 ```
 
-See `theme.css` in the repo root for a full reference of all customizable CSS variables and selectors. The `examples/demo-notebook/.notebook/theme.css` shows a more elaborate theme with textures.
+See `theme-reference.css` in the repo root for a full reference of all customizable CSS variables and selectors. The `examples/demo-notebook/.notebook/theme.css` shows a more elaborate theme with textures.
 
 ## Requirements
 

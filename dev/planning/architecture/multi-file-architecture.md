@@ -3,34 +3,141 @@ id: dev-multi-file-architecture
 title: Multi-File Architecture
 author: Claude
 created: 2024-12-26T11:00:00Z
-modified: 2025-12-26T15:30:00Z
-tags: [rejected, architecture]
+modified: 2025-12-26T17:00:00Z
+tags: [active, architecture]
 ---
 
 # Multi-File Architecture
 
-*ADR: Migrating from single HTML file to multi-file ES modules architecture*
+*ADR: Migrating from single HTML file to multi-file architecture with server-based loading*
 
 ## Status
 
-**Partially Implemented, JS Modules Rejected** - CSS/HTML extraction done, JS module splitting abandoned.
+**Revisited: Server-Based Approach Approved** - Accepting server requirement to enable real file separation.
 
-### Resolution (2025-12-26)
+### History
 
-**What was implemented:**
-- Phase 1-3: Directory structure, CSS extraction (`css/app.css`), JS extraction (`js/app.js`)
+**Phase 1-3 (Completed 2025-12-26):**
+- Directory structure, CSS extraction (`css/app.css`), JS extraction (`js/app.js`)
 - Result: `index.html` (210 lines), `css/app.css` (~2800 lines), `js/app.js` (~6500 lines)
 
-**What was rejected: JS module splitting (Phase 4+)**
+**Phase 4+ Initially Rejected:**
+ES modules don't work with `file://` protocol. This was seen as conflicting with "double-click to open" goal.
 
-ES modules don't work with `file://` protocol - they require a server. This conflicts with the core design goal of "double-click to open."
+**Phase 4+ Revisited (2025-12-26):**
+Re-evaluating the constraint. Target users run Claude Code alongside the notebook, meaning:
+- They already have a terminal open
+- They likely have Node.js installed
+- A simple CLI command (`notebook`) is acceptable UX
 
-Attempted workaround (regular script loading without ES modules) provides no real benefit:
-- All functions remain in global namespace (no encapsulation)
-- Manual script ordering required
-- Same maintainability as single file, but split across multiple files
+### New Decision
 
-**Decision:** Keep single `js/app.js` with clear section markers. The existing `generate_index.py` tool provides adequate navigation for a ~6500 line file. Theme/template features can be implemented without JS module splitting.
+**Accept server requirement** to unlock:
+- Real `.css` theme files (not JS-wrapped strings)
+- Real `.yaml` template files (not embedded in app.js)
+- Dynamic theme picker with live preview
+- Cleaner codebase (remove ~500 lines of embedded strings)
+- Standard web development patterns
+
+**No fallback mode** - maintaining two copies (embedded + real files) is a maintenance burden. If opened via `file://`, show a friendly message directing users to run `notebook`.
+
+---
+
+## Server-Based Architecture
+
+### CLI Tool
+
+Simple Node.js CLI installed via npm:
+
+```bash
+# Install globally (one-time, from repo)
+npm link
+
+# Run from anywhere
+notebook              # Starts server, opens browser
+notebook --port 8081  # Custom port
+```
+
+### Target Structure
+
+```
+repo/
+├── package.json               # npm package with bin entry
+├── cli.js                     # Node.js static file server
+├── index.html                 # HTML shell
+├── css/
+│   └── app.css                # Application styles
+├── js/
+│   └── app.js                 # Application logic (single file, section markers)
+├── defaults/
+│   └── templates/
+│       ├── note.yaml          # Real YAML files
+│       ├── code.yaml
+│       ├── bookmark.yaml
+│       ├── image.yaml
+│       ├── theme.yaml
+│       └── settings.yaml
+├── themes/
+│   ├── index.json             # Theme registry metadata
+│   ├── manuscript.css         # Real CSS files
+│   ├── minimal.css
+│   ├── terminal.css
+│   └── handwritten.css
+├── theme-reference.css        # Documentation of all customizable selectors
+└── examples/
+    ├── research-notebook/     # Research use case
+    ├── tutor-notebook/        # AI tutoring use case
+    └── dev-notebook/          # Development use case
+```
+
+### How Dynamic Loading Works
+
+With HTTP serving, the app can use `fetch()` to load files from its own directory:
+
+```js
+// Load theme registry
+const themes = await fetch('/themes/index.json').then(r => r.json());
+
+// Load a theme's CSS
+const css = await fetch(`/themes/${themeId}.css`).then(r => r.text());
+
+// Load default templates
+const noteYaml = await fetch('/defaults/templates/note.yaml').then(r => r.text());
+```
+
+### file:// Protocol Handling
+
+When opened via `file://`:
+1. Detect: `window.location.protocol === 'file:'`
+2. Show friendly error page with install instructions
+3. No fallback - server mode is required
+
+```html
+<div id="file-protocol-error" style="display:none">
+  <h1>Server Required</h1>
+  <p>This app requires a local server. Run:</p>
+  <pre>npm link  # one-time install
+notebook  # start server</pre>
+</div>
+```
+
+### Theme Picker Flow
+
+1. Settings modal includes "Theme" section
+2. Dropdown lists themes from `/themes/index.json`
+3. Selecting a theme:
+   - Fetches `/themes/{id}.css`
+   - Writes to notebook's `.notebook/theme.css`
+   - Reloads theme CSS
+4. "Custom" option preserves existing `.notebook/theme.css`
+
+### Lazy/Copy-on-Write for Templates
+
+1. App loads defaults from `/defaults/templates/*.yaml` via fetch
+2. Notebooks start minimal - no `.notebook/templates/` needed
+3. When user edits a template, modified version writes to notebook
+4. On load, notebook-local files override app defaults
+5. "Reset to defaults" deletes the local file
 
 ---
 

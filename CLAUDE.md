@@ -76,7 +76,7 @@ Card rendering, viewer display, and editing all work automatically via templates
 - `.notebook/theme.css` loads into `@layer theme` (highest layer, overrides all built-in styles)
 - Print styles are unlayered, so they beat theme backgrounds (clean white print by default)
 - New notebooks get a minimal starter `theme.css` with documented variables
-- Full reference: `/theme.css` in repo root documents all customizable selectors
+- Full reference: `/theme-reference.css` in repo root documents all customizable selectors
 - Demo theme: `examples/demo-notebook/.notebook/theme.css` shows elaborate theming with textures
 - Key function: `getDefaultThemeContent()` generates the starter theme for new notebooks
 

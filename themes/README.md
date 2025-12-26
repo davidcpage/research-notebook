@@ -64,11 +64,13 @@ const css = await getThemeCSS('manuscript');
 
 ### Why ES Modules?
 
-ES module `import()` works with the `file://` protocol in modern browsers, allowing the app to dynamically load themes without a server. The `.css` files are kept for backwards compatibility and manual use.
+> **Note**: ES module `import()` does NOT work with the `file://` protocol due to CORS restrictions. These theme modules are currently **not integrated** into the app. See the multi-file-architecture ADR for details on this rejected approach.
+
+For now, use manual copy (see above) or wait for a future theme picker UI that will embed themes directly in the app.
 
 ## Creating Your Own Theme
 
-Themes use CSS custom properties and `[data-template="..."]` selectors. See the [theme.css reference](/theme.css) in the repo root for all customizable selectors.
+Themes use CSS custom properties and `[data-template="..."]` selectors. See [theme-reference.css](/theme-reference.css) in the repo root for all customizable selectors.
 
 ### Key Concepts
 
