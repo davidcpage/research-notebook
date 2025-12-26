@@ -1,5 +1,5 @@
-notebook_title: Research Notebook
-notebook_subtitle: Bookmarks, notes, and connections
+notebook_title: AI Tutor Notebook
+notebook_subtitle: Learn with Claude as your guide
 sections:
   - name: quizzes
     visible: true
@@ -8,7 +8,7 @@ sections:
     visible: false
     path: assets
   - name: System
-    visible: false
+    visible: true
     path:
       - .
       - .notebook
@@ -57,4 +57,4 @@ extensions:
     parser: text-image
     defaultTemplate: image
 theme: friendly
-quiz_self_review: false
+quiz_self_review: true
