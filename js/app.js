@@ -383,7 +383,8 @@ const SETTINGS_SCHEMA = {
     default_author: { default: null },
     authors: { default: [{ name: 'Claude', icon: 'claude.svg' }] },
     extensions: { default: () => getDefaultExtensionRegistry() },
-    theme: { default: null }
+    theme: { default: null },
+    quiz_self_review: { default: true }  // Allow students to self-mark pending questions
 };
 
 // Build settings object from parsed data, filling in defaults
@@ -1912,6 +1913,17 @@ function renderQuizQuestion(question, index, attempt, isInteractive = false) {
 
 // Render review UI for pending_review questions
 function renderReviewUI(attemptAnswer, questionIndex) {
+    // Check if self-review is allowed
+    const allowSelfReview = notebookSettings?.quiz_self_review !== false;
+
+    if (!allowSelfReview) {
+        // Show awaiting review message instead of buttons
+        return `<div class="quiz-awaiting-review">
+            <span class="quiz-awaiting-icon">⏳</span>
+            Awaiting review
+        </div>`;
+    }
+
     return `<div class="quiz-review-ui" data-question-index="${questionIndex}">
         <div class="quiz-review-label">Mark this answer:</div>
         <div class="quiz-review-buttons">

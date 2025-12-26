@@ -1,4 +1,60 @@
-title: Tutor Notebook
-subtitle: Learning with an AI tutor
+notebook_title: Research Notebook
+notebook_subtitle: Bookmarks, notes, and connections
+sections:
+  - name: quizzes
+    visible: true
+    path: quizzes
+  - name: Assets
+    visible: false
+    path: assets
+  - name: System
+    visible: false
+    path:
+      - .
+      - .notebook
+      - .notebook/templates
 default_author: Claude
+authors:
+  - name: Claude
+    icon: claude.svg
+extensions:
+  .md:
+    parser: yaml-frontmatter
+    defaultTemplate: note
+    bodyField: content
+  .code.py:
+    parser: comment-frontmatter
+    defaultTemplate: code
+    bodyField: code
+    companionFiles:
+      - suffix: .output.html
+        field: output
+  .bookmark.json:
+    parser: json
+    defaultTemplate: bookmark
+  .quiz.json:
+    parser: json
+    defaultTemplate: quiz
+  .card.yaml:
+    parser: yaml
+    defaultTemplate: null
+  .png:
+    parser: binary-image
+    defaultTemplate: image
+  .jpg:
+    parser: binary-image
+    defaultTemplate: image
+  .jpeg:
+    parser: binary-image
+    defaultTemplate: image
+  .gif:
+    parser: binary-image
+    defaultTemplate: image
+  .webp:
+    parser: binary-image
+    defaultTemplate: image
+  .svg:
+    parser: text-image
+    defaultTemplate: image
 theme: friendly
+quiz_self_review: false

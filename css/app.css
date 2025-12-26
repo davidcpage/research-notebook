@@ -1745,6 +1745,23 @@ main {
     font-style: italic;
 }
 
+.quiz-awaiting-review {
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--quiz-pending-bg);
+    color: var(--quiz-pending-text);
+    border-radius: 6px;
+    border-left: 3px solid var(--quiz-pending-text);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
+.quiz-awaiting-icon {
+    font-size: 1.1rem;
+}
+
 /* Worked problem */
 .quiz-worked {
     padding: 0.75rem;
