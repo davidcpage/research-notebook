@@ -1,0 +1,44 @@
+{
+  "id": "completed-quiz",
+  "title": "Completed Quiz Example",
+  "author": "Claude",
+  "topic": "Math Basics",
+  "questions": [
+    {
+      "type": "multiple_choice",
+      "question": "What is 2 + 2?",
+      "options": ["3", "4", "5", "6"],
+      "correct": 1,
+      "explanation": "2 + 2 = 4"
+    },
+    {
+      "type": "numeric",
+      "question": "What is the square root of 16?",
+      "answer": 4,
+      "tolerance": 0,
+      "explanation": "√16 = 4 because 4 × 4 = 16"
+    },
+    {
+      "type": "short_answer",
+      "question": "Describe what multiplication means in your own words.",
+      "explanation": "Multiplication is repeated addition. For example, 3 × 4 means adding 4 three times."
+    }
+  ],
+  "attempts": [
+    {
+      "timestamp": "2025-12-26T12:30:00Z",
+      "answers": [
+        { "questionIndex": 0, "answer": 1, "status": "correct" },
+        { "questionIndex": 1, "answer": 4, "status": "correct" },
+        { "questionIndex": 2, "answer": "Multiplication is when you add a number to itself multiple times.", "status": "pending_review" }
+      ],
+      "score": {
+        "correct": 2,
+        "total": 3,
+        "pending_review": 1
+      }
+    }
+  ],
+  "created": "2025-12-26T12:00:00Z",
+  "modified": "2025-12-26T12:30:00Z"
+}

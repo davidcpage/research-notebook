@@ -1,0 +1,102 @@
+name: quiz
+description: Interactive quiz with multiple question types for self-assessment
+schema:
+  title:
+    type: text
+    required: true
+  author:
+    type: text
+  topic:
+    type: text
+    description: Subject area for progress tracking
+  questions:
+    type: array
+    required: true
+    description: Array of question objects
+    items:
+      type: object
+      properties:
+        type:
+          type: text
+          enum: [multiple_choice, numeric, short_answer, worked, matching, ordering]
+          required: true
+        question:
+          type: markdown
+          required: true
+        # multiple_choice fields
+        options:
+          type: array
+          description: Answer options for multiple_choice
+        correct:
+          type: number
+          description: Index of correct option (0-based)
+        # numeric fields
+        answer:
+          type: number
+          description: Expected numeric answer
+        tolerance:
+          type: number
+          description: Acceptable margin of error
+          default: 0
+        # matching fields
+        pairs:
+          type: array
+          description: Array of [left, right] pairs to match
+        # ordering fields
+        correctOrder:
+          type: array
+          description: Items in correct order
+        # Common optional fields
+        hint:
+          type: markdown
+          description: Hint shown on request
+        explanation:
+          type: markdown
+          description: Shown after answering
+        points:
+          type: number
+          default: 1
+  attempts:
+    type: array
+    description: Array of attempt records
+    items:
+      type: object
+      properties:
+        timestamp:
+          type: datetime
+        answers:
+          type: array
+          description: Array of {questionIndex, answer, status}
+        score:
+          type: object
+          properties:
+            correct:
+              type: number
+            total:
+              type: number
+            pending_review:
+              type: number
+        review:
+          type: markdown
+          description: Claude's feedback on pending_review questions
+  created:
+    type: datetime
+  modified:
+    type: datetime
+card:
+  layout: quiz
+  placeholder: "❓"
+viewer:
+  layout: quiz
+editor:
+  layout: yaml
+style:
+  variables:
+    --template-border: "#c9d4e8"
+    --template-bg: "#f0f4fa"
+    --template-preview-bg: "#e8eef6"
+    --template-title-text: "#2c3e50"
+ui:
+  button_label: null
+  icon: "❓"
+  sort_order: 10

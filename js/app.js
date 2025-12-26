@@ -143,6 +143,10 @@ function getDefaultExtensionRegistry() {
             parser: 'json',
             defaultTemplate: 'bookmark'
         },
+        '.quiz.json': {
+            parser: 'json',
+            defaultTemplate: 'quiz'
+        },
         '.card.yaml': {
             parser: 'yaml',
             defaultTemplate: null  // Must specify template: in file
@@ -1336,6 +1340,8 @@ function renderCardPreview(card, template) {
             return renderFieldsPreview(card, template);
         case 'yaml':
             return renderYamlPreview(card, template);
+        case 'quiz':
+            return renderQuizPreview(card, template);
         default:
             return `<div class="preview-placeholder">${placeholder}</div>`;
     }
@@ -1500,6 +1506,51 @@ function renderYamlPreview(card, template) {
     return `<pre class="preview-yaml">${escapeHtml(yamlStr)}</pre>`;
 }
 
+// Quiz layout: show question count and progress
+function renderQuizPreview(card, template) {
+    const questions = card.questions || [];
+    const attempts = card.attempts || [];
+    const placeholder = template.card?.placeholder || '❓';
+    const topic = card.topic ? `<div class="quiz-topic">${escapeHtml(card.topic)}</div>` : '';
+
+    if (questions.length === 0) {
+        return `<div class="preview-placeholder">${placeholder}</div>`;
+    }
+
+    // Calculate progress from most recent attempt
+    let progressHtml = '';
+    let stateClass = 'quiz-not-started';
+
+    if (attempts.length > 0) {
+        const lastAttempt = attempts[attempts.length - 1];
+        const score = lastAttempt.score || {};
+        const correct = score.correct || 0;
+        const total = score.total || questions.length;
+        const pending = score.pending_review || 0;
+
+        if (pending > 0) {
+            stateClass = 'quiz-pending-review';
+            progressHtml = `<div class="quiz-progress">
+                <span class="quiz-score">${correct}/${total} correct</span>
+                <span class="quiz-pending">${pending} awaiting review</span>
+            </div>`;
+        } else {
+            stateClass = 'quiz-completed';
+            progressHtml = `<div class="quiz-progress">
+                <span class="quiz-score">${correct}/${total} correct</span>
+            </div>`;
+        }
+    }
+
+    return `
+        <div class="quiz-preview ${stateClass}">
+            ${topic}
+            <div class="quiz-question-count">${questions.length} question${questions.length !== 1 ? 's' : ''}</div>
+            ${progressHtml}
+        </div>
+    `;
+}
+
 // Render card title (may use template formatting)
 function renderCardTitle(card, template) {
     if (template.card?.title_template) {
@@ -1646,6 +1697,8 @@ function renderViewerContent(card, template) {
             return renderViewerSections(card, template);
         case 'yaml':
             return renderViewerYaml(card, template);
+        case 'quiz':
+            return renderQuizViewer(card, template);
         default:
             return renderViewerDocument(card, template);
     }
@@ -1696,6 +1749,292 @@ function renderViewerYaml(card, template) {
 
     const yamlStr = jsyaml.dump(viewObj, { indent: 2, lineWidth: -1 });
     return `<pre class="viewer-yaml">${escapeHtml(yamlStr)}</pre>`;
+}
+
+// Quiz viewer: display all questions with their content
+function renderQuizViewer(card, template) {
+    const questions = card.questions || [];
+    const attempts = card.attempts || [];
+
+    if (questions.length === 0) {
+        return '<div class="viewer-empty">No questions in this quiz</div>';
+    }
+
+    // Get latest attempt for showing previous answers
+    const lastAttempt = attempts.length > 0 ? attempts[attempts.length - 1] : null;
+
+    let html = '<div class="quiz-viewer">';
+
+    // Topic header if present
+    if (card.topic) {
+        html += `<div class="quiz-viewer-topic">${escapeHtml(card.topic)}</div>`;
+    }
+
+    // Progress summary if there are attempts
+    if (lastAttempt) {
+        const score = lastAttempt.score || {};
+        html += `<div class="quiz-summary">
+            <span class="quiz-summary-score">${score.correct || 0}/${score.total || questions.length} correct</span>
+            ${score.pending_review ? `<span class="quiz-summary-pending">${score.pending_review} awaiting review</span>` : ''}
+        </div>`;
+    }
+
+    // Render each question
+    questions.forEach((q, index) => {
+        html += renderQuizQuestion(q, index, lastAttempt);
+    });
+
+    html += '</div>';
+    return html;
+}
+
+// Render a single quiz question (read-only display)
+function renderQuizQuestion(question, index, attempt) {
+    const qNum = index + 1;
+    const attemptAnswer = attempt?.answers?.find(a => a.questionIndex === index);
+
+    let statusClass = '';
+    let statusBadge = '';
+    if (attemptAnswer) {
+        if (attemptAnswer.status === 'correct') {
+            statusClass = 'quiz-correct';
+            statusBadge = '<span class="quiz-status-badge correct">✓</span>';
+        } else if (attemptAnswer.status === 'incorrect') {
+            statusClass = 'quiz-incorrect';
+            statusBadge = '<span class="quiz-status-badge incorrect">✗</span>';
+        } else if (attemptAnswer.status === 'pending_review') {
+            statusClass = 'quiz-pending';
+            statusBadge = '<span class="quiz-status-badge pending">⏳</span>';
+        }
+    }
+
+    let html = `<div class="quiz-question ${statusClass}" data-question-index="${index}">`;
+    html += `<div class="quiz-question-header">
+        <span class="quiz-question-number">Q${qNum}</span>
+        ${statusBadge}
+    </div>`;
+
+    // Question text (supports markdown)
+    html += `<div class="quiz-question-text md-content">${marked.parse(question.question || '')}</div>`;
+
+    // Render answer area based on question type
+    html += renderQuizAnswerArea(question, attemptAnswer);
+
+    // Hint (if available)
+    if (question.hint) {
+        html += `<details class="quiz-hint">
+            <summary>Hint</summary>
+            <div class="md-content">${marked.parse(question.hint)}</div>
+        </details>`;
+    }
+
+    // Explanation (shown after attempt)
+    if (attemptAnswer && question.explanation) {
+        html += `<div class="quiz-explanation">
+            <div class="quiz-explanation-label">Explanation</div>
+            <div class="md-content">${marked.parse(question.explanation)}</div>
+        </div>`;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+// Render the answer area for a question based on its type
+function renderQuizAnswerArea(question, attemptAnswer) {
+    const type = question.type || 'multiple_choice';
+
+    switch (type) {
+        case 'multiple_choice':
+            return renderMultipleChoiceAnswer(question, attemptAnswer);
+        case 'numeric':
+            return renderNumericAnswer(question, attemptAnswer);
+        case 'short_answer':
+            return renderShortAnswer(question, attemptAnswer);
+        case 'worked':
+            return renderWorkedAnswer(question, attemptAnswer);
+        case 'matching':
+            return renderMatchingAnswer(question, attemptAnswer);
+        case 'ordering':
+            return renderOrderingAnswer(question, attemptAnswer);
+        default:
+            return '<div class="quiz-unknown-type">Unknown question type</div>';
+    }
+}
+
+// Multiple choice: radio button options
+function renderMultipleChoiceAnswer(question, attemptAnswer) {
+    const options = question.options || [];
+    const correctIndex = question.correct;
+    const selectedIndex = attemptAnswer?.answer;
+
+    let html = '<div class="quiz-options">';
+    options.forEach((opt, i) => {
+        let optClass = 'quiz-option';
+        let indicator = '';
+
+        if (attemptAnswer) {
+            if (i === correctIndex) {
+                optClass += ' correct';
+                indicator = '<span class="quiz-option-indicator">✓</span>';
+            }
+            if (i === selectedIndex && i !== correctIndex) {
+                optClass += ' selected incorrect';
+                indicator = '<span class="quiz-option-indicator">✗</span>';
+            } else if (i === selectedIndex) {
+                optClass += ' selected';
+            }
+        }
+
+        html += `<div class="${optClass}">
+            <span class="quiz-option-letter">${String.fromCharCode(65 + i)}</span>
+            <span class="quiz-option-text">${escapeHtml(opt)}</span>
+            ${indicator}
+        </div>`;
+    });
+    html += '</div>';
+    return html;
+}
+
+// Numeric: show expected answer and tolerance
+function renderNumericAnswer(question, attemptAnswer) {
+    const answer = question.answer;
+    const tolerance = question.tolerance || 0;
+    const userAnswer = attemptAnswer?.answer;
+
+    let html = '<div class="quiz-numeric">';
+    if (attemptAnswer) {
+        html += `<div class="quiz-numeric-user">Your answer: <strong>${userAnswer !== undefined ? userAnswer : '—'}</strong></div>`;
+        html += `<div class="quiz-numeric-correct">Expected: <strong>${answer}</strong>`;
+        if (tolerance > 0) {
+            html += ` (±${tolerance})`;
+        }
+        html += '</div>';
+    } else {
+        html += '<div class="quiz-numeric-input-area">[Numeric input]</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+// Short answer: textarea for free response
+function renderShortAnswer(question, attemptAnswer) {
+    const userAnswer = attemptAnswer?.answer;
+
+    let html = '<div class="quiz-short-answer">';
+    if (attemptAnswer) {
+        html += `<div class="quiz-short-answer-response">${escapeHtml(userAnswer || '(No response)')}</div>`;
+        if (attemptAnswer.status === 'pending_review') {
+            html += '<div class="quiz-awaiting-review">Awaiting Claude review</div>';
+        }
+    } else {
+        html += '<div class="quiz-short-answer-area">[Short answer]</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+// Worked problem: multi-step solution
+function renderWorkedAnswer(question, attemptAnswer) {
+    const userAnswer = attemptAnswer?.answer;
+
+    let html = '<div class="quiz-worked">';
+    if (attemptAnswer && userAnswer) {
+        // userAnswer might be an array of steps or a single string
+        if (Array.isArray(userAnswer)) {
+            html += '<div class="quiz-worked-steps">';
+            userAnswer.forEach((step, i) => {
+                html += `<div class="quiz-worked-step">
+                    <span class="quiz-step-number">Step ${i + 1}:</span>
+                    <span class="quiz-step-content">${escapeHtml(step)}</span>
+                </div>`;
+            });
+            html += '</div>';
+        } else {
+            html += `<div class="quiz-worked-response">${escapeHtml(userAnswer)}</div>`;
+        }
+        if (attemptAnswer.status === 'pending_review') {
+            html += '<div class="quiz-awaiting-review">Awaiting Claude review</div>';
+        }
+    } else {
+        html += '<div class="quiz-worked-area">[Worked solution steps]</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+// Matching: pairs to connect
+function renderMatchingAnswer(question, attemptAnswer) {
+    const pairs = question.pairs || [];
+    const userPairs = attemptAnswer?.answer || [];
+
+    let html = '<div class="quiz-matching">';
+    html += '<div class="quiz-matching-pairs">';
+
+    pairs.forEach((pair, i) => {
+        const [left, right] = pair;
+        const userRight = userPairs[i];
+        let pairClass = 'quiz-matching-pair';
+
+        if (attemptAnswer) {
+            if (userRight === right) {
+                pairClass += ' correct';
+            } else {
+                pairClass += ' incorrect';
+            }
+        }
+
+        html += `<div class="${pairClass}">
+            <span class="quiz-matching-left">${escapeHtml(left)}</span>
+            <span class="quiz-matching-arrow">→</span>
+            <span class="quiz-matching-right">${escapeHtml(attemptAnswer ? (userRight || '?') : right)}</span>
+        </div>`;
+    });
+
+    html += '</div></div>';
+    return html;
+}
+
+// Ordering: items to arrange in sequence
+function renderOrderingAnswer(question, attemptAnswer) {
+    const correctOrder = question.correctOrder || [];
+    const userOrder = attemptAnswer?.answer || [];
+
+    let html = '<div class="quiz-ordering">';
+
+    if (attemptAnswer) {
+        html += '<div class="quiz-ordering-user"><div class="quiz-ordering-label">Your order:</div>';
+        userOrder.forEach((item, i) => {
+            const isCorrectPosition = correctOrder[i] === item;
+            html += `<div class="quiz-ordering-item ${isCorrectPosition ? 'correct' : 'incorrect'}">
+                <span class="quiz-ordering-number">${i + 1}</span>
+                <span class="quiz-ordering-text">${escapeHtml(item)}</span>
+            </div>`;
+        });
+        html += '</div>';
+
+        html += '<div class="quiz-ordering-correct"><div class="quiz-ordering-label">Correct order:</div>';
+        correctOrder.forEach((item, i) => {
+            html += `<div class="quiz-ordering-item correct">
+                <span class="quiz-ordering-number">${i + 1}</span>
+                <span class="quiz-ordering-text">${escapeHtml(item)}</span>
+            </div>`;
+        });
+        html += '</div>';
+    } else {
+        html += '<div class="quiz-ordering-items">';
+        // Show items in shuffled/random order for display
+        correctOrder.forEach((item, i) => {
+            html += `<div class="quiz-ordering-item">
+                <span class="quiz-ordering-handle">≡</span>
+                <span class="quiz-ordering-text">${escapeHtml(item)}</span>
+            </div>`;
+        });
+        html += '</div>';
+    }
+
+    html += '</div>';
+    return html;
 }
 
 // Image viewer: large image with description

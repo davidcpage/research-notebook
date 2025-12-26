@@ -5,7 +5,7 @@ title: "Planning: AI Tutor Features"
 author: Claude
 _subdir: features
 created: "2025-12-26T18:38:57.158Z"
-modified: "2025-12-26T19:00:00.000Z"
+modified: "2025-12-26T20:00:00.000Z"
 sectionId: section-planning
 tags: [planning, feature]
 ---
@@ -13,6 +13,26 @@ tags: [planning, feature]
 # AI Tutor Features: Implementation Plan
 
 This document plans the implementation of tutoring-focused features for research-notebook, enabling it to function as an AI tutoring platform where Claude Code acts as a tutor and the browser app displays learning materials.
+
+## Implementation Status
+
+| Component | Status | Issues |
+|-----------|--------|--------|
+| Quiz template definition | ✅ Complete | dp-038 |
+| Quiz card preview | ✅ Complete | dp-039 |
+| Quiz viewer (read-only) | ✅ Complete | dp-040 |
+| Quiz CSS styling | ✅ Complete | dp-041 |
+| Interactive quiz-taking | 🔲 Pending | dp-042 |
+| Auto-grading logic | 🔲 Pending | dp-043 |
+| Attempt storage | 🔲 Pending | dp-044 |
+| Review mode UI | 🔲 Pending | dp-045 |
+| CLAUDE.md for tutoring | 🔲 Pending | dp-046 |
+| README.md for tutoring | 🔲 Pending | dp-047 |
+| End-to-end testing | 🔲 Pending | dp-048 |
+| Theme integration | 🔲 Pending | dp-049 |
+| Progress tracking | 🔲 Pending | dp-050 |
+
+**Demo files**: `examples/tutor-notebook/quizzes/` contains test quizzes.
 
 ## Overview
 
@@ -218,22 +238,22 @@ ui:
 
 ### 1.5 Rendering
 
-#### Card Preview (`renderQuizPreview`)
+#### Card Preview (`renderQuizPreview`) ✅ Implemented
 - Shows quiz title and question count
 - Progress indicator if attempts exist (e.g., "2/5 correct, 1 pending review")
 - Visual indicator for quiz state: not started, in progress, completed
 
-#### Viewer (`renderQuizViewer`)
-- **Take mode**: Interactive quiz-taking interface
-  - One question at a time or all visible (user preference via settings?)
+#### Viewer (`renderQuizViewer`) ✅ Read-only implemented, 🔲 Interactive pending
+- **Design decision**: Viewer = interactive quiz-taking (student mode), Editor = YAML for raw editing (teacher/Claude)
+- **Take mode** (pending): Interactive quiz-taking interface
   - Input controls per question type
   - Hints revealed on request
   - Submit button
-- **Review mode**: After submission
+- **Review mode** (pending): After submission
   - Shows answers with correct/incorrect indicators
   - Displays explanations
   - For pending-review questions, shows "Awaiting Claude review" badge
-- **History mode**: Past attempts with scores
+- **Read-only display** (implemented): Shows all questions with answers from last attempt
 
 #### CSS Classes
 ```css
@@ -254,14 +274,15 @@ ui:
 
 ### 1.6 Implementation Steps
 
-1. **Template**: Create `defaults/templates/quiz.yaml`
-2. **Extension mapping**: Add `.quiz.json` → `json` parser in `getDefaultExtensionRegistry()`
-3. **Card layout**: Add `quiz` case in `renderCardPreview()` → `renderQuizPreview()`
-4. **Viewer layout**: Add `quiz` case in viewer rendering → `renderQuizViewer()`
-5. **Grading logic**: `gradeQuizAttempt(quiz, answers)` — auto-grade where possible
-6. **Attempt storage**: `saveQuizAttempt(card, answers)` — update card and save
-7. **CSS**: Add quiz-specific styles
-8. **Editor**: JSON/YAML editor for questions (advanced users / Claude-generated)
+1. ✅ **Template**: Create `defaults/templates/quiz.yaml`
+2. ✅ **Extension mapping**: Add `.quiz.json` → `json` parser in `getDefaultExtensionRegistry()`
+3. ✅ **Card layout**: Add `quiz` case in `renderCardPreview()` → `renderQuizPreview()`
+4. ✅ **Viewer layout**: Add `quiz` case in viewer rendering → `renderQuizViewer()` (read-only)
+5. 🔲 **Interactive UI**: Add input controls to viewer for quiz-taking
+6. 🔲 **Grading logic**: `gradeQuizAttempt(quiz, answers)` — auto-grade where possible
+7. 🔲 **Attempt storage**: `saveQuizAttempt(card, answers)` — update card and save
+8. ✅ **CSS**: Add quiz-specific styles
+9. ✅ **Editor**: Uses YAML layout for raw editing
 
 ---
 
@@ -368,27 +389,27 @@ An AI-assisted learning environment powered by Claude Code.
 
 ## 4. Implementation Order
 
-### Phase 1: Quiz Infrastructure
-1. Create `defaults/templates/quiz.yaml`
-2. Add extension mapping for `.quiz.json`
-3. Implement `renderQuizPreview()` — basic card display
-4. Implement `renderQuizViewer()` — question display (read-only first)
+### Phase 1: Quiz Infrastructure ✅ Complete
+1. ✅ Create `defaults/templates/quiz.yaml`
+2. ✅ Add extension mapping for `.quiz.json`
+3. ✅ Implement `renderQuizPreview()` — basic card display
+4. ✅ Implement `renderQuizViewer()` — question display (read-only)
+5. ✅ Add CSS styling for quiz components
 
-### Phase 2: Interactive Quizzes
-5. Add quiz-taking UI (inputs, selection, submission)
-6. Implement auto-grading for: multiple_choice, numeric, matching, ordering
-7. Implement attempt storage and progress display
-8. Add CSS styling for quiz components
+### Phase 2: Interactive Quizzes 🔲 Pending
+6. 🔲 Add quiz-taking UI in viewer (inputs, selection, submission)
+7. 🔲 Implement auto-grading for: multiple_choice, numeric, matching, ordering
+8. 🔲 Implement attempt storage
+9. 🔲 Add review mode UI (shows results after submission)
 
-### Phase 3: Claude Integration
-9. Mark non-auto-gradable answers as "pending review"
-10. Document review workflow in CLAUDE.md
-11. Test end-to-end: Claude creates quiz → student takes → Claude reviews
+### Phase 3: Documentation & Testing 🔲 Pending
+10. 🔲 Write CLAUDE.md for tutoring notebooks
+11. 🔲 Write README.md for tutoring notebooks
+12. 🔲 Test end-to-end: Claude creates quiz → student takes → Claude reviews
 
-### Phase 4: Polish
-12. Quiz editor improvements (if needed)
-13. Progress tracking enhancements
-14. Theme integration (quiz colors)
+### Phase 4: Polish 🔲 Pending
+13. 🔲 Theme integration (quiz colors work with all themes)
+14. 🔲 Progress tracking enhancements
 
 ---
 
@@ -540,4 +561,4 @@ Quiz States:
 
 ---
 
-*Status: Ready for implementation*
+*Status: Phase 1 complete. Ready for Phase 2 (interactive quiz-taking).*

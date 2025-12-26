@@ -1,0 +1,62 @@
+{
+  "id": "demo-quiz",
+  "title": "Demo Quiz: Question Types",
+  "author": "Claude",
+  "topic": "Quiz System Demo",
+  "questions": [
+    {
+      "type": "multiple_choice",
+      "question": "What is the capital of France?",
+      "options": ["London", "Berlin", "Paris", "Madrid"],
+      "correct": 2,
+      "hint": "It's known as the City of Light.",
+      "explanation": "Paris is the capital and largest city of France, located on the Seine River."
+    },
+    {
+      "type": "numeric",
+      "question": "What is the value of $\\pi$ to two decimal places?",
+      "answer": 3.14,
+      "tolerance": 0.01,
+      "hint": "It's the ratio of a circle's circumference to its diameter.",
+      "explanation": "Pi (π) ≈ 3.14159... The value 3.14 is the standard two-decimal approximation."
+    },
+    {
+      "type": "short_answer",
+      "question": "Explain in one sentence why the sky appears blue.",
+      "hint": "Think about how light interacts with Earth's atmosphere.",
+      "explanation": "Rayleigh scattering causes shorter blue wavelengths to scatter more than longer wavelengths."
+    },
+    {
+      "type": "worked",
+      "question": "Solve the equation: $2x + 5 = 13$\n\nShow your work step by step.",
+      "hint": "Start by isolating the variable term.",
+      "explanation": "Step 1: Subtract 5 from both sides: 2x = 8\nStep 2: Divide both sides by 2: x = 4"
+    },
+    {
+      "type": "matching",
+      "question": "Match each programming language with its primary use case:",
+      "pairs": [
+        ["Python", "Data Science"],
+        ["JavaScript", "Web Development"],
+        ["SQL", "Database Queries"],
+        ["CSS", "Styling"]
+      ],
+      "hint": "Think about what each language is most commonly associated with."
+    },
+    {
+      "type": "ordering",
+      "question": "Arrange these steps for making tea in the correct order:",
+      "correctOrder": [
+        "Boil water",
+        "Add tea bag to cup",
+        "Pour hot water",
+        "Steep for 3-5 minutes",
+        "Remove tea bag"
+      ],
+      "hint": "Start with the preparation step."
+    }
+  ],
+  "attempts": [],
+  "created": "2025-12-26T12:00:00Z",
+  "modified": "2025-12-26T12:00:00Z"
+}
