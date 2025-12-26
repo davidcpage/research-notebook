@@ -7,7 +7,12 @@
     {
       "type": "multiple_choice",
       "question": "What is the capital of France?",
-      "options": ["London", "Berlin", "Paris", "Madrid"],
+      "options": [
+        "London",
+        "Berlin",
+        "Paris",
+        "Madrid"
+      ],
       "correct": 2,
       "hint": "It's known as the City of Light.",
       "explanation": "Paris is the capital and largest city of France, located on the Seine River."
@@ -36,10 +41,22 @@
       "type": "matching",
       "question": "Match each programming language with its primary use case:",
       "pairs": [
-        ["Python", "Data Science"],
-        ["JavaScript", "Web Development"],
-        ["SQL", "Database Queries"],
-        ["CSS", "Styling"]
+        [
+          "Python",
+          "Data Science"
+        ],
+        [
+          "JavaScript",
+          "Web Development"
+        ],
+        [
+          "SQL",
+          "Database Queries"
+        ],
+        [
+          "CSS",
+          "Styling"
+        ]
       ],
       "hint": "Think about what each language is most commonly associated with."
     },
@@ -56,7 +73,121 @@
       "hint": "Start with the preparation step."
     }
   ],
-  "attempts": [],
+  "attempts": [
+    {
+      "timestamp": "2025-12-26T20:52:17.523Z",
+      "answers": [
+        {
+          "questionIndex": 0,
+          "answer": 2,
+          "status": "correct"
+        },
+        {
+          "questionIndex": 1,
+          "answer": 3.14,
+          "status": "correct"
+        },
+        {
+          "questionIndex": 2,
+          "answer": "I don't know",
+          "status": "incorrect",
+          "review": {
+            "feedback": "This needed an actual explanation. The sky appears blue because of **Rayleigh scattering** - shorter blue wavelengths of sunlight scatter more than longer red wavelengths when they hit molecules in Earth's atmosphere. Try reading about light scattering and give it another go!",
+            "reviewer": "Claude",
+            "reviewedAt": "2025-12-26T20:55:00Z"
+          }
+        },
+        {
+          "questionIndex": 3,
+          "answer": "x=4",
+          "status": "correct",
+          "review": {
+            "feedback": "Correct answer! Though next time, try to show your working steps:\n\n1. Subtract 5 from both sides: 2x = 8\n2. Divide both sides by 2: x = 4\n\nShowing your work helps catch errors and demonstrates understanding.",
+            "reviewer": "Claude",
+            "reviewedAt": "2025-12-26T20:55:00Z"
+          }
+        },
+        {
+          "questionIndex": 4,
+          "status": "incorrect"
+        },
+        {
+          "questionIndex": 5,
+          "answer": [
+            "Add tea bag to cup",
+            "Remove tea bag",
+            "Pour hot water",
+            "Boil water",
+            "Steep for 3-5 minutes"
+          ],
+          "status": "incorrect"
+        }
+      ],
+      "score": {
+        "correct": 3,
+        "total": 6,
+        "pending_review": 0
+      }
+    },
+    {
+      "timestamp": "2025-12-26T21:03:50.717Z",
+      "answers": [
+        {
+          "questionIndex": 0,
+          "answer": 2,
+          "status": "correct"
+        },
+        {
+          "questionIndex": 1,
+          "answer": 3.14,
+          "status": "correct"
+        },
+        {
+          "questionIndex": 2,
+          "answer": "I don't know, something to do with Raleigh scattering?",
+          "status": "correct",
+          "review": {
+            "feedback": "Yes! You're on the right track - it's **Rayleigh scattering** (note the spelling). The short blue wavelengths of sunlight scatter more than longer red wavelengths when hitting air molecules. That's why we see blue sky during the day, and red/orange sunsets when light travels through more atmosphere!",
+            "reviewer": "Claude",
+            "reviewedAt": "2025-12-26T21:05:00Z"
+          }
+        },
+        {
+          "questionIndex": 3,
+          "answer": "x=5",
+          "status": "incorrect",
+          "review": {
+            "feedback": "Not quite! Let's work through it:\n\n1. Start with: 2x + 5 = 13\n2. Subtract 5 from both sides: 2x = 8\n3. Divide both sides by 2: **x = 4**\n\nIt looks like you may have subtracted 3 instead of 5, or made an arithmetic slip. Try plugging x=5 back in: 2(5) + 5 = 15 ≠ 13. But x=4: 2(4) + 5 = 13 ✓",
+            "reviewer": "Claude",
+            "reviewedAt": "2025-12-26T21:05:00Z"
+          }
+        },
+        {
+          "questionIndex": 4,
+          "status": "incorrect"
+        },
+        {
+          "questionIndex": 5,
+          "answer": [
+            "Add tea bag to cup",
+            "Steep for 3-5 minutes",
+            "Boil water",
+            "Pour hot water",
+            "Remove tea bag"
+          ],
+          "status": "incorrect"
+        }
+      ],
+      "score": {
+        "correct": 3,
+        "total": 6,
+        "pending_review": 0
+      }
+    }
+  ],
   "created": "2025-12-26T12:00:00Z",
-  "modified": "2025-12-26T12:00:00Z"
+  "modified": "2025-12-26T21:05:00Z",
+  "_subdir": null,
+  "_fileModified": 1766782417171,
+  "type": "quiz"
 }
