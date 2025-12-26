@@ -53,6 +53,9 @@ const IDB_DIR_HANDLE_KEY = 'notebookDirHandle';  // IndexedDB key for persisting
 let filesystemObserver = null;  // FileSystemObserver instance for watching changes
 let isReloadingFromFilesystem = false;  // Flag to prevent observer triggering during reload
 
+// Quiz state: tracks current answers during quiz-taking
+let quizAnswers = {};  // { quizId: { questionIndex: answer, ... } }
+
 // Reserved directory names (excluded from section auto-discovery)
 // Note: 'assets' is NOT reserved - it's a regular section (default invisible)
 const RESERVED_DIRECTORIES = new Set([
@@ -1683,6 +1686,43 @@ function openViewer(sectionId, itemId) {
     modal.classList.add('active');
 }
 
+// Refresh the viewer if it's open (called after filesystem reload)
+function refreshOpenViewer() {
+    const modal = document.getElementById('viewerModal');
+    if (!modal?.classList.contains('active') || !currentViewingCard) {
+        return;
+    }
+
+    // Find the updated card in the reloaded data
+    const cardId = currentViewingCard.id;
+    const sectionId = currentViewingCard.sectionId;
+    const card = findCardById(cardId);
+
+    if (!card) {
+        console.log('[Viewer] Card no longer exists after reload');
+        return;
+    }
+
+    const template = templateRegistry[card.template || card.type];
+    if (!template) return;
+
+    // Update currentViewingCard reference
+    currentViewingCard = { ...card, sectionId };
+
+    // Re-render content
+    const contentEl = document.getElementById('viewerContent');
+    contentEl.innerHTML = renderViewerContent(card, template) + renderAuthorBadge(card);
+
+    // Apply syntax highlighting if needed
+    contentEl.querySelectorAll('pre code').forEach(el => {
+        if (!el.getAttribute('data-highlighted')) {
+            hljs.highlightElement(el);
+        }
+    });
+
+    console.log('[Viewer] Refreshed open viewer for card:', cardId);
+}
+
 function renderViewerContent(card, template) {
     const layout = template.viewer?.layout || 'document';
 
@@ -1763,15 +1803,24 @@ function renderQuizViewer(card, template) {
     // Get latest attempt for showing previous answers
     const lastAttempt = attempts.length > 0 ? attempts[attempts.length - 1] : null;
 
-    let html = '<div class="quiz-viewer">';
+    // Interactive mode: no attempts yet, or user clicked "Retake"
+    const isInteractive = !lastAttempt || card._quizRetakeMode;
+
+    let html = `<div class="quiz-viewer" data-quiz-id="${card.id}" data-interactive="${isInteractive}">`;
 
     // Topic header if present
     if (card.topic) {
         html += `<div class="quiz-viewer-topic">${escapeHtml(card.topic)}</div>`;
     }
 
-    // Progress summary if there are attempts
-    if (lastAttempt) {
+    // Mode header: Take Quiz vs Review Results
+    if (isInteractive) {
+        html += `<div class="quiz-mode-header">
+            <span class="quiz-mode-label">Take Quiz</span>
+            <span class="quiz-mode-count">${questions.length} question${questions.length !== 1 ? 's' : ''}</span>
+        </div>`;
+    } else {
+        // Progress summary for review mode
         const score = lastAttempt.score || {};
         html += `<div class="quiz-summary">
             <span class="quiz-summary-score">${score.correct || 0}/${score.total || questions.length} correct</span>
@@ -1781,15 +1830,26 @@ function renderQuizViewer(card, template) {
 
     // Render each question
     questions.forEach((q, index) => {
-        html += renderQuizQuestion(q, index, lastAttempt);
+        html += renderQuizQuestion(q, index, isInteractive ? null : lastAttempt, isInteractive);
     });
+
+    // Submit button for interactive mode, Retake button for review mode
+    if (isInteractive) {
+        html += `<div class="quiz-actions">
+            <button class="quiz-submit-btn" onclick="submitQuiz('${card.id}')">Submit Quiz</button>
+        </div>`;
+    } else if (lastAttempt) {
+        html += `<div class="quiz-actions">
+            <button class="quiz-retake-btn" onclick="retakeQuiz('${card.id}')">Retake Quiz</button>
+        </div>`;
+    }
 
     html += '</div>';
     return html;
 }
 
-// Render a single quiz question (read-only display)
-function renderQuizQuestion(question, index, attempt) {
+// Render a single quiz question (interactive or review mode)
+function renderQuizQuestion(question, index, attempt, isInteractive = false) {
     const qNum = index + 1;
     const attemptAnswer = attempt?.answers?.find(a => a.questionIndex === index);
 
@@ -1808,7 +1868,7 @@ function renderQuizQuestion(question, index, attempt) {
         }
     }
 
-    let html = `<div class="quiz-question ${statusClass}" data-question-index="${index}">`;
+    let html = `<div class="quiz-question ${statusClass}" data-question-index="${index}" data-question-type="${question.type || 'multiple_choice'}">`;
     html += `<div class="quiz-question-header">
         <span class="quiz-question-number">Q${qNum}</span>
         ${statusBadge}
@@ -1818,9 +1878,9 @@ function renderQuizQuestion(question, index, attempt) {
     html += `<div class="quiz-question-text md-content">${marked.parse(question.question || '')}</div>`;
 
     // Render answer area based on question type
-    html += renderQuizAnswerArea(question, attemptAnswer);
+    html += renderQuizAnswerArea(question, attemptAnswer, isInteractive, index);
 
-    // Hint (if available)
+    // Hint (if available) - always shown in interactive mode, collapsible
     if (question.hint) {
         html += `<details class="quiz-hint">
             <summary>Hint</summary>
@@ -1828,7 +1888,7 @@ function renderQuizQuestion(question, index, attempt) {
         </details>`;
     }
 
-    // Explanation (shown after attempt)
+    // Explanation (shown after attempt in review mode)
     if (attemptAnswer && question.explanation) {
         html += `<div class="quiz-explanation">
             <div class="quiz-explanation-label">Explanation</div>
@@ -1836,34 +1896,77 @@ function renderQuizQuestion(question, index, attempt) {
         </div>`;
     }
 
+    // Review UI for pending_review questions
+    if (attemptAnswer?.status === 'pending_review') {
+        html += renderReviewUI(attemptAnswer, index);
+    }
+
+    // Show existing review feedback if present
+    if (attemptAnswer?.review) {
+        html += renderReviewFeedback(attemptAnswer.review);
+    }
+
+    html += '</div>';
+    return html;
+}
+
+// Render review UI for pending_review questions
+function renderReviewUI(attemptAnswer, questionIndex) {
+    return `<div class="quiz-review-ui" data-question-index="${questionIndex}">
+        <div class="quiz-review-label">Mark this answer:</div>
+        <div class="quiz-review-buttons">
+            <button class="quiz-review-btn correct" onclick="submitQuizReview(${questionIndex}, 'correct')">
+                ✓ Correct
+            </button>
+            <button class="quiz-review-btn incorrect" onclick="submitQuizReview(${questionIndex}, 'incorrect')">
+                ✗ Incorrect
+            </button>
+        </div>
+        <textarea class="quiz-review-feedback" placeholder="Optional feedback..."
+                  id="reviewFeedback_${questionIndex}"></textarea>
+    </div>`;
+}
+
+// Render existing review feedback
+function renderReviewFeedback(review) {
+    let html = '<div class="quiz-review-result">';
+    if (review.feedback) {
+        html += `<div class="quiz-review-feedback-display">
+            <span class="quiz-review-feedback-label">Feedback:</span>
+            <div class="md-content">${marked.parse(review.feedback)}</div>
+        </div>`;
+    }
+    if (review.reviewer) {
+        html += `<div class="quiz-review-attribution">Reviewed by ${escapeHtml(review.reviewer)}</div>`;
+    }
     html += '</div>';
     return html;
 }
 
 // Render the answer area for a question based on its type
-function renderQuizAnswerArea(question, attemptAnswer) {
+function renderQuizAnswerArea(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
     const type = question.type || 'multiple_choice';
 
     switch (type) {
         case 'multiple_choice':
-            return renderMultipleChoiceAnswer(question, attemptAnswer);
+            return renderMultipleChoiceAnswer(question, attemptAnswer, isInteractive, questionIndex);
         case 'numeric':
-            return renderNumericAnswer(question, attemptAnswer);
+            return renderNumericAnswer(question, attemptAnswer, isInteractive, questionIndex);
         case 'short_answer':
-            return renderShortAnswer(question, attemptAnswer);
+            return renderShortAnswer(question, attemptAnswer, isInteractive, questionIndex);
         case 'worked':
-            return renderWorkedAnswer(question, attemptAnswer);
+            return renderWorkedAnswer(question, attemptAnswer, isInteractive, questionIndex);
         case 'matching':
-            return renderMatchingAnswer(question, attemptAnswer);
+            return renderMatchingAnswer(question, attemptAnswer, isInteractive, questionIndex);
         case 'ordering':
-            return renderOrderingAnswer(question, attemptAnswer);
+            return renderOrderingAnswer(question, attemptAnswer, isInteractive, questionIndex);
         default:
             return '<div class="quiz-unknown-type">Unknown question type</div>';
     }
 }
 
 // Multiple choice: radio button options
-function renderMultipleChoiceAnswer(question, attemptAnswer) {
+function renderMultipleChoiceAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
     const options = question.options || [];
     const correctIndex = question.correct;
     const selectedIndex = attemptAnswer?.answer;
@@ -1873,74 +1976,99 @@ function renderMultipleChoiceAnswer(question, attemptAnswer) {
         let optClass = 'quiz-option';
         let indicator = '';
 
-        if (attemptAnswer) {
-            if (i === correctIndex) {
-                optClass += ' correct';
-                indicator = '<span class="quiz-option-indicator">✓</span>';
+        if (isInteractive) {
+            // Interactive mode: clickable options
+            optClass += ' interactive';
+            html += `<div class="${optClass}" data-option-index="${i}" onclick="selectQuizOption(this, ${questionIndex}, ${i})">
+                <span class="quiz-option-radio"></span>
+                <span class="quiz-option-letter">${String.fromCharCode(65 + i)}</span>
+                <span class="quiz-option-text">${escapeHtml(opt)}</span>
+            </div>`;
+        } else {
+            // Review mode: show correct/incorrect
+            if (attemptAnswer) {
+                if (i === correctIndex) {
+                    optClass += ' correct';
+                    indicator = '<span class="quiz-option-indicator">✓</span>';
+                }
+                if (i === selectedIndex && i !== correctIndex) {
+                    optClass += ' selected incorrect';
+                    indicator = '<span class="quiz-option-indicator">✗</span>';
+                } else if (i === selectedIndex) {
+                    optClass += ' selected';
+                }
             }
-            if (i === selectedIndex && i !== correctIndex) {
-                optClass += ' selected incorrect';
-                indicator = '<span class="quiz-option-indicator">✗</span>';
-            } else if (i === selectedIndex) {
-                optClass += ' selected';
-            }
+            html += `<div class="${optClass}">
+                <span class="quiz-option-letter">${String.fromCharCode(65 + i)}</span>
+                <span class="quiz-option-text">${escapeHtml(opt)}</span>
+                ${indicator}
+            </div>`;
         }
-
-        html += `<div class="${optClass}">
-            <span class="quiz-option-letter">${String.fromCharCode(65 + i)}</span>
-            <span class="quiz-option-text">${escapeHtml(opt)}</span>
-            ${indicator}
-        </div>`;
     });
     html += '</div>';
     return html;
 }
 
 // Numeric: show expected answer and tolerance
-function renderNumericAnswer(question, attemptAnswer) {
+function renderNumericAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
     const answer = question.answer;
     const tolerance = question.tolerance || 0;
     const userAnswer = attemptAnswer?.answer;
 
     let html = '<div class="quiz-numeric">';
-    if (attemptAnswer) {
+    if (isInteractive) {
+        // Interactive mode: number input
+        html += `<div class="quiz-numeric-input-area">
+            <input type="number" class="quiz-numeric-input" data-question-index="${questionIndex}"
+                   placeholder="Enter your answer" step="any"
+                   onchange="updateQuizAnswer(${questionIndex}, this.value)">
+        </div>`;
+    } else if (attemptAnswer) {
+        // Review mode: show user answer and correct answer
         html += `<div class="quiz-numeric-user">Your answer: <strong>${userAnswer !== undefined ? userAnswer : '—'}</strong></div>`;
         html += `<div class="quiz-numeric-correct">Expected: <strong>${answer}</strong>`;
         if (tolerance > 0) {
             html += ` (±${tolerance})`;
         }
         html += '</div>';
-    } else {
-        html += '<div class="quiz-numeric-input-area">[Numeric input]</div>';
     }
     html += '</div>';
     return html;
 }
 
 // Short answer: textarea for free response
-function renderShortAnswer(question, attemptAnswer) {
+function renderShortAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
     const userAnswer = attemptAnswer?.answer;
 
     let html = '<div class="quiz-short-answer">';
-    if (attemptAnswer) {
+    if (isInteractive) {
+        // Interactive mode: textarea
+        html += `<textarea class="quiz-short-answer-input" data-question-index="${questionIndex}"
+                   placeholder="Type your answer here..."
+                   onchange="updateQuizAnswer(${questionIndex}, this.value)"></textarea>`;
+    } else if (attemptAnswer) {
+        // Review mode: show user response
         html += `<div class="quiz-short-answer-response">${escapeHtml(userAnswer || '(No response)')}</div>`;
-        if (attemptAnswer.status === 'pending_review') {
-            html += '<div class="quiz-awaiting-review">Awaiting Claude review</div>';
-        }
-    } else {
-        html += '<div class="quiz-short-answer-area">[Short answer]</div>';
     }
     html += '</div>';
     return html;
 }
 
 // Worked problem: multi-step solution
-function renderWorkedAnswer(question, attemptAnswer) {
+function renderWorkedAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
     const userAnswer = attemptAnswer?.answer;
 
     let html = '<div class="quiz-worked">';
-    if (attemptAnswer && userAnswer) {
-        // userAnswer might be an array of steps or a single string
+    if (isInteractive) {
+        // Interactive mode: textarea for showing work
+        html += `<div class="quiz-worked-input-area">
+            <label class="quiz-worked-label">Show your work:</label>
+            <textarea class="quiz-worked-input" data-question-index="${questionIndex}"
+                   placeholder="Enter your solution step by step..."
+                   onchange="updateQuizAnswer(${questionIndex}, this.value)"></textarea>
+        </div>`;
+    } else if (attemptAnswer && userAnswer) {
+        // Review mode: show user's work
         if (Array.isArray(userAnswer)) {
             html += '<div class="quiz-worked-steps">';
             userAnswer.forEach((step, i) => {
@@ -1953,56 +2081,106 @@ function renderWorkedAnswer(question, attemptAnswer) {
         } else {
             html += `<div class="quiz-worked-response">${escapeHtml(userAnswer)}</div>`;
         }
-        if (attemptAnswer.status === 'pending_review') {
-            html += '<div class="quiz-awaiting-review">Awaiting Claude review</div>';
-        }
-    } else {
-        html += '<div class="quiz-worked-area">[Worked solution steps]</div>';
     }
     html += '</div>';
     return html;
 }
 
 // Matching: pairs to connect
-function renderMatchingAnswer(question, attemptAnswer) {
+function renderMatchingAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
     const pairs = question.pairs || [];
     const userPairs = attemptAnswer?.answer || [];
 
-    let html = '<div class="quiz-matching">';
-    html += '<div class="quiz-matching-pairs">';
-
-    pairs.forEach((pair, i) => {
-        const [left, right] = pair;
-        const userRight = userPairs[i];
-        let pairClass = 'quiz-matching-pair';
-
-        if (attemptAnswer) {
-            if (userRight === right) {
-                pairClass += ' correct';
-            } else {
-                pairClass += ' incorrect';
-            }
+    // Get all right-side items, shuffled for interactive mode
+    const rightItems = pairs.map(p => p[1]);
+    if (isInteractive) {
+        // Fisher-Yates shuffle
+        for (let i = rightItems.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [rightItems[i], rightItems[j]] = [rightItems[j], rightItems[i]];
         }
+    }
 
-        html += `<div class="${pairClass}">
-            <span class="quiz-matching-left">${escapeHtml(left)}</span>
-            <span class="quiz-matching-arrow">→</span>
-            <span class="quiz-matching-right">${escapeHtml(attemptAnswer ? (userRight || '?') : right)}</span>
-        </div>`;
-    });
+    let html = '<div class="quiz-matching">';
 
-    html += '</div></div>';
+    if (isInteractive) {
+        // Interactive mode: dropdowns for matching
+        html += '<div class="quiz-matching-interactive">';
+        pairs.forEach((pair, i) => {
+            const [left] = pair;
+            html += `<div class="quiz-matching-row" data-pair-index="${i}">
+                <span class="quiz-matching-left">${escapeHtml(left)}</span>
+                <span class="quiz-matching-arrow">→</span>
+                <select class="quiz-matching-select" data-pair-index="${i}"
+                        onchange="updateQuizMatchingAnswer(${questionIndex}, ${i}, this.value)">
+                    <option value="">Select...</option>
+                    ${rightItems.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('')}
+                </select>
+            </div>`;
+        });
+        html += '</div>';
+    } else {
+        // Review mode: show results
+        html += '<div class="quiz-matching-pairs">';
+        pairs.forEach((pair, i) => {
+            const [left, right] = pair;
+            const userRight = userPairs[i];
+            const isCorrect = userRight === right;
+            let pairClass = 'quiz-matching-pair';
+
+            if (attemptAnswer) {
+                pairClass += isCorrect ? ' correct' : ' incorrect';
+            }
+
+            let rightContent = '';
+            if (attemptAnswer) {
+                rightContent = escapeHtml(userRight || '?');
+                if (!isCorrect) {
+                    rightContent += ` <span class="quiz-correct-answer">(${escapeHtml(right)})</span>`;
+                }
+            } else {
+                rightContent = escapeHtml(right);
+            }
+
+            html += `<div class="${pairClass}">
+                <span class="quiz-matching-left">${escapeHtml(left)}</span>
+                <span class="quiz-matching-arrow">→</span>
+                <span class="quiz-matching-right">${rightContent}</span>
+            </div>`;
+        });
+        html += '</div>';
+    }
+
+    html += '</div>';
     return html;
 }
 
 // Ordering: items to arrange in sequence
-function renderOrderingAnswer(question, attemptAnswer) {
+function renderOrderingAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
     const correctOrder = question.correctOrder || [];
     const userOrder = attemptAnswer?.answer || [];
 
     let html = '<div class="quiz-ordering">';
 
-    if (attemptAnswer) {
+    if (isInteractive) {
+        // Interactive mode: reorderable list with up/down buttons
+        // Initialize with shuffled order (stored in data attribute for retrieval)
+        const shuffled = shuffleArray([...correctOrder]);
+        html += `<div class="quiz-ordering-interactive" data-question-index="${questionIndex}" data-items='${JSON.stringify(shuffled)}'>
+            <div class="quiz-ordering-label">Drag to reorder (or use arrows):</div>`;
+        shuffled.forEach((item, i) => {
+            html += `<div class="quiz-ordering-item interactive" data-item-index="${i}">
+                <span class="quiz-ordering-number">${i + 1}</span>
+                <span class="quiz-ordering-text">${escapeHtml(item)}</span>
+                <span class="quiz-ordering-controls">
+                    <button class="quiz-ordering-btn" onclick="moveQuizOrderingItem(${questionIndex}, ${i}, -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
+                    <button class="quiz-ordering-btn" onclick="moveQuizOrderingItem(${questionIndex}, ${i}, 1)" ${i === shuffled.length - 1 ? 'disabled' : ''}>↓</button>
+                </span>
+            </div>`;
+        });
+        html += '</div>';
+    } else if (attemptAnswer) {
+        // Review mode: show user order vs correct order
         html += '<div class="quiz-ordering-user"><div class="quiz-ordering-label">Your order:</div>';
         userOrder.forEach((item, i) => {
             const isCorrectPosition = correctOrder[i] === item;
@@ -2021,20 +2199,367 @@ function renderOrderingAnswer(question, attemptAnswer) {
             </div>`;
         });
         html += '</div>';
-    } else {
-        html += '<div class="quiz-ordering-items">';
-        // Show items in shuffled/random order for display
-        correctOrder.forEach((item, i) => {
-            html += `<div class="quiz-ordering-item">
-                <span class="quiz-ordering-handle">≡</span>
-                <span class="quiz-ordering-text">${escapeHtml(item)}</span>
-            </div>`;
-        });
-        html += '</div>';
     }
 
     html += '</div>';
     return html;
+}
+
+// Helper: shuffle array (Fisher-Yates)
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+// Helper: find card by ID across all sections
+function findCardById(cardId) {
+    // Convert to string for comparison (YAML may parse numeric IDs as numbers)
+    const cardIdStr = String(cardId);
+    for (const section of data.sections) {
+        const item = section.items.find(i => String(i.id) === cardIdStr);
+        if (item) return item;
+    }
+    // Also check systemNotes
+    const systemNote = data.systemNotes?.find(n => String(n.id) === cardIdStr);
+    if (systemNote) return systemNote;
+    return null;
+}
+
+// Quiz interaction: select multiple choice option
+function selectQuizOption(element, questionIndex, optionIndex) {
+    const quizViewer = element.closest('.quiz-viewer');
+    const quizId = quizViewer?.dataset.quizId;
+    if (!quizId) return;
+
+    // Deselect all options in this question
+    const question = element.closest('.quiz-question');
+    question.querySelectorAll('.quiz-option').forEach(opt => opt.classList.remove('selected'));
+
+    // Select this option
+    element.classList.add('selected');
+
+    // Store answer
+    if (!quizAnswers[quizId]) quizAnswers[quizId] = {};
+    quizAnswers[quizId][questionIndex] = optionIndex;
+}
+
+// Quiz interaction: update text/numeric answer
+function updateQuizAnswer(questionIndex, value) {
+    const quizViewer = document.querySelector('.quiz-viewer[data-interactive="true"]');
+    const quizId = quizViewer?.dataset.quizId;
+    if (!quizId) return;
+
+    if (!quizAnswers[quizId]) quizAnswers[quizId] = {};
+
+    // Parse numeric values
+    const question = quizViewer.querySelector(`[data-question-index="${questionIndex}"]`);
+    const qType = question?.dataset.questionType;
+    if (qType === 'numeric') {
+        quizAnswers[quizId][questionIndex] = value !== '' ? parseFloat(value) : null;
+    } else {
+        quizAnswers[quizId][questionIndex] = value;
+    }
+}
+
+// Quiz interaction: update matching answer
+function updateQuizMatchingAnswer(questionIndex, pairIndex, value) {
+    const quizViewer = document.querySelector('.quiz-viewer[data-interactive="true"]');
+    const quizId = quizViewer?.dataset.quizId;
+    if (!quizId) return;
+
+    if (!quizAnswers[quizId]) quizAnswers[quizId] = {};
+    if (!quizAnswers[quizId][questionIndex]) quizAnswers[quizId][questionIndex] = [];
+
+    // Store as array of matched values
+    quizAnswers[quizId][questionIndex][pairIndex] = value;
+}
+
+// Quiz interaction: move ordering item up or down
+function moveQuizOrderingItem(questionIndex, itemIndex, direction) {
+    const quizViewer = document.querySelector('.quiz-viewer[data-interactive="true"]');
+    const quizId = quizViewer?.dataset.quizId;
+    if (!quizId) return;
+
+    const orderingContainer = quizViewer.querySelector(`.quiz-ordering-interactive[data-question-index="${questionIndex}"]`);
+    if (!orderingContainer) return;
+
+    // Get current items array from data attribute
+    let items = JSON.parse(orderingContainer.dataset.items);
+    const newIndex = itemIndex + direction;
+
+    if (newIndex < 0 || newIndex >= items.length) return;
+
+    // Swap items
+    [items[itemIndex], items[newIndex]] = [items[newIndex], items[itemIndex]];
+
+    // Update data attribute
+    orderingContainer.dataset.items = JSON.stringify(items);
+
+    // Store answer
+    if (!quizAnswers[quizId]) quizAnswers[quizId] = {};
+    quizAnswers[quizId][questionIndex] = [...items];
+
+    // Re-render the ordering items
+    const itemElements = orderingContainer.querySelectorAll('.quiz-ordering-item');
+    items.forEach((item, i) => {
+        const el = itemElements[i];
+        el.querySelector('.quiz-ordering-number').textContent = i + 1;
+        el.querySelector('.quiz-ordering-text').textContent = item;
+        el.dataset.itemIndex = i;
+
+        // Update button states
+        const upBtn = el.querySelector('.quiz-ordering-btn:first-child');
+        const downBtn = el.querySelector('.quiz-ordering-btn:last-child');
+        upBtn.disabled = i === 0;
+        downBtn.disabled = i === items.length - 1;
+
+        // Update onclick handlers
+        upBtn.onclick = () => moveQuizOrderingItem(questionIndex, i, -1);
+        downBtn.onclick = () => moveQuizOrderingItem(questionIndex, i, 1);
+    });
+}
+
+// Quiz interaction: submit quiz
+async function submitQuiz(quizId) {
+    const answers = quizAnswers[quizId] || {};
+
+    // Find the card
+    const card = findCardById(quizId);
+    if (!card) {
+        showToast('Quiz not found', 'error');
+        return;
+    }
+
+    // Check if all questions have answers
+    const questions = card.questions || [];
+    const unanswered = questions.filter((q, i) => answers[i] === undefined || answers[i] === null || answers[i] === '');
+
+    if (unanswered.length > 0) {
+        if (!confirm(`You have ${unanswered.length} unanswered question(s). Submit anyway?`)) {
+            return;
+        }
+    }
+
+    // Also collect ordering answers that weren't explicitly moved (still at initial shuffle)
+    const quizViewer = document.querySelector('.quiz-viewer[data-interactive="true"]');
+    questions.forEach((q, i) => {
+        if (q.type === 'ordering' && answers[i] === undefined) {
+            const orderingContainer = quizViewer?.querySelector(`.quiz-ordering-interactive[data-question-index="${i}"]`);
+            if (orderingContainer) {
+                answers[i] = JSON.parse(orderingContainer.dataset.items);
+            }
+        }
+    });
+
+    // Grade and save the attempt
+    const attempt = gradeQuizAttempt(card, answers);
+    await saveQuizAttempt(card, attempt);
+
+    // Clear quiz state
+    delete quizAnswers[quizId];
+
+    showToast('Quiz submitted!', 'success');
+}
+
+// Quiz interaction: retake quiz
+function retakeQuiz(quizId) {
+    const card = findCardById(quizId);
+    if (!card) return;
+
+    // Set retake mode flag and re-open viewer
+    card._quizRetakeMode = true;
+    quizAnswers[quizId] = {};
+
+    // Re-render the viewer content
+    const viewerContent = document.getElementById('viewerContent');
+    if (viewerContent) {
+        const template = templateRegistry[card.template || card.type];
+        viewerContent.innerHTML = renderQuizViewer(card, template);
+    }
+}
+
+// Grade quiz attempt: auto-grade what we can, mark others as pending
+function gradeQuizAttempt(card, answers) {
+    const questions = card.questions || [];
+    const gradedAnswers = [];
+    let correctCount = 0;
+    let pendingCount = 0;
+
+    questions.forEach((q, index) => {
+        const userAnswer = answers[index];
+        const result = {
+            questionIndex: index,
+            answer: userAnswer,
+            status: 'incorrect'
+        };
+
+        switch (q.type) {
+            case 'multiple_choice':
+                // Auto-grade: compare to correct index
+                if (userAnswer === q.correct) {
+                    result.status = 'correct';
+                    correctCount++;
+                }
+                break;
+
+            case 'numeric':
+                // Auto-grade: check within tolerance
+                if (userAnswer !== null && userAnswer !== undefined) {
+                    const expected = q.answer;
+                    const tolerance = q.tolerance || 0;
+                    if (Math.abs(userAnswer - expected) <= tolerance) {
+                        result.status = 'correct';
+                        correctCount++;
+                    }
+                }
+                break;
+
+            case 'matching':
+                // Auto-grade: compare each pair
+                const pairs = q.pairs || [];
+                let allCorrect = true;
+                pairs.forEach((pair, i) => {
+                    const [, correctRight] = pair;
+                    if (userAnswer?.[i] !== correctRight) {
+                        allCorrect = false;
+                    }
+                });
+                if (allCorrect && userAnswer?.length === pairs.length) {
+                    result.status = 'correct';
+                    correctCount++;
+                }
+                break;
+
+            case 'ordering':
+                // Auto-grade: compare order
+                const correctOrder = q.correctOrder || [];
+                const isCorrect = Array.isArray(userAnswer) &&
+                    userAnswer.length === correctOrder.length &&
+                    userAnswer.every((item, i) => item === correctOrder[i]);
+                if (isCorrect) {
+                    result.status = 'correct';
+                    correctCount++;
+                }
+                break;
+
+            case 'short_answer':
+            case 'worked':
+                // Cannot auto-grade: mark as pending review
+                result.status = 'pending_review';
+                pendingCount++;
+                break;
+        }
+
+        gradedAnswers.push(result);
+    });
+
+    return {
+        timestamp: new Date().toISOString(),
+        answers: gradedAnswers,
+        score: {
+            correct: correctCount,
+            total: questions.length,
+            pending_review: pendingCount
+        }
+    };
+}
+
+// Save quiz attempt to card and persist
+async function saveQuizAttempt(card, attempt) {
+    // Add attempt to card
+    if (!card.attempts) card.attempts = [];
+    card.attempts.push(attempt);
+
+    // Clear retake mode flag
+    delete card._quizRetakeMode;
+
+    // Update modified timestamp
+    card.modified = new Date().toISOString();
+
+    // Save to IndexedDB
+    await saveData();
+
+    // Save to filesystem - find the section containing this card
+    const section = data.sections.find(s => s.items.some(i => i.id === card.id));
+    if (section) {
+        await saveCardFile(section.id, card);
+    }
+
+    // Re-render the viewer to show results
+    const viewerContent = document.getElementById('viewerContent');
+    if (viewerContent) {
+        const template = templateRegistry[card.template || card.type];
+        viewerContent.innerHTML = renderQuizViewer(card, template);
+    }
+
+    // Re-render main view to update card preview
+    render();
+}
+
+// Submit a review for a pending_review question
+async function submitQuizReview(questionIndex, status) {
+    const quizViewer = document.querySelector('.quiz-viewer');
+    const quizId = quizViewer?.dataset.quizId;
+    if (!quizId) return;
+
+    const card = findCardById(quizId);
+    if (!card) return;
+
+    const attempts = card.attempts || [];
+    if (attempts.length === 0) return;
+
+    // Get feedback from textarea
+    const feedbackEl = document.getElementById(`reviewFeedback_${questionIndex}`);
+    const feedback = feedbackEl?.value?.trim() || '';
+
+    // Update the last attempt's answer
+    const lastAttempt = attempts[attempts.length - 1];
+    const answer = lastAttempt.answers?.find(a => a.questionIndex === questionIndex);
+    if (!answer) return;
+
+    // Update status and add review
+    answer.status = status;
+    answer.review = {
+        feedback: feedback || undefined,
+        reviewedAt: new Date().toISOString()
+    };
+
+    // Recalculate score
+    let correctCount = 0;
+    let pendingCount = 0;
+    lastAttempt.answers.forEach(a => {
+        if (a.status === 'correct') correctCount++;
+        else if (a.status === 'pending_review') pendingCount++;
+    });
+    lastAttempt.score.correct = correctCount;
+    lastAttempt.score.pending_review = pendingCount;
+
+    // Update modified timestamp
+    card.modified = new Date().toISOString();
+
+    // Save to IndexedDB
+    await saveData();
+
+    // Save to filesystem - find the section containing this card
+    const section = data.sections.find(s => s.items.some(i => i.id === card.id));
+    if (section) {
+        await saveCardFile(section.id, card);
+    }
+
+    // Re-render the viewer
+    const viewerContent = document.getElementById('viewerContent');
+    if (viewerContent) {
+        const template = templateRegistry[card.template || card.type];
+        viewerContent.innerHTML = renderQuizViewer(card, template);
+    }
+
+    // Re-render main view to update card preview
+    render();
+
+    showToast(`Marked as ${status}`, 'success');
 }
 
 // Image viewer: large image with description
@@ -5170,6 +5695,7 @@ async function handleFilesystemChanges(records, observer) {
         if (filename.endsWith('.code.py')) return true;
         if (filename.endsWith('.output.html')) return true;
         if (filename.endsWith('.bookmark.json')) return true;
+        if (filename.endsWith('.quiz.json')) return true;
         if (filename === 'settings.yaml') return true;
         return false;
     });
@@ -5205,6 +5731,10 @@ async function reloadFromFilesystem(showNotification = true) {
         const fsData = await loadFromFilesystem(notebookDirHandle);
         data = fsData;
         render();
+
+        // If viewer is open, refresh it with updated data
+        refreshOpenViewer();
+
         if (showNotification) {
             showToast('🔄 Synced external changes');
         }
