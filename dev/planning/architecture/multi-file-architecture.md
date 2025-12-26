@@ -3,7 +3,7 @@ id: dev-multi-file-architecture
 title: Multi-File Architecture
 author: Claude
 created: 2024-12-26T11:00:00Z
-modified: 2024-12-26T11:00:00Z
+modified: 2025-12-26T15:00:00Z
 tags: [in-progress, architecture]
 ---
 
@@ -55,9 +55,8 @@ repo/
 │   │   ├── note.js             # Default note template (exports YAML string)
 │   │   ├── code.js             # Default code template
 │   │   └── bookmark.js         # Default bookmark template
-│   ├── theme.js                # Default theme.css content
-│   ├── claude-md.js            # Default CLAUDE.md content
-│   └── readme.js               # Default README.md content
+│   └── theme.js                # Default theme.css content
+│                               # Note: CLAUDE.md/README.md live in examples/, not here
 ├── themes/
 │   ├── index.js                # Theme registry (exports available themes)
 │   ├── manuscript.js           # Theme: warm parchment
@@ -169,20 +168,47 @@ The theme picker could also support "live preview" before committing.
 ### Neutral
 
 - **`generate_index.py`** - May become unnecessary or transform into a different utility
-- **CLAUDE.md for notebooks** - Still needs to be copied to notebook directories for Claude Code integration (addressed separately via CLI or documentation)
+- **CLAUDE.md for notebooks** - Handled via example notebook templates (see Open Question #1 - DECIDED)
 
 ## Open Questions
 
-### 1. How to handle CLAUDE.md and README.md?
+### 1. How to handle CLAUDE.md and README.md? ✓ DECIDED
 
-These files are special because Claude Code needs them in the notebook directory to work. Options:
+**Decision:** Use **example notebooks as templates** for different use cases.
 
-a. **CLI initializer**: `python scripts/init_notebook.py /path/to/notebook`
-b. **App button**: "Initialize for Claude Code" writes the boilerplate
-c. **Documentation**: "Copy `defaults/CLAUDE.md` to your notebook"
-d. **Auto-create on first save**: When any card is saved, ensure CLAUDE.md exists
+**Rationale:** A single default CLAUDE.md doesn't fit all use cases. An AI tutor notebook needs different Claude instructions than a research notebook or dev notebook. Rather than a generic initializer, provide curated examples that users fork.
 
-Leaning toward (a) or (b) - explicit initialization is clearer.
+**Implementation:**
+
+```
+examples/
+├── research-notebook/       # Standard research use
+│   ├── .notebook/
+│   │   └── theme.css        # Manuscript theme (warm, scholarly)
+│   ├── CLAUDE.md            # Research-focused Claude instructions
+│   └── README.md            # What this template is for
+├── tutor-notebook/          # AI tutoring collaboration
+│   ├── .notebook/
+│   │   └── theme.css        # Friendly, accessible theme
+│   ├── CLAUDE.md            # Student collaboration guidelines
+│   └── README.md
+└── dev-notebook/            # Development/coding focus
+    ├── .notebook/
+    │   └── theme.css        # Terminal/dark theme
+    ├── CLAUDE.md            # Code-focused instructions
+    └── README.md
+```
+
+**Workflow:** `cp -r examples/tutor-notebook my-project` or simple CLI wrapper `scripts/new-notebook.py`.
+
+**Card templates principle:** Only include `.notebook/templates/*.yaml` if genuinely customized for that use case (e.g., tutor notebook might add an `exercise` card type). Standard types (note, code, bookmark) inherit from app's `defaults/templates/*.js` via lazy/copy-on-write.
+
+**Benefits:**
+- Each use case gets tailored CLAUDE.md, theming, and README
+- Clear what you're getting before you start
+- Easy to add new templates (community contributions)
+- Consistent with lazy/copy-on-write - "if it exists, it's customized"
+- No magic - just directories you can inspect and modify
 
 ### 2. Module organization
 
@@ -249,22 +275,34 @@ Leaning toward (a) - add later if there's demand.
 
 1. Convert templates to `defaults/templates/*.js`
 2. Convert theme to `defaults/theme.js`
-3. Convert CLAUDE.md/README.md to `defaults/*.js`
-4. Update app to import defaults
+3. Update app to import defaults
+4. Implement lazy/copy-on-write behavior
 
-### Phase 5: Theme System
+Note: CLAUDE.md/README.md are NOT in defaults/ - they live in example notebooks (see Phase 5b).
+
+### Phase 5a: Theme System
 
 1. Create `themes/index.js` registry
 2. Convert existing themes to ES modules
 3. Add theme picker UI to settings
 4. Implement copy-to-notebook on selection
 
+### Phase 5b: Example Notebooks
+
+1. Create `examples/research-notebook/` with research-focused CLAUDE.md, manuscript theme
+2. Create `examples/tutor-notebook/` with student collaboration CLAUDE.md, friendly theme
+3. Create `examples/dev-notebook/` with code-focused CLAUDE.md, terminal theme
+4. Optional: `scripts/new-notebook.py` CLI helper
+5. Decide fate of existing `examples/demo-notebook/`
+
+Note: Can run in parallel with Phase 5a after Phase 4 completes.
+
 ### Phase 6: Cleanup
 
 1. Remove old `research_notebook.html`
-2. Update documentation
-3. Update `generate_index.py` or remove if obsolete
-4. Update example notebooks
+2. Update root CLAUDE.md for new structure
+3. Update root README.md with new usage instructions
+4. Update `generate_index.py` or remove if obsolete
 
 ## References
 
