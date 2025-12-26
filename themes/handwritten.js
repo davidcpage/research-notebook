@@ -1,4 +1,10 @@
-/*
+// Research Notebook Theme: "Handwritten"
+// A warm, personal aesthetic using calligraphic fonts
+
+export const name = "Handwritten";
+export const description = "Calligraphic style with handwriting fonts for a personal journal feel";
+
+export default `/*
  * Research Notebook Theme: "Handwritten"
  *
  * A warm, personal aesthetic using calligraphic fonts.
@@ -295,3 +301,4 @@ header h2 {
 .modal.viewer[data-template="code"] ::-webkit-scrollbar-thumb {
     background: #5a5045;
 }
+`;

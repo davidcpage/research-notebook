@@ -1,4 +1,10 @@
-/*
+// Research Notebook Theme: "Minimal"
+// A clean, sparse design with generous whitespace
+
+export const name = "Minimal";
+export const description = "Clean, sparse design with subtle accents and generous whitespace";
+
+export default `/*
  * Research Notebook Theme: "Minimal"
  *
  * A clean, sparse design with generous whitespace
@@ -159,3 +165,4 @@ header h2 {
 .modal.viewer[data-template="code"] ::-webkit-scrollbar-thumb {
     background: #404040;
 }
+`;

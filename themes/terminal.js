@@ -1,4 +1,10 @@
-/*
+// Research Notebook Theme: "Terminal"
+// Dark hacker aesthetic with phosphor green accents
+
+export const name = "Terminal";
+export const description = "Dark hacker aesthetic with green-on-black terminal feel";
+
+export default `/*
  * Research Notebook Theme: "Terminal"
  *
  * Dark hacker aesthetic with phosphor green accents.
@@ -236,3 +242,4 @@ header h2 {
     0%, 50% { opacity: 1; }
     51%, 100% { opacity: 0; }
 }
+`;

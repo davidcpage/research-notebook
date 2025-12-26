@@ -1,4 +1,10 @@
-/*
+// Research Notebook Theme: "Manuscript"
+// A warm, scholarly theme with textured parchment backgrounds
+
+export const name = "Manuscript";
+export const description = "Warm, scholarly parchment aesthetic with textured backgrounds";
+
+export default `/*
  * Research Notebook Theme: "Manuscript"
  *
  * A warm, scholarly theme with textured parchment backgrounds
@@ -242,3 +248,4 @@ header h2 {
 .modal.viewer[data-template="code"] ::-webkit-scrollbar-thumb:hover {
     background: #666;
 }
+`;
