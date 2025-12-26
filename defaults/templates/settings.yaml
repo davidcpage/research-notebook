@@ -38,7 +38,7 @@ schema:
   extensions:
     type: yaml
   theme:
-    type: text
+    type: theme
 card:
   layout: yaml
   placeholder: "⚙"
@@ -62,7 +62,7 @@ editor:
       rows: 20
       monospace: true
     - field: theme
-      label: Theme CSS file (optional)
+      label: Base Theme
 style:
   variables:
     --preview-bg: "#f5f5f5"

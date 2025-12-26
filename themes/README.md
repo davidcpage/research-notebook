@@ -4,13 +4,18 @@ A collection of themes for the Research Notebook application.
 
 ## How to Use
 
-### In the App (Future)
+### Theme Picker (Recommended)
 
-The app will provide a theme picker UI to browse and apply themes. Selected themes are copied to your notebook's `.notebook/theme.css`.
+1. Open your notebook in the app
+2. Click the Settings card in the System section
+3. Select a base theme from the "Base Theme" dropdown
+4. Click Save - the theme applies immediately
 
-### Manual Copy (Current)
+Your `.notebook/theme.css` can add customizations on top of the base theme.
 
-To apply a theme manually:
+### Manual Copy (Alternative)
+
+To apply a theme manually without the picker:
 
 ```bash
 cp themes/manuscript.css my-notebook/.notebook/theme.css
@@ -25,6 +30,7 @@ Then refresh the notebook in your browser.
 | Manuscript | `manuscript.css` | Warm, scholarly parchment aesthetic with textured backgrounds |
 | Minimal | `minimal.css` | Clean, sparse design with subtle accents |
 | Terminal | `terminal.css` | Dark hacker aesthetic with green-on-black terminal feel |
+| Friendly | `friendly.css` | Accessible, warm aesthetic with light blue accents |
 | Handwritten | `handwritten.css` | Calligraphic style using handwriting fonts |
 
 ## Theme Registry

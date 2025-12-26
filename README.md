@@ -1,31 +1,66 @@
 # Research Notebook
 
-A browser-based research management tool that combines bookmarks, markdown notes, and executable Python code with file-based storage.
+A browser-based research management tool that combines bookmarks, markdown notes, and executable Python code with file-based storage. Designed for use alongside Claude Code.
 
 ## Features
 
 - **Bookmarks** with auto-generated thumbnails (via microlink API or PDF.js)
 - **Markdown notes** with LaTeX math support and wiki-style `[[internal links]]`
 - **Executable Python code** cells via Pyodide (numpy, pandas, matplotlib pre-loaded)
-- **Syntax-highlighted editor** with CodeMirror 6 (Python, YAML, CSS, Markdown) - dark theme for code, light parchment theme for prose
+- **Syntax-highlighted editor** with CodeMirror 6 (Python, YAML, CSS, Markdown)
 - **Bidirectional backlinks** between items
 - **File-based storage** using the File System Access API
-- **Customizable themes** via CSS - edit `theme.css` in your notebook folder
+- **Theme picker** with 5 built-in themes + custom CSS support
+- **LLM-friendly** - plain files that Claude Code can read and edit directly
 
 ## Getting Started
 
-1. Open `index.html` in Chrome or Edge
-2. Select a folder to store your notebook
-3. Start creating sections, notes, bookmarks, and code cells
+### Installation
+
+```bash
+# Clone the repo
+git clone https://github.com/anthropics/research-notebook.git
+cd research-notebook
+
+# Install the CLI (one-time)
+npm link
+
+# Start the notebook
+notebook
+```
+
+This starts a local server and opens the app in your browser.
+
+### Creating a New Notebook
+
+1. Click "Select Folder" and choose an empty directory
+2. The app creates the notebook structure automatically
+3. Start adding notes, bookmarks, and code cells
+
+### Using an Example Template
+
+```bash
+# Copy an example as your starting point
+cp -r examples/research-notebook ~/my-project
+```
+
+Available templates:
+- `research-notebook` - Manuscript theme, research-focused
+- `dev-notebook` - Terminal theme, code-focused
+- `tutor-notebook` - Friendly theme, learning-focused
 
 ## Application Structure
 
 ```
 repo/
-├── index.html          # HTML shell (210 lines)
+├── package.json        # npm package (provides 'notebook' command)
+├── cli.js              # Local server
+├── index.html          # HTML shell (~210 lines)
 ├── css/app.css         # Application styles (~2800 lines)
 ├── js/app.js           # Application logic (~6500 lines)
-└── examples/           # Example notebooks with different themes
+├── defaults/           # Default templates and theme
+├── themes/             # Built-in themes (manuscript, terminal, etc.)
+└── examples/           # Example notebooks
 ```
 
 ## Design Philosophy
@@ -74,22 +109,33 @@ The application code (`js/app.js`, ~6500 lines) is structured for LLM navigation
 
 ## Theming
 
-Each notebook includes a `.notebook/theme.css` file you can edit to customize colors and styling:
+### Built-in Themes
+
+Open Settings and select a base theme:
+- **Manuscript** - Warm, scholarly parchment aesthetic
+- **Minimal** - Clean, sparse design
+- **Terminal** - Dark hacker aesthetic
+- **Friendly** - Accessible, light blue (for learning)
+- **Handwritten** - Calligraphic fonts
+
+### Custom Styling
+
+Add customizations in `.notebook/theme.css` - they layer on top of the base theme:
 
 ```css
 :root {
     --accent: #c45d3a;        /* Change the accent color */
     --bg-primary: #f8f6f3;    /* Change the background */
-    --code-bg: #1a3a52;       /* Change code block colors */
 }
 ```
 
-See `theme-reference.css` in the repo root for a full reference of all customizable CSS variables and selectors. The `examples/demo-notebook/.notebook/theme.css` shows a more elaborate theme with textures.
+See `theme-reference.css` for all customizable CSS variables and selectors.
 
 ## Requirements
 
+- **Node.js** (for the `notebook` CLI command)
 - **Chrome or Edge** (requires File System Access API)
-- **Python 3** (only for generate_index.py, not for running the app)
+- **Python 3** (optional, only for `generate_index.py` dev tool)
 
 ## License
 

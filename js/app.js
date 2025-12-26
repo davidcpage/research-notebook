@@ -655,17 +655,34 @@ async function loadTemplates(dirHandle) {
     return templateRegistry;
 }
 
-// Load theme.css from .notebook/theme.css
+// Load theme CSS: base theme from /themes/ + customizations from .notebook/theme.css
 async function loadThemeCss(dirHandle) {
     if (!dirHandle) return;
 
-    // Remove any existing theme style element
-    const existingTheme = document.getElementById('theme-css');
-    if (existingTheme) {
-        existingTheme.remove();
+    // Remove any existing theme style elements
+    const existingBase = document.getElementById('theme-base-css');
+    if (existingBase) existingBase.remove();
+    const existingCustom = document.getElementById('theme-custom-css');
+    if (existingCustom) existingCustom.remove();
+
+    // 1. Load base theme from /themes/{id}.css if set in settings
+    const baseThemeId = notebookSettings?.theme;
+    if (baseThemeId) {
+        try {
+            const baseCSS = await fetchThemeCSS(baseThemeId);
+            if (baseCSS) {
+                const baseStyle = document.createElement('style');
+                baseStyle.id = 'theme-base-css';
+                baseStyle.textContent = `@layer theme {\n${baseCSS}\n}`;
+                document.head.appendChild(baseStyle);
+                console.log(`[Theme] Loaded base theme: ${baseThemeId}`);
+            }
+        } catch (e) {
+            console.error(`[Theme] Error loading base theme ${baseThemeId}:`, e);
+        }
     }
 
-    // Load from .notebook/theme.css
+    // 2. Load customizations from .notebook/theme.css (layered on top)
     const configDir = await getNotebookConfigDir(dirHandle, false);
     if (configDir) {
         try {
@@ -674,15 +691,17 @@ async function loadThemeCss(dirHandle) {
             const content = await file.text();
 
             // Create and inject style element, wrapped in @layer theme
-            // This allows print styles (unlayered) to override theme backgrounds
+            // This loads after base theme, so customizations take precedence
             const style = document.createElement('style');
-            style.id = 'theme-css';
+            style.id = 'theme-custom-css';
             style.textContent = `@layer theme {\n${content}\n}`;
             document.head.appendChild(style);
-            console.log('[Theme] Loaded .notebook/theme.css into @layer theme');
+            console.log('[Theme] Loaded .notebook/theme.css customizations');
         } catch (e) {
-            // File doesn't exist, that's fine (theme is optional)
-            console.log('[Theme] No theme.css found (optional)');
+            // File doesn't exist, that's fine (theme.css is optional)
+            if (!baseThemeId) {
+                console.log('[Theme] No theme configured');
+            }
         }
     }
 }
@@ -2717,6 +2736,36 @@ function renderEditorField(fieldConfig, fieldDef, value) {
             };
             div.appendChild(addBtn);
         }
+    } else if (type === 'theme') {
+        // Theme picker dropdown - populated from theme registry
+        inputEl = document.createElement('select');
+        inputEl.id = `editor-${field}`;
+
+        // Add "None" option for no base theme
+        const noneOption = document.createElement('option');
+        noneOption.value = '';
+        noneOption.textContent = '(None - use theme.css only)';
+        noneOption.selected = !value;
+        inputEl.appendChild(noneOption);
+
+        // Add themes from registry
+        const themes = themeRegistryCache || [];
+        themes.forEach(theme => {
+            const option = document.createElement('option');
+            option.value = theme.id;
+            option.textContent = theme.name;
+            option.title = theme.description || '';
+            option.selected = theme.id === value;
+            inputEl.appendChild(option);
+        });
+
+        div.appendChild(inputEl);
+
+        // Add description hint
+        const hint = document.createElement('p');
+        hint.className = 'form-hint';
+        hint.textContent = 'Base theme from /themes/. Your .notebook/theme.css customizations are layered on top.';
+        div.appendChild(hint);
     } else {
         // Default text input
         inputEl = document.createElement('input');
@@ -4236,6 +4285,8 @@ async function saveCardFile(sectionId, card) {
         }
 
         await saveSettings(notebookDirHandle);
+        // Reload theme in case base theme changed
+        await loadThemeCss(notebookDirHandle);
         card.filename = '.notebook/settings.yaml';
         card.id = 'system-settings.yaml';
         recordSave('.notebook/settings.yaml');
@@ -5998,8 +6049,36 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// Show error when opened via file:// protocol (requires server)
+function showFileProtocolError() {
+    document.body.innerHTML = `
+        <div style="max-width: 600px; margin: 100px auto; padding: 40px; font-family: system-ui, sans-serif; text-align: center;">
+            <h1 style="color: #c9302c; margin-bottom: 20px;">Server Required</h1>
+            <p style="color: #555; line-height: 1.6; margin-bottom: 30px;">
+                This app needs to be served via HTTP, not opened directly as a file.
+                The <code>file://</code> protocol doesn't support the features this app needs.
+            </p>
+            <div style="background: #f5f5f5; border-radius: 8px; padding: 20px; text-align: left;">
+                <p style="margin: 0 0 15px 0; font-weight: 600;">To run the notebook:</p>
+                <pre style="background: #282c34; color: #abb2bf; padding: 15px; border-radius: 4px; overflow-x: auto; margin: 0;"><code>cd ${window.location.pathname.split('/').slice(0, -1).join('/') || '/path/to/research-notebook'}
+npm link
+notebook</code></pre>
+            </div>
+            <p style="color: #888; font-size: 14px; margin-top: 20px;">
+                This will start a local server and open the app in your browser.
+            </p>
+        </div>
+    `;
+}
+
 // Initialize
 async function init() {
+    // Check for file:// protocol - app requires server
+    if (window.location.protocol === 'file:') {
+        showFileProtocolError();
+        return;
+    }
+
     // Fetch default assets from server (templates, theme content, theme registry)
     // These are needed before rendering for modified indicators and theme picker
     await Promise.all([

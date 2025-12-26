@@ -16,6 +16,11 @@
       "description": "Dark hacker aesthetic with green-on-black terminal feel"
     },
     {
+      "id": "friendly",
+      "name": "Friendly",
+      "description": "Accessible, warm aesthetic with light blue accents for learning"
+    },
+    {
       "id": "handwritten",
       "name": "Handwritten",
       "description": "Calligraphic style with handwriting fonts for a personal journal feel"

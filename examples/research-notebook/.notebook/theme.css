@@ -1,29 +1,6 @@
 /*
- * Research Notebook Theme: "Manuscript"
- * Warm, scholarly parchment aesthetic
+ * Research Notebook Theme Customizations
+ *
+ * Base theme: manuscript (set in settings.yaml)
+ * Add your customizations below to override the base theme.
  */
-
-:root {
-    /* Warm sepia-toned palette */
-    --bg-primary: #faf8f3;
-    --bg-secondary: #f5f2ea;
-    --text-primary: #3d3733;
-    --text-secondary: #5a544c;
-    --text-muted: #8a8279;
-    --accent: #8b6914;
-    --border: #ddd5c5;
-    --link-color: #7a5d12;
-    --link-hover: #a67c1a;
-}
-
-/* Header styling */
-header h1 {
-    font-family: Georgia, 'Times New Roman', serif;
-    font-weight: normal;
-    letter-spacing: 0.05em;
-}
-
-header h2 {
-    font-style: italic;
-    color: var(--text-muted);
-}

@@ -3,9 +3,16 @@ notebook_subtitle: Bookmarks, notes, and connections
 sections:
   - name: Research
     visible: true
-  - name: System
-    path: "."
+    path: research
+  - name: Assets
     visible: false
+    path: assets
+  - name: System
+    visible: false
+    path:
+      - .
+      - .notebook
+      - .notebook/templates
 default_author: ""
 authors:
   - name: Claude Opus
@@ -28,4 +35,4 @@ extensions:
   .card.yaml:
     parser: yaml
     defaultTemplate: null
-theme: ""
+theme: manuscript

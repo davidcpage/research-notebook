@@ -3,8 +3,8 @@ id: dev-multi-file-architecture
 title: Multi-File Architecture
 author: Claude
 created: 2024-12-26T11:00:00Z
-modified: 2025-12-26T17:00:00Z
-tags: [active, architecture]
+modified: 2025-12-26T18:00:00Z
+tags: [completed, architecture]
 ---
 
 # Multi-File Architecture
@@ -13,33 +13,25 @@ tags: [active, architecture]
 
 ## Status
 
-**Revisited: Server-Based Approach Approved** - Accepting server requirement to enable real file separation.
+**COMPLETED** - All phases implemented. Server-based architecture is live.
 
-### History
+### Implementation Summary
 
-**Phase 1-3 (Completed 2025-12-26):**
-- Directory structure, CSS extraction (`css/app.css`), JS extraction (`js/app.js`)
-- Result: `index.html` (210 lines), `css/app.css` (~2800 lines), `js/app.js` (~6500 lines)
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1-3 | ✅ Done | Directory structure, CSS/JS extraction |
+| Phase 4 | ✅ Done | Dynamic fetch for templates and themes |
+| Phase 5a | ✅ Done | Theme picker UI in settings |
+| Phase 5b | ✅ Done | Example notebooks with base themes |
+| Phase 6 | ✅ Done | Cleanup and documentation |
 
-**Phase 4+ Initially Rejected:**
-ES modules don't work with `file://` protocol. This was seen as conflicting with "double-click to open" goal.
+### Key Decisions Made
 
-**Phase 4+ Revisited (2025-12-26):**
-Re-evaluating the constraint. Target users run Claude Code alongside the notebook, meaning:
-- They already have a terminal open
-- They likely have Node.js installed
-- A simple CLI command (`notebook`) is acceptable UX
-
-### New Decision
-
-**Accept server requirement** to unlock:
-- Real `.css` theme files (not JS-wrapped strings)
-- Real `.yaml` template files (not embedded in app.js)
-- Dynamic theme picker with live preview
-- Cleaner codebase (remove ~500 lines of embedded strings)
-- Standard web development patterns
-
-**No fallback mode** - maintaining two copies (embedded + real files) is a maintenance burden. If opened via `file://`, show a friendly message directing users to run `notebook`.
+1. **Server requirement accepted** - `notebook` CLI command starts local server
+2. **No file:// fallback** - Shows friendly error with install instructions
+3. **Base theme + customizations** - Settings has theme picker, `.notebook/theme.css` layers on top
+4. **Example notebooks as templates** - research, dev, tutor notebooks with tailored CLAUDE.md
+5. **Templates fetched dynamically** - From `/defaults/templates/*.yaml` via HTTP
 
 ---
 
@@ -58,36 +50,40 @@ notebook              # Starts server, opens browser
 notebook --port 8081  # Custom port
 ```
 
-### Target Structure
+### Final Structure (Implemented)
 
 ```
 repo/
-├── package.json               # npm package with bin entry
-├── cli.js                     # Node.js static file server
-├── index.html                 # HTML shell
+├── package.json               # npm package with bin entry for 'notebook' command
+├── cli.js                     # Node.js static file server (auto-opens browser)
+├── index.html                 # HTML shell (~210 lines)
 ├── css/
-│   └── app.css                # Application styles
+│   └── app.css                # Application styles (~2800 lines)
 ├── js/
-│   └── app.js                 # Application logic (single file, section markers)
+│   └── app.js                 # Application logic (~6500 lines, section markers)
 ├── defaults/
+│   ├── theme.css              # Default theme.css for new notebooks
 │   └── templates/
-│       ├── note.yaml          # Real YAML files
+│       ├── note.yaml          # Real YAML template files
 │       ├── code.yaml
 │       ├── bookmark.yaml
 │       ├── image.yaml
 │       ├── theme.yaml
+│       ├── template.yaml
 │       └── settings.yaml
 ├── themes/
-│   ├── index.json             # Theme registry metadata
-│   ├── manuscript.css         # Real CSS files
-│   ├── minimal.css
-│   ├── terminal.css
-│   └── handwritten.css
+│   ├── index.json             # Theme registry (id, name, description)
+│   ├── manuscript.css         # Warm, scholarly parchment
+│   ├── minimal.css            # Clean, sparse design
+│   ├── terminal.css           # Dark hacker aesthetic
+│   ├── friendly.css           # Accessible, light blue (for learning)
+│   └── handwritten.css        # Calligraphic fonts
 ├── theme-reference.css        # Documentation of all customizable selectors
 └── examples/
-    ├── research-notebook/     # Research use case
-    ├── tutor-notebook/        # AI tutoring use case
-    └── dev-notebook/          # Development use case
+    ├── demo-notebook/         # Full-featured reference
+    ├── research-notebook/     # theme: manuscript
+    ├── dev-notebook/          # theme: terminal
+    └── tutor-notebook/        # theme: friendly
 ```
 
 ### How Dynamic Loading Works
@@ -121,15 +117,26 @@ notebook  # start server</pre>
 </div>
 ```
 
-### Theme Picker Flow
+### Theme Picker Flow (Implemented)
 
-1. Settings modal includes "Theme" section
-2. Dropdown lists themes from `/themes/index.json`
-3. Selecting a theme:
-   - Fetches `/themes/{id}.css`
-   - Writes to notebook's `.notebook/theme.css`
-   - Reloads theme CSS
-4. "Custom" option preserves existing `.notebook/theme.css`
+**Base theme + customizations architecture:**
+
+1. Settings modal has "Base Theme" dropdown populated from `/themes/index.json`
+2. Selecting a theme saves `theme: {id}` to settings.yaml
+3. Theme loading (in `loadThemeCss()`):
+   - First loads base theme from `/themes/{id}.css` → `<style id="theme-base-css">`
+   - Then loads `.notebook/theme.css` → `<style id="theme-custom-css">`
+   - Both wrapped in `@layer theme` for proper cascade
+4. "(None)" option uses only `.notebook/theme.css` with no base
+
+**CSS cascade order:**
+```
+css/app.css (@layer reset → vendors → base → components → templates → theme)
+    ↓
+/themes/{id}.css (base theme, in @layer theme)
+    ↓
+.notebook/theme.css (customizations, in @layer theme, wins by source order)
+```
 
 ### Lazy/Copy-on-Write for Templates
 

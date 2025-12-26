@@ -73,12 +73,30 @@ Card rendering, viewer display, and editing all work automatically via templates
 - **Modified indicator**: Template files (note, code, bookmark), README.md, CLAUDE.md, and theme.css show orange "MODIFIED" badge when they differ from defaults. Viewer shows "Show Diff" button (uses jsdiff library), "Merge Defaults" (templates only), and "Reset to Defaults" buttons. Key functions: `isSystemCardModified()`, `getSystemCardDefaultContent()`, `showSystemCardDiff()`, `resetSystemCardDefaults()`
 
 ### Theming
-- `.notebook/theme.css` loads into `@layer theme` (highest layer, overrides all built-in styles)
-- Print styles are unlayered, so they beat theme backgrounds (clean white print by default)
-- New notebooks get a minimal starter `theme.css` with documented variables
-- Full reference: `/theme-reference.css` in repo root documents all customizable selectors
-- Demo theme: `examples/demo-notebook/.notebook/theme.css` shows elaborate theming with textures
-- Key function: `getDefaultThemeContent()` generates the starter theme for new notebooks
+The app uses a two-layer theme system: base themes + notebook customizations.
+
+**CSS cascade**: `css/app.css` → `/themes/{id}.css` (base) → `.notebook/theme.css` (customizations)
+
+**Base themes** (in `/themes/` directory):
+- `manuscript` - Warm, scholarly parchment aesthetic with textured backgrounds
+- `minimal` - Clean, sparse design with subtle accents and generous whitespace
+- `terminal` - Dark hacker aesthetic with green-on-black terminal feel
+- `friendly` - Accessible, warm aesthetic with light blue accents for learning
+- `handwritten` - Calligraphic style with handwriting fonts for personal journal feel
+
+**Selection**: Set `theme: manuscript` in `.notebook/settings.yaml` or use the Theme picker in Settings editor.
+
+**Customizations**: `.notebook/theme.css` loads after the base theme, allowing per-notebook overrides.
+
+**CSS layers**: Both base and custom themes inject into `@layer theme` (highest layer, overrides all built-in styles). Print styles are unlayered, so they beat theme backgrounds.
+
+**Key files**:
+- `/themes/index.json` - Theme registry (id, name, description)
+- `/themes/*.css` - Base theme stylesheets
+- `/theme-reference.css` - Documents all customizable selectors
+- `examples/demo-notebook/.notebook/theme.css` - Shows elaborate customizations
+
+**Key functions**: `loadThemeCss()`, `fetchThemeRegistry()`, `fetchThemeCSS()`
 
 ### Adding new field types
 When adding field type handling in `renderEditorField()`, check type-specific conditions BEFORE generic ones like `multiline && monospace`. The yaml type must be checked early or it falls through to code textarea handling.
@@ -110,6 +128,17 @@ repo/
 ├── index.html          # HTML shell with CDN imports (~210 lines)
 ├── css/app.css         # All application styles (~2800 lines)
 ├── js/app.js           # All application JavaScript (~6500 lines)
+├── cli.js              # Node.js static server (required for themes)
+├── themes/             # Base themes (fetched at runtime)
+│   ├── index.json      # Theme registry
+│   ├── manuscript.css
+│   ├── minimal.css
+│   ├── terminal.css
+│   ├── friendly.css
+│   └── handwritten.css
+├── defaults/           # Default files for new notebooks
+│   ├── theme.css       # Starter customization template
+│   └── templates/      # Default template definitions
 └── examples/           # Example notebooks
 ```
 - External CDN dependencies: PDF.js, Marked.js, KaTeX, Pyodide, Highlight.js, CodeMirror 6
@@ -250,7 +279,7 @@ The app uses CSS cascade layers for predictable style precedence:
 | `base` | CSS variables, typography, body | Foundation styles |
 | `components` | Cards, modals, buttons, forms | UI element styles |
 | `templates` | Card type styling | Template-specific rules |
-| `theme` | User theme.css | Loaded dynamically |
+| `theme` | Base theme + .notebook/theme.css | Loaded dynamically (base first, then customizations) |
 | *(unlayered)* | Print styles | Print media queries |
 
 **Key insight**: Unlayered styles beat all layers regardless of specificity. This means:
@@ -313,8 +342,22 @@ CodeMirror 6 provides syntax highlighting in editor fields for code, YAML, CSS, 
 
 ## Development Guidelines
 
+### Running the App
+**Server required**: The app fetches theme files and defaults from the repo, so it must run via HTTP server (not `file://`).
+
+```bash
+# Recommended: Install globally (works from any directory)
+npm link
+notebook
+
+# Or run directly from repo
+node cli.js
+
+# Alternative: Any static server (from repo root)
+python3 -m http.server 8080
+```
+
 ### Testing
-- Open `index.html` directly in browser (no build/server needed)
 - Data in IndexedDB: Database `ResearchNotebookDB`, Store `notebook`
 - View in DevTools → Application → IndexedDB
 
