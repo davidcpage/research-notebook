@@ -1,0 +1,73 @@
+name: settings
+description: Notebook configuration
+schema:
+  notebook_title:
+    type: text
+    required: true
+  notebook_subtitle:
+    type: text
+  sections:
+    type: records
+    allowDelete: false
+    allowAdd: true
+    schema:
+      name:
+        type: text
+        label: Name
+      path:
+        type: text
+        label: Path
+        placeholder: "(auto from name)"
+      visible:
+        type: boolean
+        default: true
+        label: Visible
+  default_author:
+    type: text
+  authors:
+    type: records
+    allowDelete: true
+    allowAdd: true
+    schema:
+      name:
+        type: text
+        label: Name
+      icon:
+        type: text
+        label: Icon file
+  extensions:
+    type: yaml
+  theme:
+    type: text
+card:
+  layout: yaml
+  placeholder: "⚙"
+viewer:
+  layout: yaml
+editor:
+  fields:
+    - field: notebook_title
+      label: Notebook Title
+    - field: notebook_subtitle
+      label: Subtitle
+    - field: sections
+      label: Sections
+    - field: default_author
+      label: Default Author
+    - field: authors
+      label: Author Icons
+    - field: extensions
+      label: Extension Registry
+      multiline: true
+      rows: 20
+      monospace: true
+    - field: theme
+      label: Theme CSS file (optional)
+style:
+  variables:
+    --preview-bg: "#f5f5f5"
+ui:
+  button_label: Settings
+  icon: "⚙"
+  show_create_button: false
+  sort_order: 99

@@ -104,3 +104,6 @@
 {"ts":"2025-12-26T17:20:28Z","type":"closed","id":"dp-023","reason":"Superseded by dp-034 which is part of the new server-based architecture plan"}
 {"ts":"2025-12-26T17:21:19Z","type":"note","id":"dp-029","content":"Starting implementation"}
 {"ts":"2025-12-26T17:23:25Z","type":"closed","id":"dp-029","reason":"Done - package.json and cli.js created. Server serves static files correctly, npm link works, 'notebook' command available globally."}
+{"ts":"2025-12-26T17:31:46Z","type":"closed","id":"dp-030","reason":"Converted all 4 themes from JS modules to real CSS files. Created index.json registry."}
+{"ts":"2025-12-26T17:34:06Z","type":"closed","id":"dp-031","reason":"Extracted all 7 templates to defaults/templates/*.yaml files (note, code, bookmark, settings, template, theme, image). Also extracted default theme.css. Function removal deferred to dp-032 when dynamic fetching is implemented."}
+{"ts":"2025-12-26T17:45:12Z","type":"closed","id":"dp-032","reason":"Implemented dynamic fetching from server. Templates load from /defaults/templates/, theme registry from /themes/index.json. Removed CLAUDE.md and README.md from modified indicator (user provides manually). Replaced embedded template/theme strings with fetch-cached versions."}

@@ -1,0 +1,30 @@
+name: theme
+description: Custom CSS theme for notebook styling
+schema:
+  content:
+    type: code
+    language: css
+    required: true
+card:
+  layout: document
+  preview_field: content
+  placeholder: "🎨"
+viewer:
+  layout: document
+  content_field: content
+editor:
+  fields:
+    - field: content
+      label: Theme CSS
+      multiline: true
+      rows: 30
+      monospace: true
+      language: css
+style:
+  variables:
+    --preview-bg: "#2d2d2d"
+ui:
+  button_label: Theme
+  icon: "🎨"
+  show_create_button: false
+  sort_order: 97

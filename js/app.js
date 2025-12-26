@@ -114,6 +114,15 @@ let extensionRegistry = null;
 // Loaded from *.template.yaml files or uses defaults
 let templateRegistry = {};
 
+// Cache for default templates loaded from /defaults/templates/
+let defaultTemplatesCache = null;
+
+// Cache for default theme content loaded from /defaults/theme.css
+let defaultThemeContentCache = null;
+
+// Cache for theme registry loaded from /themes/index.json
+let themeRegistryCache = null;
+
 // Get the default extension registry (hardcoded fallback)
 function getDefaultExtensionRegistry() {
     return {
@@ -148,314 +157,115 @@ function getDefaultExtensionRegistry() {
     };
 }
 
-// Get the default templates (hardcoded fallback)
-function getDefaultTemplates() {
-    return {
-        note: {
-            name: 'note',
-            description: 'Markdown note with full formatting support',
-            schema: {
-                title: { type: 'text', required: true },
-                author: { type: 'text' },
-                content: { type: 'markdown', required: true },
-                created: { type: 'datetime' },
-                modified: { type: 'datetime' }
-            },
-            card: {
-                layout: 'document',
-                preview_field: 'content',
-                placeholder: '📝'
-            },
-            viewer: {
-                layout: 'document',
-                content_field: 'content'
-            },
-            editor: {
-                fields: [
-                    { field: 'title', label: 'Title' },
-                    { field: 'author', label: 'Author' },
-                    { field: 'content', label: 'Content', multiline: true, rows: 20, preview: true }
-                ]
-            },
-            style: {
-                variables: {
-                    '--preview-bg': '#f0ebe0'
-                }
-            },
-            ui: {
-                button_label: 'Note',
-                icon: '📝',
-                sort_order: 1
-            }
-        },
-        code: {
-            name: 'code',
-            description: 'Executable Python code with output',
-            schema: {
-                title: { type: 'text', required: true },
-                author: { type: 'text' },
-                code: { type: 'code', language: 'python', required: true },
-                output: { type: 'html' },
-                showOutput: { type: 'boolean', default: true }
-            },
-            card: {
-                layout: 'split-pane',
-                slots: {
-                    left: { field: 'output', width: '60%' },
-                    right: { field: 'code', width: '40%' }
-                },
-                fallback_layout: 'document',
-                fallback_field: 'code',
-                placeholder: '🐍'
-            },
-            viewer: {
-                layout: 'split-pane',
-                slots: {
-                    left: { field: 'output', width: '60%' },
-                    right: { field: 'code', width: '40%' }
-                }
-            },
-            editor: {
-                fields: [
-                    { field: 'title', label: 'Title' },
-                    { field: 'author', label: 'Author' },
-                    { field: 'code', label: 'Code', multiline: true, rows: 20, monospace: true }
-                ],
-                actions: [
-                    { label: 'Run', action: 'execute', icon: '▶' }
-                ]
-            },
-            style: {
-                variables: {
-                    '--card-bg': '#f8faf8'
-                }
-            },
-            ui: {
-                button_label: 'Code',
-                icon: '🐍',
-                sort_order: 2
-            }
-        },
-        bookmark: {
-            name: 'bookmark',
-            description: 'Web bookmark with thumbnail and description',
-            schema: {
-                title: { type: 'text', required: true },
-                url: { type: 'url', required: true },
-                description: { type: 'markdown' },
-                thumbnail: { type: 'thumbnail', auto_generate: true },
-                favicon: { type: 'url' },
-                created: { type: 'datetime' },
-                modified: { type: 'datetime' }
-            },
-            card: {
-                layout: 'image',
-                preview_field: 'thumbnail',
-                placeholder: '🔗',
-                title_link_field: 'url'
-            },
-            viewer: {
-                layout: 'image',
-                image_field: 'thumbnail',
-                content_field: 'description'
-            },
-            editor: {
-                fields: [
-                    { field: 'thumbnail', label: 'Thumbnail (optional)', widget: 'thumbnail-upload' },
-                    { field: 'url', label: 'URL', auto_fetch: true },
-                    { field: 'title', label: 'Title (optional)' },
-                    { field: 'description', label: 'Description (optional)', multiline: true, rows: 4 }
-                ]
-            },
-            style: {
-                variables: {
-                    '--preview-bg': 'linear-gradient(135deg, #f8f6f3 0%, #e8e4df 100%)'
-                }
-            },
-            ui: {
-                button_label: 'Bookmark',
-                icon: '🔗',
-                sort_order: 3
-            }
-        },
-        settings: {
-            name: 'settings',
-            description: 'Notebook configuration',
-            schema: {
-                notebook_title: { type: 'text', required: true },
-                notebook_subtitle: { type: 'text' },
-                sections: {
-                    type: 'records',
-                    allowDelete: false,
-                    allowAdd: true,
-                    schema: {
-                        name: { type: 'text', label: 'Name' },
-                        path: { type: 'text', label: 'Path', placeholder: '(auto from name)' },
-                        visible: { type: 'boolean', default: true, label: 'Visible' }
+// Fetch default templates from /defaults/templates/
+// This must be called during app initialization before templates are used
+async function fetchDefaultTemplates() {
+    if (defaultTemplatesCache) {
+        return defaultTemplatesCache;
+    }
+
+    console.log('[Templates] Fetching default templates...');
+    const templates = {};
+
+    try {
+        // Fetch the template index
+        const indexResponse = await fetch('/defaults/templates/index.json');
+        if (!indexResponse.ok) {
+            throw new Error(`Failed to fetch template index: ${indexResponse.status}`);
+        }
+        const index = await indexResponse.json();
+
+        // Fetch each template YAML file
+        for (const templateName of index.templates) {
+            try {
+                const response = await fetch(`/defaults/templates/${templateName}.yaml`);
+                if (response.ok) {
+                    const yamlContent = await response.text();
+                    const template = jsyaml.load(yamlContent);
+                    if (template && template.name) {
+                        templates[template.name] = template;
                     }
-                },
-                default_author: { type: 'text' },
-                authors: {
-                    type: 'records',
-                    allowDelete: true,
-                    allowAdd: true,
-                    schema: {
-                        name: { type: 'text', label: 'Name' },
-                        icon: { type: 'text', label: 'Icon file' }
-                    }
-                },
-                extensions: { type: 'yaml' },
-                theme: { type: 'text' }
-            },
-            card: {
-                layout: 'yaml',
-                placeholder: '⚙'
-            },
-            viewer: {
-                layout: 'yaml'
-            },
-            editor: {
-                fields: [
-                    { field: 'notebook_title', label: 'Notebook Title' },
-                    { field: 'notebook_subtitle', label: 'Subtitle' },
-                    { field: 'sections', label: 'Sections' },
-                    { field: 'default_author', label: 'Default Author' },
-                    { field: 'authors', label: 'Author Icons' },
-                    { field: 'extensions', label: 'Extension Registry', multiline: true, rows: 20, monospace: true },
-                    { field: 'theme', label: 'Theme CSS file (optional)' }
-                ]
-            },
-            style: {
-                variables: {
-                    '--preview-bg': '#f5f5f5'
                 }
-            },
-            ui: {
-                button_label: 'Settings',
-                icon: '⚙',
-                show_create_button: false,
-                sort_order: 99
-            }
-        },
-        template: {
-            name: 'template',
-            description: 'Template definition file',
-            schema: {
-                name: { type: 'text', required: true },
-                description: { type: 'text' },
-                schema: { type: 'yaml' },
-                card: { type: 'yaml' },
-                viewer: { type: 'yaml' },
-                editor: { type: 'yaml' },
-                style: { type: 'yaml' },
-                ui: { type: 'yaml' }
-            },
-            card: {
-                layout: 'yaml',
-                placeholder: '📋'
-            },
-            viewer: {
-                layout: 'yaml'
-            },
-            editor: {
-                fields: [
-                    { field: 'name', label: 'Template Name' },
-                    { field: 'description', label: 'Description' },
-                    { field: 'schema', label: 'Schema', rows: 10 },
-                    { field: 'card', label: 'Card Layout', rows: 6 },
-                    { field: 'viewer', label: 'Viewer Layout', rows: 4 },
-                    { field: 'editor', label: 'Editor Config', rows: 6 },
-                    { field: 'style', label: 'Style', rows: 4 },
-                    { field: 'ui', label: 'UI Config', rows: 4 }
-                ]
-            },
-            style: {
-                variables: {
-                    '--preview-bg': '#f0f4f8'
-                }
-            },
-            ui: {
-                button_label: 'Template',
-                icon: '📋',
-                show_create_button: false,
-                sort_order: 98
-            }
-        },
-        theme: {
-            name: 'theme',
-            description: 'Custom CSS theme for notebook styling',
-            schema: {
-                content: { type: 'code', language: 'css', required: true }
-            },
-            card: {
-                layout: 'document',
-                preview_field: 'content',
-                placeholder: '🎨'
-            },
-            viewer: {
-                layout: 'document',
-                content_field: 'content'
-            },
-            editor: {
-                fields: [
-                    { field: 'content', label: 'Theme CSS', multiline: true, rows: 30, monospace: true, language: 'css' }
-                ]
-            },
-            style: {
-                variables: {
-                    '--preview-bg': '#2d2d2d'
-                }
-            },
-            ui: {
-                button_label: 'Theme',
-                icon: '🎨',
-                show_create_button: false,
-                sort_order: 97
-            }
-        },
-        image: {
-            name: 'image',
-            description: 'Image file (PNG, JPG, SVG, GIF, WebP)',
-            schema: {
-                title: { type: 'text', required: true },  // filename with extension
-                path: { type: 'text' },  // relative path (e.g., assets/thumbnails/img.png)
-                filesize: { type: 'text' },  // human-readable size (e.g., "124 KB")
-                src: { type: 'text', required: true },
-                alt: { type: 'text' },
-                caption: { type: 'markdown' }
-            },
-            card: {
-                layout: 'image',
-                preview_field: 'src',
-                placeholder: '🖼️'
-            },
-            viewer: {
-                layout: 'image',
-                image_field: 'src',
-                content_field: 'caption'
-            },
-            editor: {
-                fields: [
-                    { field: 'title', label: 'Filename' },
-                    { field: 'path', label: 'Path', readonly: true },
-                    { field: 'filesize', label: 'Size', readonly: true },
-                    { field: 'alt', label: 'Alt Text' },
-                    { field: 'caption', label: 'Caption', multiline: true, rows: 3 }
-                ]
-            },
-            style: {
-                variables: {
-                    '--preview-bg': '#f5f5f5'
-                }
-            },
-            ui: {
-                button_label: 'Image',
-                icon: '🖼️',
-                show_create_button: false,
-                sort_order: 96
+            } catch (e) {
+                console.error(`[Templates] Error loading ${templateName}.yaml:`, e);
             }
         }
-    };
+
+        console.log(`[Templates] Loaded ${Object.keys(templates).length} default templates`);
+        defaultTemplatesCache = templates;
+        return templates;
+    } catch (e) {
+        console.error('[Templates] Error fetching defaults:', e);
+        // Return empty object - app should still work with user templates only
+        defaultTemplatesCache = {};
+        return {};
+    }
+}
+
+// Get cached default templates (synchronous, must call fetchDefaultTemplates first)
+function getDefaultTemplates() {
+    if (!defaultTemplatesCache) {
+        console.warn('[Templates] getDefaultTemplates called before fetchDefaultTemplates - returning empty');
+        return {};
+    }
+    return defaultTemplatesCache;
+}
+
+// Fetch default theme.css content from /defaults/theme.css
+async function fetchDefaultThemeContent() {
+    if (defaultThemeContentCache !== null) {
+        return defaultThemeContentCache;
+    }
+
+    try {
+        const response = await fetch('/defaults/theme.css');
+        if (response.ok) {
+            defaultThemeContentCache = await response.text();
+            console.log('[Theme] Loaded default theme.css content');
+            return defaultThemeContentCache;
+        }
+    } catch (e) {
+        console.error('[Theme] Error fetching default theme.css:', e);
+    }
+
+    // Fallback to empty string
+    defaultThemeContentCache = '';
+    return '';
+}
+
+// Fetch theme registry from /themes/index.json
+async function fetchThemeRegistry() {
+    if (themeRegistryCache !== null) {
+        return themeRegistryCache;
+    }
+
+    try {
+        const response = await fetch('/themes/index.json');
+        if (response.ok) {
+            const data = await response.json();
+            themeRegistryCache = data.themes || [];
+            console.log(`[Themes] Loaded ${themeRegistryCache.length} themes from registry`);
+            return themeRegistryCache;
+        }
+    } catch (e) {
+        console.error('[Themes] Error fetching theme registry:', e);
+    }
+
+    themeRegistryCache = [];
+    return [];
+}
+
+// Fetch a theme's CSS from /themes/{id}.css
+async function fetchThemeCSS(themeId) {
+    try {
+        const response = await fetch(`/themes/${themeId}.css`);
+        if (response.ok) {
+            return await response.text();
+        }
+    } catch (e) {
+        console.error(`[Themes] Error fetching ${themeId}.css:`, e);
+    }
+    return null;
 }
 
 // Generate YAML content for a template file
@@ -474,7 +284,8 @@ function getTemplateFileContent(templateName) {
 }
 
 // Check if a system card's content differs from defaults
-// Covers: template files (note, code, bookmark), README.md, CLAUDE.md, theme.css
+// Covers: template files (note, code, bookmark) and theme.css
+// Note: README.md and CLAUDE.md are excluded - users provide these manually
 function isSystemCardModified(card) {
     const defaultContent = getSystemCardDefaultContent(card);
     if (!defaultContent) return false;
@@ -488,7 +299,8 @@ function isTemplateModified(card) {
     return isSystemCardModified(card);
 }
 
-// Get the default content for a system card (template, README.md, or CLAUDE.md)
+// Get the default content for a system card (template or theme.css)
+// README.md and CLAUDE.md are excluded - users provide these manually
 function getSystemCardDefaultContent(card) {
     // Template files (note.template.yaml, code.template.yaml, bookmark.template.yaml)
     if (card.template === 'template') {
@@ -496,16 +308,6 @@ function getSystemCardDefaultContent(card) {
         if (defaultTemplateNames.includes(card.name)) {
             return getTemplateFileContent(card.name);
         }
-    }
-
-    // README.md - use current notebook title for comparison
-    if (card.filename === 'README.md') {
-        return getReadmeTemplate(data.title || 'Research Notebook');
-    }
-
-    // CLAUDE.md
-    if (card.filename === 'CLAUDE.md') {
-        return getClaudeMdTemplate();
     }
 
     // theme.css
@@ -523,8 +325,8 @@ function getSystemCardCurrentContent(card) {
         return getTemplateFileContentFromCard(card);
     }
 
-    // README.md, CLAUDE.md, theme.css - use the content field directly
-    if (card.filename === 'README.md' || card.filename === 'CLAUDE.md' || card.filename === 'theme.css') {
+    // theme.css - use the content field directly
+    if (card.filename === 'theme.css') {
         return card.content || '';
     }
 
@@ -553,86 +355,14 @@ function getTemplateFileContentFromCard(card) {
     });
 }
 
-// Generate default theme.css content (minimal starter for new notebooks)
+// Get default theme.css content (loaded from /defaults/theme.css)
+// Returns cached content or empty string if not yet loaded
 function getDefaultThemeContent() {
-    return `/*
- * Research Notebook Theme
- * =======================
- * Customize your notebook's appearance by uncommenting and modifying styles below.
- * This file loads after the app's built-in styles, so your changes take precedence.
- *
- * For a complete reference of all customizable elements, see:
- * https://github.com/anthropics/research-notebook/blob/main/theme.css
- */
-
-
-/* ==========================================================================
-   GLOBAL COLOR VARIABLES
-   ==========================================================================
-   Uncomment and modify these to change colors throughout the entire app.
-*/
-
-/*
-:root {
-    /* Backgrounds */
-    --bg-primary: #f8f6f3;        /* Main page background */
-    --bg-secondary: #ffffff;      /* Card and modal backgrounds */
-    --bg-accent: #1a1a1a;         /* Header background */
-
-    /* Text colors */
-    --text-primary: #1a1a1a;      /* Main body text */
-    --text-secondary: #5a5a5a;    /* Secondary text */
-    --text-muted: #8a8a8a;        /* Muted text, metadata */
-
-    /* Borders */
-    --border: #e0ddd8;            /* Standard borders */
-    --border-dark: #c5c2bd;       /* Darker borders (buttons) */
-
-    /* Accent color (buttons, links, highlights) */
-    --accent: #c45d3a;            /* Primary accent (terracotta) */
-    --accent-hover: #a84d2e;      /* Accent hover state */
-
-    /* Code blocks */
-    --code-bg: #1a3a52;           /* Code background (dark teal) */
-    --code-text: #e0e6ed;         /* Code text color */
-
-    /* Internal wiki links */
-    --link-color: #2563eb;        /* Link color (blue) */
-    --link-hover: #1d4ed8;        /* Link hover color */
-}
-*/
-
-
-/* ==========================================================================
-   TEMPLATE STYLING
-   ==========================================================================
-   Style specific card types using template variables.
-   The same selector styles BOTH the card AND its viewer for consistency.
-
-   Available variables:
-   --template-border, --template-bg, --template-preview-bg,
-   --template-title-text, --template-meta-text, --template-heading-font,
-   --template-code-bg, --template-code-text, --template-output-bg
-*/
-
-/* Example: Customize note cards */
-/*
-.card[data-template="note"],
-.modal.viewer[data-template="note"] {
-    --template-border: #d9d0be;
-    --template-bg: #f6f0e2;
-    --template-heading-font: Georgia, serif;
-}
-*/
-
-
-/* ==========================================================================
-   YOUR CUSTOMIZATIONS
-   ==========================================================================
-   Add your custom styles below.
-*/
-
-`;
+    if (defaultThemeContentCache === null) {
+        console.warn('[Theme] getDefaultThemeContent called before fetchDefaultThemeContent');
+        return '';
+    }
+    return defaultThemeContentCache;
 }
 
 // Settings schema - single source of truth for settings fields and defaults
@@ -859,8 +589,8 @@ async function loadAuthors(dirHandle) {
 
 // Load templates from .notebook/templates/
 async function loadTemplates(dirHandle) {
-    // Start with default templates (ensures settings is always available)
-    const defaults = getDefaultTemplates();
+    // Fetch default templates from server (ensures settings is always available)
+    const defaults = await fetchDefaultTemplates();
     templateRegistry = { ...defaults };
 
     if (!dirHandle) {
@@ -3773,244 +3503,6 @@ function isFileSystemAccessSupported() {
     return 'showDirectoryPicker' in window;
 }
 
-// Template for README.md in notebook folders
-function getReadmeTemplate(notebookTitle) {
-    return `# ${notebookTitle || 'Research Notebook'}
-
-This folder contains a Research Notebook - a collection of notes, code snippets, and bookmarks stored as plain files.
-
-## Directory Structure
-
-\`\`\`
-notebook-folder/
-├── settings.yaml           # Notebook settings (title, subtitle, sections)
-├── theme.css               # Custom CSS theme (optional)
-├── *.template.yaml         # Card type templates (note, code, bookmark)
-├── README.md               # This file
-├── CLAUDE.md               # Instructions for Claude Code
-├── research/               # Section directory (example)
-│   ├── note-title.md       # Markdown note with YAML frontmatter
-│   ├── code-title.code.py  # Python code with comment frontmatter
-│   └── code-title.output.html  # Code execution output (auto-generated)
-├── references/             # Another section (example)
-│   └── bookmark.bookmark.json  # Bookmark metadata
-└── assets/
-    ├── thumbnails/         # Bookmark thumbnail images
-    └── author-icons/       # Author icon SVGs
-\`\`\`
-
-**Note:** Sections are directories at the root level. The directory name becomes the section slug.
-
-## File Formats
-
-### Notes (\`.md\`)
-Markdown files with YAML frontmatter:
-
-\`\`\`markdown
----
-id: abc123
-title: My Note Title
-created: 2024-01-15T10:30:00Z
-modified: 2024-01-20T14:22:00Z
----
-
-Note content in markdown...
-\`\`\`
-
-### Code (\`.code.py\`)
-Python files with comment-based frontmatter:
-
-\`\`\`python
-# ---
-# id: def456
-# title: Analysis Script
-# created: 2024-01-15T10:30:00Z
-# modified: 2024-01-20T14:22:00Z
-# output: analysis-script.output.html
-# showOutput: true
-# ---
-
-import numpy as np
-# Your code here...
-\`\`\`
-
-### Bookmarks (\`.bookmark.json\`)
-JSON files with URL and metadata:
-
-\`\`\`json
-{
-  "id": "ghi789",
-  "type": "bookmark",
-  "title": "Example Site",
-  "url": "https://example.com",
-  "description": "Description here",
-  "thumbnail": "../assets/thumbnails/ghi789.png",
-  "created": "2024-01-15T10:30:00Z",
-  "modified": "2024-01-20T14:22:00Z"
-}
-\`\`\`
-
-## Git Workflow
-
-This folder is designed for git version control:
-
-\`\`\`bash
-# Initialize git (first time only)
-git init
-git add .
-git commit -m "Initial notebook"
-
-# After making changes in the browser
-git add .
-git commit -m "Add notes on transformers"
-
-# View history of a specific note
-git log --oneline research/attention-mechanisms.md
-\`\`\`
-
-## Internal Links
-
-Notes support wiki-style internal links:
-- \`[[Section Name > Item Title]]\` - Links to another item
-- Links work across notes, code, and bookmarks
-
-## Opening the Notebook
-
-Open \`research_notebook.html\` in Chrome/Edge and select this folder when prompted.
-`;
-}
-
-// Template for CLAUDE.md in notebook folders
-function getClaudeMdTemplate() {
-    return `# CLAUDE.md
-
-This folder is a Research Notebook that stores notes, code, and bookmarks as plain files. You can read and edit these files directly.
-
-## Directory Structure
-
-Sections are directories at the root level. Configuration is stored in \`.notebook/\`.
-
-\`\`\`
-notebook/
-├── .notebook/              # Configuration directory
-│   ├── settings.yaml       # Notebook settings
-│   ├── theme.css           # Custom theme (optional)
-│   └── templates/          # Card templates
-│       ├── note.yaml
-│       ├── code.yaml
-│       └── bookmark.yaml
-├── CLAUDE.md               # This file
-├── README.md               # Notebook readme
-├── research/               # Section directory
-│   ├── my-note.md
-│   └── analysis.code.py
-├── references/             # Another section
-│   └── paper.bookmark.json
-└── assets/
-    └── thumbnails/         # Auto-generated thumbnails
-\`\`\`
-
-## Quick Reference
-
-| Type | Extension | Format |
-|------|-----------|--------|
-| Notes | \`.md\` | Markdown with YAML frontmatter |
-| Code | \`.code.py\` | Python with comment frontmatter |
-| Code Output | \`.output.html\` | HTML (auto-generated, don't edit) |
-| Bookmarks | \`.bookmark.json\` | JSON |
-| Settings | \`.notebook/settings.yaml\` | YAML |
-| Thumbnails | \`assets/thumbnails/*.png\` | Images (auto-generated) |
-
-## Reading Items
-
-\`\`\`bash
-# List all sections (directories at root, excluding .notebook, assets)
-ls -d */ | grep -v assets
-
-# Read a note
-cat research/attention-mechanisms.md
-
-# Read code
-cat ideas/analysis.code.py
-
-# Search across all notes
-grep -r "transformer" --include="*.md"
-\`\`\`
-
-## Creating Items
-
-### New Note
-Create \`{section}/{slug}.md\`:
-
-\`\`\`markdown
----
-id: 1733329200000
-title: Your Note Title
-created: 2024-01-15T10:30:00Z
-modified: 2024-01-15T10:30:00Z
----
-
-Your markdown content here...
-\`\`\`
-
-### New Code
-Create \`{section}/{slug}.code.py\`:
-
-\`\`\`python
-# ---
-# id: 1733329200001
-# title: Your Code Title
-# created: 2024-01-15T10:30:00Z
-# modified: 2024-01-15T10:30:00Z
-# ---
-
-# Your Python code here
-\`\`\`
-
-### New Section
-1. Create directory at root: \`mkdir {section-slug}\`
-2. Add to \`.notebook/settings.yaml\` sections array with name and visible fields
-
-Example in .notebook/settings.yaml:
-\`\`\`yaml
-sections:
-  - name: Research
-    visible: true
-  - name: References
-    visible: true
-\`\`\`
-
-## Editing Items
-
-- Edit the file content directly
-- Update the \`modified\` timestamp
-- The browser app will auto-detect changes (Chrome 129+) or user can click Refresh
-
-## Important Notes
-
-- **Slugs**: Filenames should be lowercase, hyphenated versions of titles (max 50 chars)
-- **IDs**: Each item needs a unique ID (numeric timestamp like \`1733329200000\` works well)
-- **Timestamps**: ISO format, milliseconds optional (e.g., \`2024-01-15T10:30:00Z\` or \`2024-01-15T10:30:00.000Z\`)
-- **Don't edit**: \`.output.html\` files (auto-generated when code runs)
-- **Internal links**: Use \`[[Section Name > Item Title]]\` syntax in markdown
-- **Thumbnails**: Bookmarks can reference \`../assets/thumbnails/{id}.png\`
-
-## Common Tasks
-
-**Add a note summarizing a paper:**
-> Create a new .md file in papers/ with frontmatter and markdown content
-
-**Search for all mentions of a topic:**
-> grep -r "attention" --include="*.md" --include="*.code.py"
-
-**List all items in a section:**
-> ls research/
-
-**Find items modified recently:**
-> find . -name "*.md" -mtime -7
-`;
-}
-
 // Convert title to filename-safe slug
 function slugify(title, maxLength = 50) {
     if (!title) return 'untitled';
@@ -4576,29 +4068,8 @@ async function saveToFilesystem(dirHandle) {
         };
         await saveSettings(dirHandle);
 
-        // Write README.md (only if it doesn't exist)
-        try {
-            await dirHandle.getFileHandle('README.md');
-            // File exists, don't overwrite
-        } catch (e) {
-            // File doesn't exist, create it
-            const readmeFile = await dirHandle.getFileHandle('README.md', { create: true });
-            const readmeWritable = await readmeFile.createWritable();
-            await readmeWritable.write(getReadmeTemplate(data.title));
-            await readmeWritable.close();
-        }
-
-        // Write CLAUDE.md (only if it doesn't exist)
-        try {
-            await dirHandle.getFileHandle('CLAUDE.md');
-            // File exists, don't overwrite
-        } catch (e) {
-            // File doesn't exist, create it
-            const claudeFile = await dirHandle.getFileHandle('CLAUDE.md', { create: true });
-            const claudeWritable = await claudeFile.createWritable();
-            await claudeWritable.write(getClaudeMdTemplate());
-            await claudeWritable.close();
-        }
+        // Note: README.md and CLAUDE.md are not auto-created
+        // Users should provide these by forking from a demo notebook
 
         // Create assets/thumbnails directory
         const assetsDir = await dirHandle.getDirectoryHandle('assets', { create: true });
@@ -6529,6 +6000,14 @@ document.addEventListener('click', (e) => {
 
 // Initialize
 async function init() {
+    // Fetch default assets from server (templates, theme content, theme registry)
+    // These are needed before rendering for modified indicators and theme picker
+    await Promise.all([
+        fetchDefaultThemeContent(),
+        fetchThemeRegistry()
+    ]);
+    // Note: fetchDefaultTemplates() is called by loadTemplates() during filesystem load
+
     // Try to restore filesystem link first
     await initFilesystem();
 

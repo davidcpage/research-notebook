@@ -1,0 +1,11 @@
+{
+  "templates": [
+    "note",
+    "code",
+    "bookmark",
+    "settings",
+    "template",
+    "theme",
+    "image"
+  ]
+}

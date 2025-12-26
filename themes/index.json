@@ -1,0 +1,24 @@
+{
+  "themes": [
+    {
+      "id": "manuscript",
+      "name": "Manuscript",
+      "description": "Warm, scholarly parchment aesthetic with textured backgrounds"
+    },
+    {
+      "id": "minimal",
+      "name": "Minimal",
+      "description": "Clean, sparse design with subtle accents and generous whitespace"
+    },
+    {
+      "id": "terminal",
+      "name": "Terminal",
+      "description": "Dark hacker aesthetic with green-on-black terminal feel"
+    },
+    {
+      "id": "handwritten",
+      "name": "Handwritten",
+      "description": "Calligraphic style with handwriting fonts for a personal journal feel"
+    }
+  ]
+}
