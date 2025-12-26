@@ -1,0 +1,161 @@
+/*
+ * Research Notebook Theme: "Minimal"
+ *
+ * A clean, sparse design with generous whitespace
+ * and subtle accents. Focuses on content over decoration.
+ */
+
+/* ========================================
+   Global Colors - Neutral & Clean
+   ======================================== */
+
+:root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #fafafa;
+    --text-primary: #1a1a1a;
+    --text-secondary: #4a4a4a;
+    --text-muted: #8a8a8a;
+    --accent: #0066cc;
+    --border: #e5e5e5;
+    --link-color: #0066cc;
+    --link-hover: #0052a3;
+}
+
+/* ========================================
+   Typography - System Fonts
+   ======================================== */
+
+header h1 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+header h2 {
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+/* ========================================
+   Note Cards - Clean White
+   ======================================== */
+
+.card[data-template="note"],
+.modal.viewer[data-template="note"] {
+    --template-border: #e5e5e5;
+    --template-bg: #ffffff;
+    --template-preview-bg: #fafafa;
+    --template-title-text: #1a1a1a;
+    --template-meta-text: #8a8a8a;
+    --template-heading-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.card[data-template="note"] {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.card[data-template="note"]:hover {
+    border-color: #d0d0d0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.card[data-template="note"] .card-preview {
+    border-bottom: 1px solid #f0f0f0;
+}
+
+/* Note viewer */
+.modal.viewer[data-template="note"] .viewer-content {
+    line-height: 1.7;
+    background: white;
+}
+
+.modal.viewer[data-template="note"] h1,
+.modal.viewer[data-template="note"] h2 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+/* ========================================
+   Code Cards - Soft Dark
+   ======================================== */
+
+.card[data-template="code"],
+.modal.viewer[data-template="code"] {
+    --template-border: #2d2d2d;
+    --template-bg: #1e1e1e;
+    --template-output-bg: #252525;
+    --template-code-bg: #1e1e1e;
+    --template-code-text: #d4d4d4;
+    --template-title-text: #e5e5e5;
+    --template-meta-text: #808080;
+}
+
+.card[data-template="code"] {
+    border-radius: 8px;
+}
+
+/* ========================================
+   Bookmark Cards - Subtle Border
+   ======================================== */
+
+.card[data-template="bookmark"] {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.card[data-template="bookmark"]:hover {
+    border-color: var(--accent);
+}
+
+/* ========================================
+   Section Headers - Understated
+   ======================================== */
+
+.section-header h3 {
+    font-weight: 500;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+}
+
+/* ========================================
+   Toolbar - Barely There
+   ======================================== */
+
+.toolbar {
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border);
+}
+
+/* ========================================
+   Scrollbars - Thin & Light
+   ======================================== */
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #d0d0d0;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #b0b0b0;
+}
+
+/* Dark scrollbars for code */
+.card[data-template="code"] ::-webkit-scrollbar-thumb,
+.modal.viewer[data-template="code"] ::-webkit-scrollbar-thumb {
+    background: #404040;
+}
