@@ -462,21 +462,29 @@ Average: 93.3%  Trend: ↗ Improving
 
 ---
 
+## Decisions
+
+1. **Repo structure**: Keep google-forms-bridge within research-notebook repo.
+   - The Apps Script bridge is thin (~200-300 lines) - not a standalone project
+   - The real value is the integrated workflow: notebook UI for teacher review, Claude Code orchestration, analytics
+   - Without the notebook, the bridge is just a less polished version of existing tools
+   - Design iteration is easier when quiz schema, response cards, and bridge evolve together
+   - Can always extract later if there's genuine external demand
+   - Structure: `/google-forms-bridge/` directory with its own README
+
+---
+
 ## Open Questions
 
-1. **Repo structure**: Should google-forms-bridge live in this repo or separately?
-   - Pro separate: Cleaner scope, can be used by other projects
-   - Pro together: Tighter integration, easier to maintain
-
-2. **Response card vs attempts array**: Currently quizzes store attempts in the quiz card. Should student responses be:
+1. **Response card vs attempts array**: Currently quizzes store attempts in the quiz card. Should student responses be:
    - Separate cards in a section (proposed above) - better for many students
    - Attempts array in quiz card - current pattern, simpler for self-study
 
-3. **Matching → Grid migration**: Should we deprecate `matching` in favor of `grid`, or keep both?
+2. **Matching → Grid migration**: Should we deprecate `matching` in favor of `grid`, or keep both?
 
-4. **Numeric questions**: Accept loss of tolerance on Google Forms export, or find workaround?
+3. **Numeric questions**: Accept loss of tolerance on Google Forms export, or find workaround?
 
-5. **Ordering questions**: Accept they can't export, or remove from quiz types entirely?
+4. **Ordering questions**: Accept they can't export, or remove from quiz types entirely?
 
 ---
 
