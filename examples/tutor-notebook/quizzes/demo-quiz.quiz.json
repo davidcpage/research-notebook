@@ -183,11 +183,89 @@
         "total": 6,
         "pending_review": 0
       }
+    },
+    {
+      "timestamp": "2025-12-28T18:12:00.990Z",
+      "answers": [
+        {
+          "questionIndex": 0,
+          "answer": 2,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 1,
+          "answer": 3.2,
+          "autoGrade": {
+            "status": "incorrect",
+            "score": 0,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 2,
+          "answer": "Don't know",
+          "autoGrade": {
+            "status": "pending_review",
+            "score": null,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 3,
+          "answer": "x=4",
+          "autoGrade": {
+            "status": "pending_review",
+            "score": null,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 4,
+          "answer": [
+            "Web Development",
+            "Web Development",
+            "Database Queries",
+            "Data Science"
+          ],
+          "autoGrade": {
+            "status": "partial",
+            "score": 0.5,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 5,
+          "answer": [
+            "Boil water",
+            "Remove tea bag",
+            "Steep for 3-5 minutes",
+            "Pour hot water",
+            "Add tea bag to cup"
+          ],
+          "autoGrade": {
+            "status": "partial",
+            "score": 0.2,
+            "maxScore": 1
+          }
+        }
+      ],
+      "score": {
+        "earned": 1.7,
+        "possible": 6,
+        "percentage": 28,
+        "correct": 1,
+        "total": 6,
+        "pending_review": 2
+      }
     }
   ],
   "created": "2025-12-26T12:00:00Z",
-  "modified": "2025-12-26T21:05:00Z",
+  "modified": "2025-12-28T18:12:00.990Z",
   "_subdir": null,
-  "_fileModified": 1766782417171,
+  "_fileModified": 1766833543254,
   "type": "quiz"
 }

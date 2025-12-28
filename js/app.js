@@ -1549,14 +1549,29 @@ function renderQuizPreview(card, template) {
             </div>`;
         } else if (pending > 0) {
             stateClass = 'quiz-pending-review';
+            // Show points-based score, excluding pending from denominator
+            const hasPointsScore = score.earned !== undefined && score.possible !== undefined;
+            const pendingPoints = lastAttempt.answers
+                ?.filter(a => (a.autoGrade?.status || a.status) === 'pending_review')
+                .reduce((sum, a) => sum + (a.autoGrade?.maxScore || 1), 0) || 0;
+            const gradedPossible = (score.possible || 0) - pendingPoints;
+            const gradedTotal = total - pending;
+            const scoreText = hasPointsScore
+                ? `${score.earned}/${gradedPossible} pts`
+                : `${correct}/${gradedTotal} correct`;
             progressHtml = `<div class="quiz-progress">
-                <span class="quiz-score">${correct}/${total} correct</span>
+                <span class="quiz-score">${scoreText}</span>
                 <span class="quiz-pending">${pending} awaiting review</span>
             </div>`;
         } else {
             stateClass = 'quiz-completed';
+            // Show points-based score if available
+            const hasPointsScore = score.earned !== undefined && score.possible !== undefined;
+            const scoreText = hasPointsScore
+                ? `${score.earned}/${score.possible} pts${score.percentage !== null ? ` (${score.percentage}%)` : ''}`
+                : `${correct}/${total} correct`;
             progressHtml = `<div class="quiz-progress">
-                <span class="quiz-score">${correct}/${total} correct</span>
+                <span class="quiz-score">${scoreText}</span>
             </div>`;
         }
     }
@@ -1868,9 +1883,22 @@ function renderQuizViewer(card, template) {
         // Progress summary for review mode
         const score = lastAttempt.score || {};
         if (hasGradedQuestions) {
+            // Show points-based score, excluding pending review from denominator
+            const hasPointsScore = score.earned !== undefined && score.possible !== undefined;
+            const pending = score.pending_review || 0;
+            // Calculate graded-only denominator (exclude pending questions' points)
+            const pendingPoints = lastAttempt.answers
+                ?.filter(a => (a.autoGrade?.status || a.status) === 'pending_review')
+                .reduce((sum, a) => sum + (a.autoGrade?.maxScore || 1), 0) || 0;
+            const gradedPossible = (score.possible || 0) - pendingPoints;
+            const gradedTotal = (score.total || questions.length) - pending;
+
+            const scoreDisplay = hasPointsScore
+                ? `${score.earned}/${gradedPossible} pts${gradedPossible > 0 ? ` (${Math.round((score.earned / gradedPossible) * 100)}%)` : ''}`
+                : `${score.correct || 0}/${gradedTotal} correct`;
             html += `<div class="quiz-summary">
-                <span class="quiz-summary-score">${score.correct || 0}/${score.total || questions.length} correct</span>
-                ${score.pending_review ? `<span class="quiz-summary-pending">${score.pending_review} awaiting review</span>` : ''}
+                <span class="quiz-summary-score">${scoreDisplay}</span>
+                ${pending ? `<span class="quiz-summary-pending">${pending} awaiting review</span>` : ''}
             </div>`;
         } else {
             html += `<div class="quiz-summary">
@@ -1907,16 +1935,25 @@ function renderQuizQuestion(question, index, attempt, isInteractive = false) {
     let statusClass = '';
     let statusBadge = '';
     if (attemptAnswer) {
-        if (attemptAnswer.status === 'correct') {
+        // Get status from autoGrade (new structure) or fall back to legacy status field
+        const status = attemptAnswer.autoGrade?.status || attemptAnswer.status;
+        const autoGrade = attemptAnswer.autoGrade;
+
+        if (status === 'correct') {
             statusClass = 'quiz-correct';
             statusBadge = '<span class="quiz-status-badge correct">✓</span>';
-        } else if (attemptAnswer.status === 'incorrect') {
+        } else if (status === 'partial') {
+            // Partial credit - show score
+            statusClass = 'quiz-partial';
+            const scoreText = autoGrade ? `${autoGrade.score}/${autoGrade.maxScore}` : '◐';
+            statusBadge = `<span class="quiz-status-badge partial">${scoreText}</span>`;
+        } else if (status === 'incorrect') {
             statusClass = 'quiz-incorrect';
             statusBadge = '<span class="quiz-status-badge incorrect">✗</span>';
-        } else if (attemptAnswer.status === 'pending_review') {
+        } else if (status === 'pending_review') {
             statusClass = 'quiz-pending';
             statusBadge = '<span class="quiz-status-badge pending">⏳</span>';
-        } else if (attemptAnswer.status === 'answered') {
+        } else if (status === 'answered') {
             // Survey question - just recorded, no grading
             statusClass = 'quiz-answered';
             statusBadge = '<span class="quiz-status-badge answered">•</span>';
@@ -1952,7 +1989,8 @@ function renderQuizQuestion(question, index, attempt, isInteractive = false) {
     }
 
     // Review UI for pending_review questions
-    if (attemptAnswer?.status === 'pending_review') {
+    const answerStatus = attemptAnswer?.autoGrade?.status || attemptAnswer?.status;
+    if (answerStatus === 'pending_review') {
         html += renderReviewUI(attemptAnswer, index);
     }
 
@@ -2764,13 +2802,22 @@ function gradeQuizAttempt(card, answers) {
     const gradedAnswers = [];
     let correctCount = 0;
     let pendingCount = 0;
+    let totalEarned = 0;
+    let totalPossible = 0;
 
     questions.forEach((q, index) => {
         const userAnswer = answers[index];
+        const maxPoints = q.points || 1;
+        const allowPartial = q.partialCredit !== false; // Default to true for applicable types
+
         const result = {
             questionIndex: index,
             answer: userAnswer,
-            status: 'incorrect'
+            autoGrade: {
+                status: 'incorrect',
+                score: 0,
+                maxScore: maxPoints
+            }
         };
 
         switch (q.type) {
@@ -2779,69 +2826,133 @@ function gradeQuizAttempt(card, answers) {
                 if (q.allowMultiple) {
                     // Checkbox mode
                     if (q.correctMultiple && q.correctMultiple.length > 0) {
-                        // Compare arrays
-                        const userArray = Array.isArray(userAnswer) ? [...userAnswer].sort() : [];
-                        const correctArray = [...q.correctMultiple].sort();
-                        if (userArray.length === correctArray.length &&
-                            userArray.every((v, i) => v === correctArray[i])) {
-                            result.status = 'correct';
+                        const userArray = Array.isArray(userAnswer) ? userAnswer : [];
+                        const correctSet = new Set(q.correctMultiple);
+
+                        // Count correct selections
+                        let correctSelections = 0;
+                        userArray.forEach(selection => {
+                            if (correctSet.has(selection)) {
+                                correctSelections++;
+                            }
+                        });
+
+                        const totalCorrect = correctSet.size;
+
+                        if (correctSelections === totalCorrect && userArray.length === totalCorrect) {
+                            // Perfect score: all correct, no extras
+                            result.autoGrade.status = 'correct';
+                            result.autoGrade.score = maxPoints;
                             correctCount++;
+                        } else if (allowPartial && correctSelections > 0) {
+                            // Partial credit: correct / max(selected, required)
+                            // This penalizes over-selection without double-counting
+                            const denominator = Math.max(userArray.length, totalCorrect);
+                            const partialRatio = correctSelections / denominator;
+                            const partialScore = Math.round(maxPoints * partialRatio * 100) / 100;
+                            if (partialScore > 0) {
+                                result.autoGrade.status = 'partial';
+                                result.autoGrade.score = partialScore;
+                            }
                         }
                     } else {
                         // No correct answer - survey question (just record response)
-                        result.status = 'answered';
+                        result.autoGrade.status = 'answered';
+                        result.autoGrade.score = null;
+                        result.autoGrade.maxScore = null;
                     }
                 } else {
                     // Single answer mode (radio/dropdown)
                     if (q.correct !== undefined) {
                         if (userAnswer === q.correct) {
-                            result.status = 'correct';
+                            result.autoGrade.status = 'correct';
+                            result.autoGrade.score = maxPoints;
                             correctCount++;
                         }
                     } else {
                         // No correct answer - survey question (just record response)
-                        result.status = 'answered';
+                        result.autoGrade.status = 'answered';
+                        result.autoGrade.score = null;
+                        result.autoGrade.maxScore = null;
                     }
                 }
                 break;
 
             case 'numeric':
-                // Auto-grade: check within tolerance
-                if (userAnswer !== null && userAnswer !== undefined) {
+                // Auto-grade: check within tolerance (with optional tolerance bands for partial credit)
+                if (userAnswer !== null && userAnswer !== undefined && q.answer !== undefined) {
                     const expected = q.answer;
                     const tolerance = q.tolerance || 0;
-                    if (Math.abs(userAnswer - expected) <= tolerance) {
-                        result.status = 'correct';
+                    const diff = Math.abs(userAnswer - expected);
+
+                    if (diff <= tolerance) {
+                        result.autoGrade.status = 'correct';
+                        result.autoGrade.score = maxPoints;
                         correctCount++;
+                    } else if (allowPartial && q.toleranceBands) {
+                        // Check tolerance bands for partial credit
+                        // Format: [{tolerance: 0.5, credit: 0.5}, {tolerance: 1.0, credit: 0.25}]
+                        const bands = [...q.toleranceBands].sort((a, b) => a.tolerance - b.tolerance);
+                        for (const band of bands) {
+                            if (diff <= band.tolerance) {
+                                const partialScore = Math.round(maxPoints * band.credit * 100) / 100;
+                                result.autoGrade.status = 'partial';
+                                result.autoGrade.score = partialScore;
+                                break;
+                            }
+                        }
                     }
                 }
                 break;
 
             case 'matching':
-                // Auto-grade: compare each pair
+                // Auto-grade: compare each pair (with optional partial credit)
                 const pairs = q.pairs || [];
-                let allCorrect = true;
-                pairs.forEach((pair, i) => {
-                    const [, correctRight] = pair;
-                    if (userAnswer?.[i] !== correctRight) {
-                        allCorrect = false;
+                if (pairs.length > 0) {
+                    let correctPairs = 0;
+                    pairs.forEach((pair, i) => {
+                        const [, correctRight] = pair;
+                        if (userAnswer?.[i] === correctRight) {
+                            correctPairs++;
+                        }
+                    });
+
+                    if (correctPairs === pairs.length) {
+                        result.autoGrade.status = 'correct';
+                        result.autoGrade.score = maxPoints;
+                        correctCount++;
+                    } else if (allowPartial && correctPairs > 0) {
+                        const partialRatio = correctPairs / pairs.length;
+                        const partialScore = Math.round(maxPoints * partialRatio * 100) / 100;
+                        result.autoGrade.status = 'partial';
+                        result.autoGrade.score = partialScore;
                     }
-                });
-                if (allCorrect && userAnswer?.length === pairs.length) {
-                    result.status = 'correct';
-                    correctCount++;
                 }
                 break;
 
             case 'ordering':
-                // Auto-grade: compare order
+                // Auto-grade: compare order (with optional partial credit for position accuracy)
                 const correctOrder = q.correctOrder || [];
-                const isCorrect = Array.isArray(userAnswer) &&
-                    userAnswer.length === correctOrder.length &&
-                    userAnswer.every((item, i) => item === correctOrder[i]);
-                if (isCorrect) {
-                    result.status = 'correct';
-                    correctCount++;
+                if (correctOrder.length > 0 && Array.isArray(userAnswer)) {
+                    let correctPositions = 0;
+                    const len = Math.min(userAnswer.length, correctOrder.length);
+
+                    for (let i = 0; i < len; i++) {
+                        if (userAnswer[i] === correctOrder[i]) {
+                            correctPositions++;
+                        }
+                    }
+
+                    if (correctPositions === correctOrder.length && userAnswer.length === correctOrder.length) {
+                        result.autoGrade.status = 'correct';
+                        result.autoGrade.score = maxPoints;
+                        correctCount++;
+                    } else if (allowPartial && correctPositions > 0) {
+                        const partialRatio = correctPositions / correctOrder.length;
+                        const partialScore = Math.round(maxPoints * partialRatio * 100) / 100;
+                        result.autoGrade.status = 'partial';
+                        result.autoGrade.score = partialScore;
+                    }
                 }
                 break;
 
@@ -2849,17 +2960,20 @@ function gradeQuizAttempt(card, answers) {
                 // Auto-grade if correct value specified
                 if (q.correct !== undefined) {
                     if (userAnswer === q.correct) {
-                        result.status = 'correct';
+                        result.autoGrade.status = 'correct';
+                        result.autoGrade.score = maxPoints;
                         correctCount++;
                     }
                 } else {
                     // No correct answer - survey question (just record response)
-                    result.status = 'answered';
+                    result.autoGrade.status = 'answered';
+                    result.autoGrade.score = null;
+                    result.autoGrade.maxScore = null;
                 }
                 break;
 
             case 'grid':
-                // Auto-grade if correctAnswers specified
+                // Auto-grade if correctAnswers specified (with partial credit per row)
                 const gridCorrectAnswers = q.correctAnswers;
                 const gridRows = q.rows || [];
                 const gridColumns = q.columns || [];
@@ -2884,40 +2998,61 @@ function gradeQuizAttempt(card, answers) {
                     }
                 }
 
-                if (Object.keys(gridCorrectLookup).length > 0) {
-                    // Check all specified rows match
-                    let gridAllCorrect = true;
+                const totalRows = Object.keys(gridCorrectLookup).length;
+                if (totalRows > 0) {
+                    let correctRows = 0;
                     Object.entries(gridCorrectLookup).forEach(([rowIdx, expectedColIdx]) => {
-                        if (userAnswer?.[rowIdx] !== expectedColIdx) {
-                            gridAllCorrect = false;
+                        if (userAnswer?.[rowIdx] === expectedColIdx) {
+                            correctRows++;
                         }
                     });
 
-                    if (gridAllCorrect) {
-                        result.status = 'correct';
+                    if (correctRows === totalRows) {
+                        result.autoGrade.status = 'correct';
+                        result.autoGrade.score = maxPoints;
                         correctCount++;
+                    } else if (allowPartial && correctRows > 0) {
+                        const partialRatio = correctRows / totalRows;
+                        const partialScore = Math.round(maxPoints * partialRatio * 100) / 100;
+                        result.autoGrade.status = 'partial';
+                        result.autoGrade.score = partialScore;
                     }
                 } else {
                     // No correct answers - survey question (just record response)
-                    result.status = 'answered';
+                    result.autoGrade.status = 'answered';
+                    result.autoGrade.score = null;
+                    result.autoGrade.maxScore = null;
                 }
                 break;
 
             case 'short_answer':
             case 'worked':
                 // Cannot auto-grade: mark as pending review
-                result.status = 'pending_review';
+                result.autoGrade.status = 'pending_review';
+                result.autoGrade.score = null; // Will be graded by teacher/AI
                 pendingCount++;
                 break;
+        }
+
+        // Accumulate totals (skip survey questions with null scores)
+        if (result.autoGrade.maxScore !== null) {
+            totalPossible += result.autoGrade.maxScore;
+            totalEarned += result.autoGrade.score || 0;
         }
 
         gradedAnswers.push(result);
     });
 
+    // Calculate percentage (avoid division by zero)
+    const percentage = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : null;
+
     return {
         timestamp: new Date().toISOString(),
         answers: gradedAnswers,
         score: {
+            earned: totalEarned,
+            possible: totalPossible,
+            percentage: percentage,
             correct: correctCount,
             total: questions.length,
             pending_review: pendingCount

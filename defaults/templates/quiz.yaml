@@ -83,6 +83,27 @@ schema:
         correctOrder:
           type: array
           description: Items in correct order
+        # Scoring fields
+        points:
+          type: number
+          description: Point value for this question (default 1)
+          default: 1
+        partialCredit:
+          type: boolean
+          description: Allow partial credit for applicable types (checkbox, grid, matching, ordering). Default true.
+          default: true
+        toleranceBands:
+          type: array
+          description: For numeric questions - additional tolerance bands for partial credit
+          items:
+            type: object
+            properties:
+              tolerance:
+                type: number
+                description: Tolerance range for this band
+              credit:
+                type: number
+                description: Credit multiplier (0-1) for answers within this tolerance
         # Common optional fields
         hint:
           type: markdown
@@ -90,9 +111,6 @@ schema:
         explanation:
           type: markdown
           description: Shown after answering
-        points:
-          type: number
-          default: 1
   attempts:
     type: array
     description: Array of attempt records
@@ -103,16 +121,28 @@ schema:
           type: datetime
         answers:
           type: array
-          description: Array of {questionIndex, answer, status}
+          description: "Array of {questionIndex, answer, autoGrade: {status, score, maxScore}}"
         score:
           type: object
           properties:
+            earned:
+              type: number
+              description: Total points earned
+            possible:
+              type: number
+              description: Maximum possible points
+            percentage:
+              type: number
+              description: Score as percentage (0-100)
             correct:
               type: number
+              description: Count of fully correct answers
             total:
               type: number
+              description: Total number of questions
             pending_review:
               type: number
+              description: Count of questions awaiting manual review
         review:
           type: markdown
           description: Claude's feedback on pending_review questions

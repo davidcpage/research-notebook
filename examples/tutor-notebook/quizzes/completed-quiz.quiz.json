@@ -7,7 +7,12 @@
     {
       "type": "multiple_choice",
       "question": "What is 2 + 2?",
-      "options": ["3", "4", "5", "6"],
+      "options": [
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
       "correct": 1,
       "explanation": "2 + 2 = 4"
     },
@@ -28,11 +33,62 @@
     {
       "timestamp": "2025-12-26T12:30:00Z",
       "answers": [
-        { "questionIndex": 0, "answer": 1, "status": "correct" },
-        { "questionIndex": 1, "answer": 4, "status": "correct" },
-        { "questionIndex": 2, "answer": "Multiplication is when you add a number to itself multiple times.", "status": "pending_review" }
+        {
+          "questionIndex": 0,
+          "answer": 1,
+          "status": "correct"
+        },
+        {
+          "questionIndex": 1,
+          "answer": 4,
+          "status": "correct"
+        },
+        {
+          "questionIndex": 2,
+          "answer": "Multiplication is when you add a number to itself multiple times.",
+          "status": "pending_review"
+        }
       ],
       "score": {
+        "correct": 2,
+        "total": 3,
+        "pending_review": 1
+      }
+    },
+    {
+      "timestamp": "2025-12-28T18:12:48.325Z",
+      "answers": [
+        {
+          "questionIndex": 0,
+          "answer": 1,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 1,
+          "answer": 4,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 2,
+          "autoGrade": {
+            "status": "pending_review",
+            "score": null,
+            "maxScore": 1
+          }
+        }
+      ],
+      "score": {
+        "earned": 2,
+        "possible": 3,
+        "percentage": 67,
         "correct": 2,
         "total": 3,
         "pending_review": 1
@@ -40,5 +96,8 @@
     }
   ],
   "created": "2025-12-26T12:00:00Z",
-  "modified": "2025-12-26T12:30:00Z"
+  "modified": "2025-12-28T18:12:48.325Z",
+  "_subdir": null,
+  "_fileModified": 1766833543254,
+  "type": "quiz"
 }

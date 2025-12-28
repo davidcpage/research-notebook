@@ -3,7 +3,7 @@
   "title": "Graded Quiz: New Question Types",
   "author": "Claude",
   "topic": "Testing Graded Questions",
-  "description": "A graded quiz demonstrating scale, grid, checkbox, and dropdown questions with correct answers.",
+  "description": "A graded quiz demonstrating scale, grid, checkbox, and dropdown questions with correct answers. Point values chosen to give integer partial credit.",
   "questions": [
     {
       "type": "scale",
@@ -13,6 +13,7 @@
       "lowLabel": "One",
       "highLabel": "Five",
       "correct": 2,
+      "points": 1,
       "hint": "Helium is the second element on the periodic table.",
       "explanation": "Helium has atomic number 2, meaning it has 2 protons in its nucleus."
     },
@@ -37,6 +38,7 @@
         "Mars": "Rocky",
         "Saturn": "Gas Giant"
       },
+      "points": 4,
       "hint": "The inner planets are rocky, the outer giants are gaseous.",
       "explanation": "Earth and Mars are terrestrial (rocky) planets. Jupiter and Saturn are gas giants composed mainly of hydrogen and helium."
     },
@@ -56,6 +58,7 @@
         2,
         3
       ],
+      "points": 3,
       "hint": "RGB stands for...",
       "explanation": "RGB uses Red, Green, and Blue as primary colors. Yellow and Cyan are secondary colors in this model."
     },
@@ -70,6 +73,7 @@
       ],
       "display": "dropdown",
       "correct": 2,
+      "points": 1,
       "hint": "It comes from the Latin word 'aurum'.",
       "explanation": "Au comes from 'aurum', the Latin word for gold. Ag is silver (argentum), Gd is gadolinium."
     },
@@ -83,87 +87,39 @@
         "Multi-paradigm"
       ],
       "correct": 3,
+      "points": 1,
       "hint": "Python is known for its flexibility.",
       "explanation": "Python is a multi-paradigm language supporting procedural, object-oriented, and functional programming styles."
     },
     {
       "type": "short_answer",
       "question": "Explain why the sky appears blue during the day.",
+      "points": 2,
       "hint": "Think about how sunlight interacts with the atmosphere.",
       "explanation": "Rayleigh scattering causes shorter blue wavelengths to scatter more than longer wavelengths."
     },
     {
       "type": "worked",
       "question": "Solve the equation: $3x - 7 = 14$\n\nShow your working.",
+      "points": 3,
       "hint": "Start by isolating the variable term.",
       "explanation": "Step 1: Add 7 to both sides: 3x = 21\nStep 2: Divide by 3: x = 7"
     }
   ],
   "created": "2025-12-28T12:00:00Z",
-  "modified": "2025-12-28T17:43:54.158Z",
-  "_subdir": null,
-  "_fileModified": 1766943415561,
+  "modified": "2025-12-28T18:10:37.111Z",
   "attempts": [
     {
-      "timestamp": "2025-12-28T17:42:45.414Z",
+      "timestamp": "2025-12-28T18:07:50.163Z",
       "answers": [
         {
           "questionIndex": 0,
           "answer": 2,
-          "status": "correct"
-        },
-        {
-          "questionIndex": 1,
-          "answer": {
-            "0": 0,
-            "1": 1,
-            "2": 0,
-            "3": 1
-          },
-          "status": "correct"
-        },
-        {
-          "questionIndex": 2,
-          "answer": [
-            0,
-            2,
-            3
-          ],
-          "status": "correct"
-        },
-        {
-          "questionIndex": 3,
-          "answer": 2,
-          "status": "correct"
-        },
-        {
-          "questionIndex": 4,
-          "answer": 3,
-          "status": "correct"
-        },
-        {
-          "questionIndex": 5,
-          "answer": "Rayleigh scattering",
-          "status": "pending_review"
-        },
-        {
-          "questionIndex": 6,
-          "answer": "x=7",
-          "status": "pending_review"
-        }
-      ],
-      "score": {
-        "correct": 5,
-        "total": 7,
-        "pending_review": 2
-      }
-    },
-    {
-      "timestamp": "2025-12-28T17:43:54.157Z",
-      "answers": [
-        {
-          "questionIndex": 0,
-          "status": "incorrect"
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
         },
         {
           "questionIndex": 1,
@@ -171,9 +127,13 @@
             "0": 1,
             "1": 1,
             "2": 0,
-            "3": 2
+            "3": 1
           },
-          "status": "incorrect"
+          "autoGrade": {
+            "status": "partial",
+            "score": 3,
+            "maxScore": 4
+          }
         },
         {
           "questionIndex": 2,
@@ -182,35 +142,145 @@
             1,
             3
           ],
-          "status": "incorrect"
+          "autoGrade": {
+            "status": "partial",
+            "score": 1,
+            "maxScore": 3
+          }
         },
         {
           "questionIndex": 3,
-          "answer": 1,
-          "status": "incorrect"
+          "answer": 2,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
         },
         {
           "questionIndex": 4,
-          "answer": 1,
-          "status": "incorrect"
+          "answer": 3,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
         },
         {
           "questionIndex": 5,
           "answer": "Don't know",
-          "status": "pending_review"
+          "autoGrade": {
+            "status": "pending_review",
+            "score": null,
+            "maxScore": 2
+          }
         },
         {
           "questionIndex": 6,
           "answer": "x=7",
-          "status": "pending_review"
+          "autoGrade": {
+            "status": "pending_review",
+            "score": null,
+            "maxScore": 3
+          }
         }
       ],
       "score": {
-        "correct": 0,
+        "earned": 7,
+        "possible": 15,
+        "percentage": 47,
+        "correct": 3,
+        "total": 7,
+        "pending_review": 2
+      }
+    },
+    {
+      "timestamp": "2025-12-28T18:10:37.111Z",
+      "answers": [
+        {
+          "questionIndex": 0,
+          "answer": 2,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 1,
+          "answer": {
+            "0": 1,
+            "1": 1,
+            "2": 1,
+            "3": 1
+          },
+          "autoGrade": {
+            "status": "partial",
+            "score": 2,
+            "maxScore": 4
+          }
+        },
+        {
+          "questionIndex": 2,
+          "answer": [
+            0,
+            1,
+            3
+          ],
+          "autoGrade": {
+            "status": "partial",
+            "score": 2,
+            "maxScore": 3
+          }
+        },
+        {
+          "questionIndex": 3,
+          "answer": 1,
+          "autoGrade": {
+            "status": "incorrect",
+            "score": 0,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 4,
+          "answer": 0,
+          "autoGrade": {
+            "status": "incorrect",
+            "score": 0,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 5,
+          "answer": "Don't know",
+          "autoGrade": {
+            "status": "pending_review",
+            "score": null,
+            "maxScore": 2
+          }
+        },
+        {
+          "questionIndex": 6,
+          "answer": "x=7",
+          "autoGrade": {
+            "status": "pending_review",
+            "score": null,
+            "maxScore": 3
+          }
+        }
+      ],
+      "score": {
+        "earned": 5,
+        "possible": 15,
+        "percentage": 33,
+        "correct": 1,
         "total": 7,
         "pending_review": 2
       }
     }
   ],
+  "_subdir": null,
+  "_fileModified": 1766945270176,
   "type": "quiz"
 }

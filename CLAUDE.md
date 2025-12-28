@@ -66,6 +66,18 @@ To add a new card type:
 
 Card rendering, viewer display, and editing all work automatically via templates.
 
+### Troubleshooting: "Unknown template" errors
+If cards fail to render with `[Render] Unknown template: X` in the console, the cause is almost always a **YAML syntax error** in `/defaults/templates/X.yaml`, not a missing template file.
+
+**Why**: Templates are fetched from `/defaults/templates/` at startup via `fetchDefaultTemplates()`. If a YAML file has a syntax error, `jsyaml.load()` fails silently and that template isn't registered. The app then falls back gracefully but cards of that type won't render.
+
+**Diagnosis**:
+1. Check the browser console for YAML parsing errors
+2. Validate the template file: `python3 -c "import yaml; yaml.safe_load(open('defaults/templates/X.yaml'))"`
+3. Common culprits: unquoted colons in descriptions (e.g., `description: Array of {foo: bar}` needs quotes)
+
+**Do NOT** create `.notebook/templates/X.yaml` in a user's notebook to "fix" this - that just works around a broken default template. Fix the source file in `/defaults/templates/`.
+
 ### System cards (settings, templates, theme)
 - `.notebook/settings.yaml` and `.notebook/templates/*.yaml` are system cards with special templates using `yaml` layout
 - **Theme card**: `.notebook/theme.css` loaded as system card, saving reloads CSS via `loadThemeCss()`
