@@ -1,0 +1,89 @@
+{
+  "id": "demo-quiz-s002",
+  "template": "quiz-response",
+  "studentId": "s002",
+  "quizId": "demo-quiz",
+  "submittedAt": "2025-12-27T10:35:00Z",
+  "answers": [
+    {
+      "questionIndex": 0,
+      "answer": 1,
+      "autoGrade": {
+        "status": "incorrect",
+        "score": 0,
+        "maxScore": 1
+      }
+    },
+    {
+      "questionIndex": 1,
+      "answer": 3.15,
+      "autoGrade": {
+        "status": "incorrect",
+        "score": 0,
+        "maxScore": 1
+      }
+    },
+    {
+      "questionIndex": 2,
+      "answer": "Because of the way light works",
+      "claudeGrade": {
+        "score": 1,
+        "maxScore": 5,
+        "feedback": "This answer is too vague. The blue sky is caused by Rayleigh scattering - when sunlight enters Earth's atmosphere, blue light (shorter wavelength) scatters more than red light (longer wavelength). You need to explain the specific mechanism.",
+        "gradedAt": "2025-12-27T11:05:00Z"
+      },
+      "teacherGrade": {
+        "score": 1,
+        "maxScore": 5,
+        "feedback": "I agree with the AI assessment. Please review the chapter on light and scattering, then try to explain this more specifically.",
+        "reviewedAt": "2025-12-27T14:00:00Z",
+        "reviewer": "Ms. Johnson"
+      }
+    },
+    {
+      "questionIndex": 3,
+      "answer": "x = 5",
+      "claudeGrade": {
+        "score": 1,
+        "maxScore": 5,
+        "feedback": "The answer is incorrect (x=4, not x=5). Also, no working was shown. For full credit, you need to show your steps: subtract 5 from both sides to get 2x=8, then divide by 2 to get x=4.",
+        "gradedAt": "2025-12-27T11:05:00Z"
+      }
+    },
+    {
+      "questionIndex": 4,
+      "answer": {
+        "Python": "Web Development",
+        "JavaScript": "Data Science",
+        "SQL": "Styling",
+        "CSS": "Database Queries"
+      },
+      "autoGrade": {
+        "status": "incorrect",
+        "score": 0,
+        "maxScore": 1
+      }
+    },
+    {
+      "questionIndex": 5,
+      "answer": [
+        "Add tea bag to cup",
+        "Boil water",
+        "Pour hot water",
+        "Steep for 3-5 minutes",
+        "Remove tea bag"
+      ],
+      "autoGrade": {
+        "status": "incorrect",
+        "score": 0,
+        "maxScore": 1
+      }
+    }
+  ],
+  "totalScore": 2,
+  "maxScore": 15,
+  "status": "graded",
+  "exportedToForms": false,
+  "created": "2025-12-27T10:35:00Z",
+  "modified": "2025-12-27T14:00:00Z"
+}

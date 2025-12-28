@@ -1,0 +1,82 @@
+{
+  "id": "demo-quiz-s001",
+  "template": "quiz-response",
+  "studentId": "s001",
+  "quizId": "demo-quiz",
+  "submittedAt": "2025-12-27T10:30:00Z",
+  "answers": [
+    {
+      "questionIndex": 0,
+      "answer": 2,
+      "autoGrade": {
+        "status": "correct",
+        "score": 1,
+        "maxScore": 1
+      }
+    },
+    {
+      "questionIndex": 1,
+      "answer": 3.14,
+      "autoGrade": {
+        "status": "correct",
+        "score": 1,
+        "maxScore": 1
+      }
+    },
+    {
+      "questionIndex": 2,
+      "answer": "The sky is blue because shorter blue light wavelengths scatter more than longer red wavelengths when sunlight hits the atmosphere.",
+      "claudeGrade": {
+        "score": 4,
+        "maxScore": 5,
+        "feedback": "Excellent understanding of Rayleigh scattering! You correctly identified that blue light scatters more than red. For full marks, mentioning that this scattering occurs due to interaction with nitrogen and oxygen molecules would strengthen the answer.",
+        "gradedAt": "2025-12-27T11:00:00Z"
+      }
+    },
+    {
+      "questionIndex": 3,
+      "answer": "2x + 5 = 13\n2x = 13 - 5\n2x = 8\nx = 4",
+      "claudeGrade": {
+        "score": 5,
+        "maxScore": 5,
+        "feedback": "Perfect! Clear step-by-step working showing subtraction of 5 from both sides, followed by division by 2. The answer x=4 is correct.",
+        "gradedAt": "2025-12-27T11:00:00Z"
+      }
+    },
+    {
+      "questionIndex": 4,
+      "answer": {
+        "Python": "Data Science",
+        "JavaScript": "Web Development",
+        "SQL": "Database Queries",
+        "CSS": "Styling"
+      },
+      "autoGrade": {
+        "status": "correct",
+        "score": 1,
+        "maxScore": 1
+      }
+    },
+    {
+      "questionIndex": 5,
+      "answer": [
+        "Boil water",
+        "Add tea bag to cup",
+        "Pour hot water",
+        "Steep for 3-5 minutes",
+        "Remove tea bag"
+      ],
+      "autoGrade": {
+        "status": "correct",
+        "score": 1,
+        "maxScore": 1
+      }
+    }
+  ],
+  "totalScore": 13,
+  "maxScore": 15,
+  "status": "graded",
+  "exportedToForms": false,
+  "created": "2025-12-27T10:30:00Z",
+  "modified": "2025-12-27T11:00:00Z"
+}

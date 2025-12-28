@@ -1,0 +1,121 @@
+{
+  "id": "demo-quiz-s003",
+  "template": "quiz-response",
+  "studentId": "s003",
+  "quizId": "demo-quiz",
+  "responseId": "2_ABaOnud_xyz123",
+  "submittedAt": "2025-12-27T10:40:00Z",
+  "answers": [
+    {
+      "questionIndex": 0,
+      "answer": 2,
+      "autoGrade": {
+        "status": "correct",
+        "score": 1,
+        "maxScore": 1
+      },
+      "teacherGrade": {
+        "score": 1,
+        "maxScore": 1,
+        "reviewedAt": "2025-12-27T15:00:00Z",
+        "reviewer": "Ms. Johnson"
+      }
+    },
+    {
+      "questionIndex": 1,
+      "answer": 3.14,
+      "autoGrade": {
+        "status": "correct",
+        "score": 1,
+        "maxScore": 1
+      },
+      "teacherGrade": {
+        "score": 1,
+        "maxScore": 1,
+        "reviewedAt": "2025-12-27T15:00:00Z",
+        "reviewer": "Ms. Johnson"
+      }
+    },
+    {
+      "questionIndex": 2,
+      "answer": "Rayleigh scattering causes blue light to scatter more than other colors because it has a shorter wavelength. This makes the sky appear blue when we look up.",
+      "claudeGrade": {
+        "score": 5,
+        "maxScore": 5,
+        "feedback": "Excellent! You correctly identified Rayleigh scattering and explained why blue light scatters more (shorter wavelength). Well done!",
+        "gradedAt": "2025-12-27T11:10:00Z"
+      },
+      "teacherGrade": {
+        "score": 5,
+        "maxScore": 5,
+        "feedback": "Perfect explanation! You clearly understand the concept.",
+        "reviewedAt": "2025-12-27T15:00:00Z",
+        "reviewer": "Ms. Johnson"
+      }
+    },
+    {
+      "questionIndex": 3,
+      "answer": "Starting with 2x + 5 = 13\nSubtract 5 from both sides: 2x = 8\nDivide both sides by 2: x = 4\nCheck: 2(4) + 5 = 8 + 5 = 13 ✓",
+      "claudeGrade": {
+        "score": 5,
+        "maxScore": 5,
+        "feedback": "Excellent work! Clear step-by-step solution with a verification check at the end. This is exactly how to show your working.",
+        "gradedAt": "2025-12-27T11:10:00Z"
+      },
+      "teacherGrade": {
+        "score": 5,
+        "maxScore": 5,
+        "feedback": "Outstanding! Love that you included the verification step.",
+        "reviewedAt": "2025-12-27T15:00:00Z",
+        "reviewer": "Ms. Johnson"
+      }
+    },
+    {
+      "questionIndex": 4,
+      "answer": {
+        "Python": "Data Science",
+        "JavaScript": "Web Development",
+        "SQL": "Database Queries",
+        "CSS": "Styling"
+      },
+      "autoGrade": {
+        "status": "correct",
+        "score": 1,
+        "maxScore": 1
+      },
+      "teacherGrade": {
+        "score": 1,
+        "maxScore": 1,
+        "reviewedAt": "2025-12-27T15:00:00Z",
+        "reviewer": "Ms. Johnson"
+      }
+    },
+    {
+      "questionIndex": 5,
+      "answer": [
+        "Boil water",
+        "Add tea bag to cup",
+        "Pour hot water",
+        "Steep for 3-5 minutes",
+        "Remove tea bag"
+      ],
+      "autoGrade": {
+        "status": "correct",
+        "score": 1,
+        "maxScore": 1
+      },
+      "teacherGrade": {
+        "score": 1,
+        "maxScore": 1,
+        "reviewedAt": "2025-12-27T15:00:00Z",
+        "reviewer": "Ms. Johnson"
+      }
+    }
+  ],
+  "totalScore": 15,
+  "maxScore": 15,
+  "status": "reviewed",
+  "exportedToForms": false,
+  "created": "2025-12-27T10:40:00Z",
+  "modified": "2025-12-27T15:00:00Z"
+}

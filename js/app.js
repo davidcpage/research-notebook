@@ -150,6 +150,10 @@ function getDefaultExtensionRegistry() {
             parser: 'json',
             defaultTemplate: 'quiz'
         },
+        '.response.json': {
+            parser: 'json',
+            defaultTemplate: 'quiz-response'
+        },
         '.card.yaml': {
             parser: 'yaml',
             defaultTemplate: null  // Must specify template: in file
@@ -1346,6 +1350,8 @@ function renderCardPreview(card, template) {
             return renderYamlPreview(card, template);
         case 'quiz':
             return renderQuizPreview(card, template);
+        case 'quiz-response':
+            return renderQuizResponsePreview(card, template);
         default:
             return `<div class="preview-placeholder">${placeholder}</div>`;
     }
@@ -1740,6 +1746,8 @@ function renderViewerContent(card, template) {
             return renderViewerYaml(card, template);
         case 'quiz':
             return renderQuizViewer(card, template);
+        case 'quiz-response':
+            return renderQuizResponseViewer(card, template);
         default:
             return renderViewerDocument(card, template);
     }
@@ -2572,6 +2580,414 @@ async function submitQuizReview(questionIndex, status) {
     render();
 
     showToast(`Marked as ${status}`, 'success');
+}
+
+// ===== Quiz Response Layout (Classroom Grading) =====
+
+// Quiz response card preview: shows student ID, score, and status
+function renderQuizResponsePreview(card, template) {
+    const placeholder = template.card?.placeholder || '📝';
+    const studentId = card.studentId || 'Unknown';
+    const answers = card.answers || [];
+    const status = card.status || 'pending';
+
+    if (answers.length === 0) {
+        return `<div class="preview-placeholder">${placeholder}</div>`;
+    }
+
+    // Calculate scores from the grade hierarchy
+    const graded = answers.filter(a => getEffectiveGrade(a) !== null);
+    const pending = answers.length - graded.length;
+    const totalScore = card.totalScore ?? graded.reduce((sum, a) => sum + (getEffectiveGrade(a)?.score || 0), 0);
+    const maxScore = card.maxScore ?? answers.reduce((sum, a) => sum + (a.autoGrade?.maxScore || a.claudeGrade?.maxScore || a.teacherGrade?.maxScore || 1), 0);
+
+    // Status class for styling
+    let statusClass = 'response-pending';
+    let statusBadge = '<span class="response-status-badge pending">Pending</span>';
+
+    if (status === 'exported') {
+        statusClass = 'response-exported';
+        statusBadge = '<span class="response-status-badge exported">Exported</span>';
+    } else if (status === 'reviewed') {
+        statusClass = 'response-reviewed';
+        statusBadge = '<span class="response-status-badge reviewed">Reviewed</span>';
+    } else if (status === 'graded') {
+        statusClass = 'response-graded';
+        statusBadge = '<span class="response-status-badge graded">Graded</span>';
+    } else if (pending > 0) {
+        statusBadge = `<span class="response-status-badge pending">${pending} pending</span>`;
+    }
+
+    return `
+        <div class="quiz-response-preview ${statusClass}">
+            <div class="response-student-id">Student ${escapeHtml(studentId)}</div>
+            <div class="response-score">${totalScore}/${maxScore}</div>
+            ${statusBadge}
+        </div>
+    `;
+}
+
+// Get the effective grade (highest priority in hierarchy: teacher > claude > auto)
+function getEffectiveGrade(answer) {
+    if (answer.teacherGrade) return answer.teacherGrade;
+    if (answer.claudeGrade) return answer.claudeGrade;
+    if (answer.autoGrade) return answer.autoGrade;
+    return null;
+}
+
+// Quiz response viewer: shows all answers with grade hierarchy
+function renderQuizResponseViewer(card, template) {
+    const answers = card.answers || [];
+    const studentId = card.studentId || 'Unknown';
+    const quizId = card.quizId;
+    const status = card.status || 'pending';
+
+    if (answers.length === 0) {
+        return '<div class="viewer-empty">No answers in this response</div>';
+    }
+
+    // Try to find the quiz card to get question text
+    const quiz = findCardById(quizId);
+    const questions = quiz?.questions || [];
+
+    let html = `<div class="quiz-response-viewer" data-response-id="${card.id}">`;
+
+    // Header with student info
+    html += `<div class="response-header">
+        <span class="response-student-label">Student ${escapeHtml(studentId)}</span>
+        <span class="response-quiz-ref">Quiz: ${escapeHtml(quiz?.title || quizId || 'Unknown')}</span>
+    </div>`;
+
+    // Score summary
+    const graded = answers.filter(a => getEffectiveGrade(a) !== null);
+    const totalScore = card.totalScore ?? graded.reduce((sum, a) => sum + (getEffectiveGrade(a)?.score || 0), 0);
+    const maxScore = card.maxScore ?? answers.reduce((sum, a) => sum + (a.autoGrade?.maxScore || a.claudeGrade?.maxScore || a.teacherGrade?.maxScore || 1), 0);
+
+    html += `<div class="response-summary">
+        <span class="response-total-score">${totalScore}/${maxScore}</span>
+        <span class="response-status-${status}">${status.charAt(0).toUpperCase() + status.slice(1)}</span>
+    </div>`;
+
+    // Render each answer
+    answers.forEach((answer, index) => {
+        const question = questions[answer.questionIndex] || questions[index];
+        html += renderResponseAnswer(answer, question, index);
+    });
+
+    html += '</div>';
+    return html;
+}
+
+// Render a single answer with grade hierarchy
+function renderResponseAnswer(answer, question, index) {
+    const qNum = index + 1;
+    const effectiveGrade = getEffectiveGrade(answer);
+    const isGraded = effectiveGrade !== null;
+
+    // Determine status class based on grade hierarchy
+    let statusClass = 'response-answer-pending';
+    let statusBadge = '<span class="response-answer-badge pending">⏳ Pending</span>';
+
+    if (answer.teacherGrade) {
+        statusClass = 'response-answer-reviewed';
+        statusBadge = '<span class="response-answer-badge reviewed">✓ Reviewed</span>';
+    } else if (answer.claudeGrade) {
+        statusClass = 'response-answer-ai-graded';
+        statusBadge = '<span class="response-answer-badge ai-graded">🤖 AI Graded</span>';
+    } else if (answer.autoGrade) {
+        const autoStatus = answer.autoGrade.status;
+        if (autoStatus === 'correct') {
+            statusClass = 'response-answer-correct';
+            statusBadge = '<span class="response-answer-badge correct">✓ Correct</span>';
+        } else if (autoStatus === 'incorrect') {
+            statusClass = 'response-answer-incorrect';
+            statusBadge = '<span class="response-answer-badge incorrect">✗ Incorrect</span>';
+        } else if (autoStatus === 'partial') {
+            statusClass = 'response-answer-partial';
+            statusBadge = '<span class="response-answer-badge partial">◐ Partial</span>';
+        }
+    }
+
+    let html = `<div class="response-answer ${statusClass}">`;
+
+    // Question header
+    html += `<div class="response-answer-header">
+        <span class="response-question-number">Q${qNum}</span>
+        ${statusBadge}
+        ${isGraded ? `<span class="response-answer-score">${effectiveGrade.score}/${effectiveGrade.maxScore || 1}</span>` : ''}
+    </div>`;
+
+    // Question text (if quiz is found)
+    if (question?.question) {
+        html += `<div class="response-question-text md-content">${marked.parse(question.question)}</div>`;
+    }
+
+    // Student's answer
+    html += `<div class="response-student-answer">
+        <div class="response-answer-label">Student Answer:</div>
+        <div class="response-answer-content">${formatStudentAnswer(answer.answer, question?.type)}</div>
+    </div>`;
+
+    // Show grade hierarchy if present
+    if (answer.autoGrade) {
+        html += renderGradeCard('Auto', answer.autoGrade, 'auto');
+    }
+    if (answer.claudeGrade) {
+        html += renderGradeCard('AI Suggestion', answer.claudeGrade, 'claude');
+    }
+    if (answer.teacherGrade) {
+        html += renderGradeCard('Teacher Review', answer.teacherGrade, 'teacher');
+    }
+
+    // If no teacher grade yet, show grading UI
+    if (!answer.teacherGrade && (answer.claudeGrade || answer.autoGrade?.status === 'pending' || !answer.autoGrade)) {
+        html += renderTeacherGradeUI(index, answer.claudeGrade);
+    }
+
+    html += '</div>';
+    return html;
+}
+
+// Format student answer for display
+function formatStudentAnswer(answer, questionType) {
+    if (answer === null || answer === undefined) {
+        return '<span class="response-no-answer">No answer provided</span>';
+    }
+
+    if (Array.isArray(answer)) {
+        // Ordering or multi-select
+        return `<ol class="response-answer-list">${answer.map(a => `<li>${escapeHtml(String(a))}</li>`).join('')}</ol>`;
+    }
+
+    if (typeof answer === 'object') {
+        // Matching pairs or other complex answer
+        return `<pre class="response-answer-json">${escapeHtml(JSON.stringify(answer, null, 2))}</pre>`;
+    }
+
+    if (typeof answer === 'number') {
+        return `<span class="response-answer-numeric">${answer}</span>`;
+    }
+
+    // Text answer - render as markdown
+    return `<div class="md-content">${marked.parse(String(answer))}</div>`;
+}
+
+// Render a grade card (for auto/claude/teacher grades)
+function renderGradeCard(label, grade, type) {
+    let html = `<div class="response-grade-card response-grade-${type}">`;
+    html += `<div class="response-grade-header">
+        <span class="response-grade-label">${escapeHtml(label)}</span>
+        <span class="response-grade-score">${grade.score}/${grade.maxScore || 1}</span>
+    </div>`;
+
+    if (grade.feedback) {
+        html += `<div class="response-grade-feedback md-content">${marked.parse(grade.feedback)}</div>`;
+    }
+
+    if (grade.reviewer) {
+        html += `<div class="response-grade-attribution">by ${escapeHtml(grade.reviewer)}</div>`;
+    }
+
+    if (grade.reviewedAt || grade.gradedAt) {
+        const date = grade.reviewedAt || grade.gradedAt;
+        html += `<div class="response-grade-date">${formatDate(date)}</div>`;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+// Render teacher grade UI (similar to quiz review UI)
+function renderTeacherGradeUI(answerIndex, claudeGrade) {
+    const prefillScore = claudeGrade?.score || '';
+    const prefillFeedback = claudeGrade?.feedback || '';
+    const maxScore = claudeGrade?.maxScore || 1;
+
+    return `<div class="response-teacher-grade-ui" data-answer-index="${answerIndex}">
+        <div class="response-grade-label">Teacher Review:</div>
+        <div class="response-grade-inputs">
+            <div class="response-score-input">
+                <label>Score:</label>
+                <input type="number" class="response-score-field" id="teacherScore_${answerIndex}"
+                       value="${prefillScore}" min="0" max="${maxScore}" step="0.5">
+                <span>/ ${maxScore}</span>
+            </div>
+            <div class="response-feedback-input">
+                <label>Feedback:</label>
+                <textarea class="response-feedback-field" id="teacherFeedback_${answerIndex}"
+                          placeholder="Optional feedback...">${escapeHtml(prefillFeedback)}</textarea>
+            </div>
+            <div class="response-grade-actions">
+                <button class="response-approve-btn" onclick="submitTeacherGrade(${answerIndex})">
+                    Save Grade
+                </button>
+                ${claudeGrade ? `<button class="response-approve-ai-btn" onclick="approveClaudeGrade(${answerIndex})">
+                    Approve AI Grade
+                </button>` : ''}
+            </div>
+        </div>
+    </div>`;
+}
+
+// Find a card by its ID across all sections
+function findCardById(cardId) {
+    if (!cardId) return null;
+
+    // Search in all sections
+    for (const section of data.sections) {
+        for (const item of section.items) {
+            if (item.id === cardId) return item;
+        }
+    }
+
+    // Search in system notes
+    if (data.systemNotes) {
+        for (const item of data.systemNotes) {
+            if (item.id === cardId) return item;
+        }
+    }
+
+    return null;
+}
+
+// Submit a teacher grade for an answer
+async function submitTeacherGrade(answerIndex) {
+    const card = currentViewingCard;
+    if (!card || card.template !== 'quiz-response') {
+        showToast('No response card open', 'error');
+        return;
+    }
+
+    const scoreEl = document.getElementById(`teacherScore_${answerIndex}`);
+    const feedbackEl = document.getElementById(`teacherFeedback_${answerIndex}`);
+
+    if (!scoreEl || scoreEl.value === '') {
+        showToast('Please enter a score', 'error');
+        return;
+    }
+
+    const score = parseFloat(scoreEl.value);
+    const feedback = feedbackEl?.value || '';
+
+    // Update the answer with teacher grade
+    if (!card.answers[answerIndex]) {
+        showToast('Answer not found', 'error');
+        return;
+    }
+
+    card.answers[answerIndex].teacherGrade = {
+        score: score,
+        maxScore: card.answers[answerIndex].claudeGrade?.maxScore ||
+                  card.answers[answerIndex].autoGrade?.maxScore || 1,
+        feedback: feedback,
+        reviewedAt: new Date().toISOString(),
+        reviewer: notebookSettings?.default_author || 'Teacher'
+    };
+
+    // Recalculate total score
+    recalculateResponseScore(card);
+
+    // Update status if all answers are reviewed
+    updateResponseStatus(card);
+
+    card.modified = new Date().toISOString();
+
+    // Save
+    const section = findSectionByItem(card);
+    if (section) {
+        await saveCardFile(section.id, card);
+    }
+
+    // Re-render
+    const viewerContent = document.getElementById('viewerContent');
+    if (viewerContent) {
+        const template = templateRegistry[card.template || card.type];
+        viewerContent.innerHTML = renderQuizResponseViewer(card, template);
+    }
+
+    render();
+    showToast('Grade saved', 'success');
+}
+
+// Approve Claude's grade as the teacher grade
+async function approveClaudeGrade(answerIndex) {
+    const card = currentViewingCard;
+    if (!card || card.template !== 'quiz-response') {
+        showToast('No response card open', 'error');
+        return;
+    }
+
+    const answer = card.answers[answerIndex];
+    if (!answer?.claudeGrade) {
+        showToast('No AI grade to approve', 'error');
+        return;
+    }
+
+    // Copy Claude grade to teacher grade with approval
+    answer.teacherGrade = {
+        ...answer.claudeGrade,
+        reviewedAt: new Date().toISOString(),
+        reviewer: notebookSettings?.default_author || 'Teacher'
+    };
+    delete answer.teacherGrade.gradedAt; // Use reviewedAt instead
+
+    // Recalculate total score
+    recalculateResponseScore(card);
+
+    // Update status if all answers are reviewed
+    updateResponseStatus(card);
+
+    card.modified = new Date().toISOString();
+
+    // Save
+    const section = findSectionByItem(card);
+    if (section) {
+        await saveCardFile(section.id, card);
+    }
+
+    // Re-render
+    const viewerContent = document.getElementById('viewerContent');
+    if (viewerContent) {
+        const template = templateRegistry[card.template || card.type];
+        viewerContent.innerHTML = renderQuizResponseViewer(card, template);
+    }
+
+    render();
+    showToast('AI grade approved', 'success');
+}
+
+// Recalculate total score for a response card
+function recalculateResponseScore(card) {
+    let totalScore = 0;
+    let maxScore = 0;
+
+    for (const answer of card.answers) {
+        const grade = getEffectiveGrade(answer);
+        if (grade) {
+            totalScore += grade.score || 0;
+            maxScore += grade.maxScore || 1;
+        }
+    }
+
+    card.totalScore = totalScore;
+    card.maxScore = maxScore;
+}
+
+// Update response status based on grading progress
+function updateResponseStatus(card) {
+    const answers = card.answers || [];
+    const allReviewed = answers.every(a => a.teacherGrade);
+    const allGraded = answers.every(a => getEffectiveGrade(a) !== null);
+
+    if (card.exportedToForms) {
+        card.status = 'exported';
+    } else if (allReviewed) {
+        card.status = 'reviewed';
+    } else if (allGraded) {
+        card.status = 'graded';
+    } else {
+        card.status = 'pending';
+    }
 }
 
 // Image viewer: large image with description
