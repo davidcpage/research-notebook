@@ -3402,27 +3402,6 @@ function renderTeacherGradeUI(answerIndex, claudeGrade) {
     </div>`;
 }
 
-// Find a card by its ID across all sections
-function findCardById(cardId) {
-    if (!cardId) return null;
-
-    // Search in all sections
-    for (const section of data.sections) {
-        for (const item of section.items) {
-            if (item.id === cardId) return item;
-        }
-    }
-
-    // Search in system notes
-    if (data.systemNotes) {
-        for (const item of data.systemNotes) {
-            if (item.id === cardId) return item;
-        }
-    }
-
-    return null;
-}
-
 // Submit a teacher grade for an answer
 async function submitTeacherGrade(answerIndex) {
     const card = currentViewingCard;
@@ -4296,7 +4275,8 @@ function openEditor(templateName, sectionId, card = null) {
 // Render a single editor field based on its configuration
 function renderEditorField(fieldConfig, fieldDef, value) {
     const { field, label, width, multiline, rows, monospace, preview, widget, auto_fetch } = fieldConfig;
-    const type = fieldDef?.type || 'text';
+    // Check fieldConfig.type first (explicit override), then schema type, then default to text
+    const type = fieldConfig.type || fieldDef?.type || 'text';
     const required = fieldDef?.required || false;
 
     const div = document.createElement('div');
@@ -4601,6 +4581,42 @@ function renderEditorField(fieldConfig, fieldDef, value) {
             };
             div.appendChild(addBtn);
         }
+    } else if (type === 'questions') {
+        // Quiz questions editor - specialized editor for quiz question arrays
+        const questionsContainer = document.createElement('div');
+        questionsContainer.className = 'quiz-questions-editor';
+        questionsContainer.id = `editor-${field}`;
+
+        const questionsArray = Array.isArray(value) ? value : [];
+        questionsArray.forEach((question, idx) => {
+            const questionEl = createQuestionEditor(question, idx, questionsArray.length);
+            questionsContainer.appendChild(questionEl);
+        });
+
+        div.appendChild(questionsContainer);
+
+        // Add question button
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'quiz-add-question';
+        addBtn.textContent = '+ Add Question';
+        addBtn.onclick = () => {
+            const container = document.getElementById(`editor-${field}`);
+            const newIdx = container.children.length;
+            const newQuestion = {
+                type: 'multiple_choice',
+                question: '',
+                options: ['', ''],
+                correct: 0,
+                points: 1
+            };
+            const questionEl = createQuestionEditor(newQuestion, newIdx, newIdx + 1);
+            container.appendChild(questionEl);
+            // Expand the new question
+            questionEl.classList.add('expanded');
+            updateQuestionEditorIndices();
+        };
+        div.appendChild(addBtn);
     } else if (type === 'theme') {
         // Theme picker dropdown - populated from theme registry
         inputEl = document.createElement('select');
@@ -4882,9 +4898,560 @@ function updateRecordsEditorIndices(field) {
     });
 }
 
+// Question types supported in Phase 1
+const PHASE1_QUESTION_TYPES = ['multiple_choice', 'checkbox', 'dropdown', 'short_answer', 'worked'];
+
+// Types that share the same options structure (can convert between without losing data)
+const OPTIONS_BASED_TYPES = ['multiple_choice', 'checkbox', 'dropdown'];
+
+// Create a single question editor element
+function createQuestionEditor(question, index, total) {
+    const questionEl = document.createElement('div');
+    questionEl.className = 'quiz-question-editor';
+    questionEl.setAttribute('data-index', index);
+
+    // Store question data
+    questionEl.setAttribute('data-question', JSON.stringify(question));
+
+    // Header row with collapse/expand, type badge, preview, and controls
+    const header = document.createElement('div');
+    header.className = 'quiz-question-header';
+
+    // Drag handle
+    const dragHandle = document.createElement('span');
+    dragHandle.className = 'quiz-question-drag';
+    dragHandle.innerHTML = '⋮⋮';
+    dragHandle.title = 'Drag to reorder';
+    header.appendChild(dragHandle);
+
+    // Question number
+    const qNum = document.createElement('span');
+    qNum.className = 'quiz-question-num';
+    qNum.textContent = `Q${index + 1}`;
+    header.appendChild(qNum);
+
+    // Type badge/selector
+    const typeSelect = document.createElement('select');
+    typeSelect.className = 'quiz-question-type';
+    PHASE1_QUESTION_TYPES.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t.replace('_', ' ');
+        opt.selected = t === question.type;
+        typeSelect.appendChild(opt);
+    });
+    typeSelect.onchange = (e) => handleQuestionTypeChange(questionEl, e.target.value);
+    header.appendChild(typeSelect);
+
+    // Preview text (truncated question)
+    const preview = document.createElement('span');
+    preview.className = 'quiz-question-preview';
+    preview.textContent = question.question ? question.question.substring(0, 50) + (question.question.length > 50 ? '...' : '') : '(no question text)';
+    header.appendChild(preview);
+
+    // Spacer
+    const spacer = document.createElement('span');
+    spacer.className = 'quiz-question-spacer';
+    header.appendChild(spacer);
+
+    // Expand/collapse toggle
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'quiz-question-toggle';
+    toggle.innerHTML = '▼';
+    toggle.title = 'Expand/collapse';
+    toggle.onclick = () => {
+        questionEl.classList.toggle('expanded');
+        toggle.innerHTML = questionEl.classList.contains('expanded') ? '▲' : '▼';
+    };
+    header.appendChild(toggle);
+
+    // Delete button
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'quiz-question-delete';
+    deleteBtn.innerHTML = '×';
+    deleteBtn.title = 'Delete question';
+    deleteBtn.onclick = () => {
+        if (confirm('Delete this question?')) {
+            questionEl.remove();
+            updateQuestionEditorIndices();
+        }
+    };
+    header.appendChild(deleteBtn);
+
+    questionEl.appendChild(header);
+
+    // Content area (shown when expanded)
+    const content = document.createElement('div');
+    content.className = 'quiz-question-content';
+
+    // Question text field
+    const questionField = document.createElement('div');
+    questionField.className = 'quiz-field';
+    questionField.innerHTML = `<label>Question</label>`;
+    const questionTextarea = document.createElement('textarea');
+    questionTextarea.className = 'quiz-question-text';
+    questionTextarea.value = question.question || '';
+    questionTextarea.rows = 3;
+    questionTextarea.placeholder = 'Enter question text (supports Markdown)';
+    questionTextarea.oninput = () => {
+        // Update preview text
+        preview.textContent = questionTextarea.value ? questionTextarea.value.substring(0, 50) + (questionTextarea.value.length > 50 ? '...' : '') : '(no question text)';
+    };
+    questionField.appendChild(questionTextarea);
+    content.appendChild(questionField);
+
+    // Type-specific fields
+    const typeFields = document.createElement('div');
+    typeFields.className = 'quiz-type-fields';
+    renderQuestionTypeFields(typeFields, question.type, question);
+    content.appendChild(typeFields);
+
+    // Points field
+    const pointsField = document.createElement('div');
+    pointsField.className = 'quiz-field quiz-field-inline';
+    pointsField.innerHTML = `
+        <label>Points</label>
+        <input type="number" class="quiz-points" value="${question.points || 1}" min="0" step="0.5">
+    `;
+    content.appendChild(pointsField);
+
+    // Determine if this type needs AI grading fields
+    const needsAIGrading = ['short_answer', 'worked'].includes(question.type);
+
+    // Advanced fields section (collapsible)
+    const advancedSection = document.createElement('div');
+    advancedSection.className = 'quiz-advanced-section';
+
+    const advancedLabel = needsAIGrading
+        ? 'Advanced (hint, explanation, model answer, rubric)'
+        : 'Advanced (hint, explanation)';
+
+    const advancedToggle = document.createElement('button');
+    advancedToggle.type = 'button';
+    advancedToggle.className = 'quiz-advanced-toggle';
+    advancedToggle.innerHTML = `▸ ${advancedLabel}`;
+    advancedToggle.onclick = () => {
+        advancedSection.classList.toggle('expanded');
+        advancedToggle.innerHTML = advancedSection.classList.contains('expanded')
+            ? `▾ ${advancedLabel}`
+            : `▸ ${advancedLabel}`;
+    };
+    advancedSection.appendChild(advancedToggle);
+
+    const advancedContent = document.createElement('div');
+    advancedContent.className = 'quiz-advanced-content';
+
+    // Hint field (all types)
+    const hintField = document.createElement('div');
+    hintField.className = 'quiz-field';
+    hintField.innerHTML = `<label>Hint</label>`;
+    const hintTextarea = document.createElement('textarea');
+    hintTextarea.className = 'quiz-hint';
+    hintTextarea.value = question.hint || '';
+    hintTextarea.rows = 2;
+    hintTextarea.placeholder = 'Optional hint shown on request';
+    hintField.appendChild(hintTextarea);
+    advancedContent.appendChild(hintField);
+
+    // Explanation field (all types)
+    const explanationField = document.createElement('div');
+    explanationField.className = 'quiz-field';
+    explanationField.innerHTML = `<label>Explanation</label>`;
+    const explanationTextarea = document.createElement('textarea');
+    explanationTextarea.className = 'quiz-explanation';
+    explanationTextarea.value = question.explanation || '';
+    explanationTextarea.rows = 2;
+    explanationTextarea.placeholder = 'Explanation shown after answering';
+    explanationField.appendChild(explanationTextarea);
+    advancedContent.appendChild(explanationField);
+
+    // Model answer and rubric only for types needing AI grading
+    if (needsAIGrading) {
+        // Model answer field
+        const modelField = document.createElement('div');
+        modelField.className = 'quiz-field';
+        modelField.innerHTML = `<label>Model Answer</label>`;
+        const modelTextarea = document.createElement('textarea');
+        modelTextarea.className = 'quiz-model-answer';
+        modelTextarea.value = question.modelAnswer || '';
+        modelTextarea.rows = 2;
+        modelTextarea.placeholder = 'Model answer for AI grading';
+        modelField.appendChild(modelTextarea);
+        advancedContent.appendChild(modelField);
+
+        // Rubric field
+        const rubricField = document.createElement('div');
+        rubricField.className = 'quiz-field';
+        rubricField.innerHTML = `<label>Rubric</label>`;
+        const rubricTextarea = document.createElement('textarea');
+        rubricTextarea.className = 'quiz-rubric';
+        rubricTextarea.value = question.rubric || '';
+        rubricTextarea.rows = 3;
+        rubricTextarea.placeholder = 'Grading criteria for AI grading';
+        rubricField.appendChild(rubricTextarea);
+        advancedContent.appendChild(rubricField);
+    }
+
+    advancedSection.appendChild(advancedContent);
+    content.appendChild(advancedSection);
+
+    questionEl.appendChild(content);
+
+    // Setup drag and drop
+    setupQuestionDragDrop(questionEl, dragHandle);
+
+    return questionEl;
+}
+
+// Render type-specific fields for a question
+function renderQuestionTypeFields(container, type, question) {
+    container.innerHTML = '';
+
+    // Options-based types: multiple_choice, checkbox, dropdown
+    if (OPTIONS_BASED_TYPES.includes(type)) {
+        const isCheckbox = type === 'checkbox';
+
+        // Type description
+        const typeDesc = document.createElement('p');
+        typeDesc.className = 'quiz-type-info';
+        if (type === 'multiple_choice') {
+            typeDesc.textContent = 'Single answer - student selects one option';
+        } else if (type === 'checkbox') {
+            typeDesc.textContent = 'Multiple answers - student can select several options';
+        } else if (type === 'dropdown') {
+            typeDesc.textContent = 'Dropdown - student selects one option from a dropdown menu';
+        }
+        container.appendChild(typeDesc);
+
+        // Options list with correct answer selector
+        const optionsField = document.createElement('div');
+        optionsField.className = 'quiz-field quiz-options-field';
+        optionsField.innerHTML = `<label>Options</label>`;
+
+        const optionsList = document.createElement('div');
+        optionsList.className = 'quiz-options-list';
+
+        const options = question.options || ['', ''];
+        const correctMultiple = question.correctMultiple || [];
+        const correctSingle = question.correct ?? 0;
+
+        options.forEach((opt, idx) => {
+            const isCorrect = isCheckbox ? correctMultiple.includes(idx) : (correctSingle === idx);
+            const optionRow = createOptionRow(opt, idx, isCheckbox, isCorrect);
+            optionsList.appendChild(optionRow);
+        });
+
+        optionsField.appendChild(optionsList);
+
+        // Add option button
+        const addOptionBtn = document.createElement('button');
+        addOptionBtn.type = 'button';
+        addOptionBtn.className = 'quiz-add-option';
+        addOptionBtn.textContent = '+ Add option';
+        addOptionBtn.onclick = () => {
+            const newIdx = optionsList.children.length;
+            const optionRow = createOptionRow('', newIdx, isCheckbox, false);
+            optionsList.appendChild(optionRow);
+            optionRow.querySelector('input[type="text"]').focus();
+        };
+        optionsField.appendChild(addOptionBtn);
+
+        container.appendChild(optionsField);
+
+    } else if (type === 'short_answer' || type === 'worked') {
+        // These types primarily use the model answer and rubric from advanced section
+        const infoText = document.createElement('p');
+        infoText.className = 'quiz-type-info';
+        infoText.textContent = type === 'short_answer'
+            ? 'Short answer questions are graded using the model answer and rubric in the Advanced section.'
+            : 'Worked problems show work area for students. Grade using model answer and rubric in the Advanced section.';
+        container.appendChild(infoText);
+    }
+}
+
+// Create a single option row for multiple choice (styled like quiz viewer)
+function createOptionRow(value, index, isCheckbox, isCorrect) {
+    const row = document.createElement('div');
+    row.className = 'quiz-option-row' + (isCorrect ? ' is-correct' : '');
+    row.setAttribute('data-index', index);
+
+    // Letter circle (styled like viewer)
+    const letter = document.createElement('span');
+    letter.className = 'quiz-option-letter';
+    letter.textContent = String.fromCharCode(65 + index);
+    row.appendChild(letter);
+
+    // Option text input
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'quiz-option-input';
+    input.value = value || '';
+    input.placeholder = `Enter option ${String.fromCharCode(65 + index)}`;
+    row.appendChild(input);
+
+    // Correct answer toggle (checkmark style)
+    const correctBtn = document.createElement('button');
+    correctBtn.type = 'button';
+    correctBtn.className = 'quiz-option-correct-btn' + (isCorrect ? ' is-correct' : '');
+    correctBtn.innerHTML = '✓';
+    correctBtn.title = isCorrect ? 'Correct answer' : 'Mark as correct';
+    correctBtn.onclick = () => {
+        const optionsList = row.parentElement;
+        if (isCheckbox) {
+            // Checkbox mode - toggle this option
+            row.classList.toggle('is-correct');
+            correctBtn.classList.toggle('is-correct');
+        } else {
+            // Radio mode - only one correct
+            optionsList.querySelectorAll('.quiz-option-row').forEach(r => {
+                r.classList.remove('is-correct');
+                r.querySelector('.quiz-option-correct-btn')?.classList.remove('is-correct');
+            });
+            row.classList.add('is-correct');
+            correctBtn.classList.add('is-correct');
+        }
+    };
+    row.appendChild(correctBtn);
+
+    // Delete button
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'quiz-option-delete';
+    deleteBtn.innerHTML = '×';
+    deleteBtn.title = 'Remove option';
+    deleteBtn.onclick = () => {
+        const optionsList = row.parentElement;
+        if (optionsList.children.length > 2) {
+            row.remove();
+            updateOptionIndices(optionsList);
+        } else {
+            showToast('Need at least 2 options', true);
+        }
+    };
+    row.appendChild(deleteBtn);
+
+    return row;
+}
+
+// Update option indices (A, B, C labels) after deletion
+function updateOptionIndices(optionsList) {
+    Array.from(optionsList.children).forEach((row, idx) => {
+        row.setAttribute('data-index', idx);
+        const label = row.querySelector('.quiz-option-label');
+        if (label) label.textContent = String.fromCharCode(65 + idx) + '.';
+        const input = row.querySelector('.quiz-option-text');
+        if (input) input.placeholder = `Option ${String.fromCharCode(65 + idx)}`;
+    });
+}
+
+// Handle question type change with confirmation
+function handleQuestionTypeChange(questionEl, newType) {
+    const currentData = JSON.parse(questionEl.getAttribute('data-question') || '{}');
+    const oldType = currentData.type;
+
+    if (oldType === newType) return;
+
+    const oldIsOptions = OPTIONS_BASED_TYPES.includes(oldType);
+    const newIsOptions = OPTIONS_BASED_TYPES.includes(newType);
+
+    // Warn only if changing FROM options-based TO non-options (will lose options)
+    if (oldIsOptions && !newIsOptions && currentData.options && currentData.options.some(o => o.trim())) {
+        if (!confirm('Changing type will remove your options. Continue?')) {
+            const select = questionEl.querySelector('.quiz-question-type');
+            select.value = oldType;
+            return;
+        }
+    }
+
+    // Update question data - preserve common fields
+    const newData = {
+        type: newType,
+        question: currentData.question || '',
+        points: currentData.points || 1,
+        hint: currentData.hint,
+        explanation: currentData.explanation,
+        modelAnswer: currentData.modelAnswer,
+        rubric: currentData.rubric
+    };
+
+    // Handle options-based types
+    if (newIsOptions) {
+        if (oldIsOptions && currentData.options) {
+            // Preserve options when switching between MC-family types
+            newData.options = currentData.options;
+
+            // Convert correct answer format
+            if (newType === 'checkbox') {
+                // Convert single correct to array
+                if (currentData.correctMultiple) {
+                    newData.correctMultiple = currentData.correctMultiple;
+                } else if (currentData.correct !== undefined) {
+                    newData.correctMultiple = [currentData.correct];
+                } else {
+                    newData.correctMultiple = [];
+                }
+            } else {
+                // multiple_choice or dropdown - single correct
+                if (currentData.correct !== undefined) {
+                    newData.correct = currentData.correct;
+                } else if (currentData.correctMultiple && currentData.correctMultiple.length > 0) {
+                    newData.correct = currentData.correctMultiple[0];
+                } else {
+                    newData.correct = 0;
+                }
+            }
+        } else {
+            // New options-based question - create defaults
+            newData.options = ['', ''];
+            if (newType === 'checkbox') {
+                newData.correctMultiple = [];
+            } else {
+                newData.correct = 0;
+            }
+        }
+    }
+
+    questionEl.setAttribute('data-question', JSON.stringify(newData));
+
+    // Re-render type fields
+    const typeFields = questionEl.querySelector('.quiz-type-fields');
+    renderQuestionTypeFields(typeFields, newType, newData);
+}
+
+// Update question editor indices after reordering
+function updateQuestionEditorIndices() {
+    const container = document.querySelector('.quiz-questions-editor');
+    if (!container) return;
+
+    Array.from(container.children).forEach((questionEl, idx) => {
+        questionEl.setAttribute('data-index', idx);
+        const qNum = questionEl.querySelector('.quiz-question-num');
+        if (qNum) qNum.textContent = `Q${idx + 1}`;
+    });
+}
+
+// Setup drag and drop for question reordering
+function setupQuestionDragDrop(questionEl, dragHandle) {
+    dragHandle.setAttribute('draggable', 'true');
+
+    dragHandle.addEventListener('dragstart', (e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', questionEl.getAttribute('data-index'));
+        questionEl.classList.add('dragging');
+    });
+
+    dragHandle.addEventListener('dragend', () => {
+        questionEl.classList.remove('dragging');
+        document.querySelectorAll('.quiz-question-editor').forEach(el => {
+            el.classList.remove('drag-over');
+        });
+    });
+
+    questionEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const dragging = document.querySelector('.quiz-question-editor.dragging');
+        if (dragging && dragging !== questionEl) {
+            questionEl.classList.add('drag-over');
+        }
+    });
+
+    questionEl.addEventListener('dragleave', () => {
+        questionEl.classList.remove('drag-over');
+    });
+
+    questionEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        questionEl.classList.remove('drag-over');
+
+        const dragging = document.querySelector('.quiz-question-editor.dragging');
+        if (!dragging || dragging === questionEl) return;
+
+        const container = questionEl.parentElement;
+        const dragIdx = parseInt(dragging.getAttribute('data-index'));
+        const dropIdx = parseInt(questionEl.getAttribute('data-index'));
+
+        if (dragIdx < dropIdx) {
+            container.insertBefore(dragging, questionEl.nextSibling);
+        } else {
+            container.insertBefore(dragging, questionEl);
+        }
+
+        updateQuestionEditorIndices();
+    });
+}
+
+// Get all questions data from the editor
+function getQuestionsEditorValue() {
+    const container = document.querySelector('.quiz-questions-editor');
+    if (!container) return [];
+
+    const questions = [];
+    Array.from(container.children).forEach(questionEl => {
+        const question = {};
+
+        // Get type
+        const typeSelect = questionEl.querySelector('.quiz-question-type');
+        question.type = typeSelect ? typeSelect.value : 'multiple_choice';
+
+        // Get question text
+        const questionText = questionEl.querySelector('.quiz-question-text');
+        question.question = questionText ? questionText.value : '';
+
+        // Get points
+        const points = questionEl.querySelector('.quiz-points');
+        question.points = points ? parseFloat(points.value) || 1 : 1;
+
+        // Get type-specific fields for options-based types
+        if (OPTIONS_BASED_TYPES.includes(question.type)) {
+            const options = [];
+            const optionRows = questionEl.querySelectorAll('.quiz-option-row');
+            const correctIndices = [];
+
+            optionRows.forEach((row, idx) => {
+                const textInput = row.querySelector('.quiz-option-input');
+                options.push(textInput ? textInput.value : '');
+
+                // Check for is-correct class
+                if (row.classList.contains('is-correct')) {
+                    correctIndices.push(idx);
+                }
+            });
+
+            question.options = options;
+
+            // Checkbox type uses correctMultiple, others use single correct
+            if (question.type === 'checkbox') {
+                question.correctMultiple = correctIndices;
+            } else {
+                question.correct = correctIndices.length > 0 ? correctIndices[0] : 0;
+            }
+        }
+
+        // Get advanced fields
+        const hint = questionEl.querySelector('.quiz-hint');
+        if (hint && hint.value.trim()) question.hint = hint.value.trim();
+
+        const explanation = questionEl.querySelector('.quiz-explanation');
+        if (explanation && explanation.value.trim()) question.explanation = explanation.value.trim();
+
+        const modelAnswer = questionEl.querySelector('.quiz-model-answer');
+        if (modelAnswer && modelAnswer.value.trim()) question.modelAnswer = modelAnswer.value.trim();
+
+        const rubric = questionEl.querySelector('.quiz-rubric');
+        if (rubric && rubric.value.trim()) question.rubric = rubric.value.trim();
+
+        questions.push(question);
+    });
+
+    return questions;
+}
+
 // Get value from an editor field
-function getEditorFieldValue(fieldName, fieldDef) {
-    const type = fieldDef?.type || 'text';
+function getEditorFieldValue(fieldName, fieldDef, fieldConfig) {
+    // Check fieldConfig.type first (explicit override), then schema type, then default to text
+    const type = fieldConfig?.type || fieldDef?.type || 'text';
 
     // Special handling for thumbnail
     if (type === 'thumbnail') {
@@ -4972,6 +5539,9 @@ function getEditorFieldValue(fieldName, fieldDef) {
             records.push(record);
         });
         return records;
+    } else if (type === 'questions') {
+        // Use the dedicated function to extract questions data
+        return getQuestionsEditorValue();
     }
 
     return el.value;
@@ -5172,7 +5742,7 @@ async function saveEditor() {
 
     for (const fieldConfig of fields) {
         const fieldDef = template.schema[fieldConfig.field];
-        const value = getEditorFieldValue(fieldConfig.field, fieldDef);
+        const value = getEditorFieldValue(fieldConfig.field, fieldDef, fieldConfig);
 
         if (fieldDef?.required && !value) {
             showToast(`${fieldConfig.label} is required`);

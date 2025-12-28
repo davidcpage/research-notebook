@@ -9,6 +9,9 @@ schema:
   topic:
     type: text
     description: Subject area for progress tracking
+  description:
+    type: markdown
+    description: Quiz description shown to students
   questions:
     type: array
     required: true
@@ -18,7 +21,7 @@ schema:
       properties:
         type:
           type: text
-          enum: [multiple_choice, numeric, short_answer, worked, matching, ordering, scale, grid]
+          enum: [multiple_choice, checkbox, dropdown, numeric, short_answer, worked, matching, ordering, scale, grid]
           required: true
         question:
           type: markdown
@@ -111,6 +114,12 @@ schema:
         explanation:
           type: markdown
           description: Shown after answering
+        modelAnswer:
+          type: markdown
+          description: Model answer for AI grading (short_answer, worked types)
+        rubric:
+          type: markdown
+          description: Grading criteria for AI grading
   attempts:
     type: array
     description: Array of attempt records
@@ -156,7 +165,24 @@ card:
 viewer:
   layout: quiz
 editor:
-  layout: yaml
+  layout: default
+  fields:
+    - field: title
+      label: Title
+    - field: author
+      label: Author
+      width: half
+    - field: topic
+      label: Topic
+      width: half
+    - field: questions
+      label: Questions
+      type: questions
+    - field: description
+      label: Description (optional)
+      type: text
+      multiline: true
+      rows: 2
 style:
   variables:
     --template-border: "#c9d4e8"
