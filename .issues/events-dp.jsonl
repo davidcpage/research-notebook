@@ -165,3 +165,6 @@
 {"ts":"2025-12-28T17:12:43Z","type":"closed","id":"dp-057","reason":"Created google-forms-bridge/ with appsscript.json, Code.gs, ExportResponses.gs, ImportGrades.gs, and README.md with clasp setup instructions."}
 {"ts":"2025-12-28T17:12:43Z","type":"closed","id":"dp-060","reason":"Implemented ExportResponses.gs with getFormMetadata, getQuestions, and exportResponses functions for extracting student submissions from Google Forms."}
 {"ts":"2025-12-28T17:12:43Z","type":"closed","id":"dp-061","reason":"Implemented ImportGrades.gs with importFromJSON function for submitting grades and feedback back to Google Forms quiz responses."}
+{"ts":"2025-12-28T17:14:42Z","type":"note","id":"dp-055","content":"PARTIAL: grade_responses.py exists with prompt caching and dry-run mode. MISSING: Batch API (uses sequential single requests), provider abstraction (only Anthropic), OpenAI/Google/Ollama providers."}
+{"ts":"2025-12-28T17:14:42Z","type":"note","id":"dp-058","content":"NOT STARTED: ExportForm.gs not yet created. ExportResponses.gs exists but handles response export, not form structure export. Need to implement exportFormToJSON for quiz import workflow."}
+{"ts":"2025-12-28T17:14:42Z","type":"note","id":"dp-059","content":"NOT STARTED: ImportQuiz.gs not yet created. Need createFormFromJSON and updateFormFromJSON to push quiz definitions to Google Forms."}
