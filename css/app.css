@@ -1638,6 +1638,11 @@ main {
     color: var(--quiz-pending-text);
 }
 
+.quiz-status-badge.answered {
+    background: #9ca3af;
+    color: white;
+}
+
 .quiz-question-text {
     margin-bottom: 1rem;
     line-height: 1.6;
@@ -1677,6 +1682,8 @@ main {
 
 .quiz-option.selected {
     border-width: 2px;
+    background: rgba(33, 150, 243, 0.1);
+    border-color: #2196f3;
 }
 
 .quiz-option-letter {

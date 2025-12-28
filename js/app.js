@@ -1527,6 +1527,9 @@ function renderQuizPreview(card, template) {
         return `<div class="preview-placeholder">${placeholder}</div>`;
     }
 
+    // Check if quiz has any graded questions (not a pure survey)
+    const hasGradedQuestions = quizHasGradedQuestions(questions);
+
     // Calculate progress from most recent attempt
     let progressHtml = '';
     let stateClass = 'quiz-not-started';
@@ -1538,7 +1541,13 @@ function renderQuizPreview(card, template) {
         const total = score.total || questions.length;
         const pending = score.pending_review || 0;
 
-        if (pending > 0) {
+        if (!hasGradedQuestions) {
+            // Pure survey - just show completed
+            stateClass = 'quiz-completed';
+            progressHtml = `<div class="quiz-progress">
+                <span class="quiz-score">Completed</span>
+            </div>`;
+        } else if (pending > 0) {
             stateClass = 'quiz-pending-review';
             progressHtml = `<div class="quiz-progress">
                 <span class="quiz-score">${correct}/${total} correct</span>
@@ -1800,6 +1809,30 @@ function renderViewerYaml(card, template) {
     return `<pre class="viewer-yaml">${escapeHtml(yamlStr)}</pre>`;
 }
 
+// Check if a quiz has any graded questions (vs pure survey)
+function quizHasGradedQuestions(questions) {
+    return questions.some(q => {
+        switch (q.type) {
+            case 'multiple_choice':
+                return q.correct !== undefined || (q.correctMultiple && q.correctMultiple.length > 0);
+            case 'scale':
+                return q.correct !== undefined;
+            case 'grid':
+                return q.correctAnswers && (Array.isArray(q.correctAnswers) ? q.correctAnswers.length > 0 : Object.keys(q.correctAnswers).length > 0);
+            case 'numeric':
+                return q.answer !== undefined;
+            case 'matching':
+            case 'ordering':
+                return true; // Always graded
+            case 'short_answer':
+            case 'worked':
+                return true; // Needs review
+            default:
+                return false;
+        }
+    });
+}
+
 // Quiz viewer: display all questions with their content
 function renderQuizViewer(card, template) {
     const questions = card.questions || [];
@@ -1814,6 +1847,9 @@ function renderQuizViewer(card, template) {
 
     // Interactive mode: no attempts yet, or user clicked "Retake"
     const isInteractive = !lastAttempt || card._quizRetakeMode;
+
+    // Check if this is a graded quiz or pure survey
+    const hasGradedQuestions = quizHasGradedQuestions(questions);
 
     let html = `<div class="quiz-viewer" data-quiz-id="${card.id}" data-interactive="${isInteractive}">`;
 
@@ -1831,10 +1867,16 @@ function renderQuizViewer(card, template) {
     } else {
         // Progress summary for review mode
         const score = lastAttempt.score || {};
-        html += `<div class="quiz-summary">
-            <span class="quiz-summary-score">${score.correct || 0}/${score.total || questions.length} correct</span>
-            ${score.pending_review ? `<span class="quiz-summary-pending">${score.pending_review} awaiting review</span>` : ''}
-        </div>`;
+        if (hasGradedQuestions) {
+            html += `<div class="quiz-summary">
+                <span class="quiz-summary-score">${score.correct || 0}/${score.total || questions.length} correct</span>
+                ${score.pending_review ? `<span class="quiz-summary-pending">${score.pending_review} awaiting review</span>` : ''}
+            </div>`;
+        } else {
+            html += `<div class="quiz-summary">
+                <span class="quiz-summary-score">Survey completed</span>
+            </div>`;
+        }
     }
 
     // Render each question
@@ -1874,6 +1916,10 @@ function renderQuizQuestion(question, index, attempt, isInteractive = false) {
         } else if (attemptAnswer.status === 'pending_review') {
             statusClass = 'quiz-pending';
             statusBadge = '<span class="quiz-status-badge pending">⏳</span>';
+        } else if (attemptAnswer.status === 'answered') {
+            // Survey question - just recorded, no grading
+            statusClass = 'quiz-answered';
+            statusBadge = '<span class="quiz-status-badge answered">•</span>';
         }
     }
 
@@ -2023,16 +2069,21 @@ function renderMultipleChoiceAnswer(question, attemptAnswer, isInteractive = fal
                 <span class="quiz-option-text">${escapeHtml(opt)}</span>
             </div>`;
         } else {
-            // Review mode: show correct/incorrect
+            // Review mode: show correct/incorrect (only if correct answer defined)
             if (attemptAnswer) {
-                if (i === correctIndex) {
-                    optClass += ' correct';
-                    indicator = '<span class="quiz-option-indicator">✓</span>';
-                }
-                if (i === userAnswer && i !== correctIndex) {
-                    optClass += ' selected incorrect';
-                    indicator = '<span class="quiz-option-indicator">✗</span>';
+                if (correctIndex !== undefined) {
+                    if (i === correctIndex) {
+                        optClass += ' correct';
+                        indicator = '<span class="quiz-option-indicator">✓</span>';
+                    }
+                    if (i === userAnswer && i !== correctIndex) {
+                        optClass += ' selected incorrect';
+                        indicator = '<span class="quiz-option-indicator">✗</span>';
+                    } else if (i === userAnswer) {
+                        optClass += ' selected';
+                    }
                 } else if (i === userAnswer) {
+                    // Survey question - just show selected, no grading
                     optClass += ' selected';
                 }
             }
@@ -2111,18 +2162,28 @@ function renderDropdownAnswer(question, attemptAnswer, isInteractive = false, qu
     } else if (attemptAnswer !== undefined) {
         // Review mode
         const selectedOpt = options[userAnswer];
-        const correctOpt = options[correctIndex];
-        const isCorrect = userAnswer === correctIndex;
 
-        html += `<div class="quiz-dropdown-answer ${isCorrect ? 'correct' : 'incorrect'}">
-            <span class="quiz-dropdown-label">Your answer:</span>
-            <span class="quiz-dropdown-value">${userAnswer !== undefined ? `${String.fromCharCode(65 + userAnswer)}. ${escapeHtml(selectedOpt)}` : '(none)'}</span>
-            ${isCorrect ? '<span class="quiz-option-indicator">✓</span>' : '<span class="quiz-option-indicator">✗</span>'}
-        </div>`;
-        if (!isCorrect && correctIndex !== undefined) {
-            html += `<div class="quiz-dropdown-correct">
-                <span class="quiz-dropdown-label">Correct:</span>
-                <span class="quiz-dropdown-value">${String.fromCharCode(65 + correctIndex)}. ${escapeHtml(correctOpt)}</span>
+        if (correctIndex !== undefined) {
+            // Graded question - show correct/incorrect
+            const correctOpt = options[correctIndex];
+            const isCorrect = userAnswer === correctIndex;
+
+            html += `<div class="quiz-dropdown-answer ${isCorrect ? 'correct' : 'incorrect'}">
+                <span class="quiz-dropdown-label">Your answer:</span>
+                <span class="quiz-dropdown-value">${userAnswer !== undefined ? `${String.fromCharCode(65 + userAnswer)}. ${escapeHtml(selectedOpt)}` : '(none)'}</span>
+                ${isCorrect ? '<span class="quiz-option-indicator">✓</span>' : '<span class="quiz-option-indicator">✗</span>'}
+            </div>`;
+            if (!isCorrect) {
+                html += `<div class="quiz-dropdown-correct">
+                    <span class="quiz-dropdown-label">Correct:</span>
+                    <span class="quiz-dropdown-value">${String.fromCharCode(65 + correctIndex)}. ${escapeHtml(correctOpt)}</span>
+                </div>`;
+            }
+        } else {
+            // Survey question - just show selected answer without grading
+            html += `<div class="quiz-dropdown-answer">
+                <span class="quiz-dropdown-label">Your answer:</span>
+                <span class="quiz-dropdown-value">${userAnswer !== undefined ? `${String.fromCharCode(65 + userAnswer)}. ${escapeHtml(selectedOpt)}` : '(none)'}</span>
             </div>`;
         }
     }
@@ -2384,14 +2445,29 @@ function renderScaleAnswer(question, attemptAnswer, isInteractive = false, quest
 function renderGridAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
     const rows = question.rows || [];
     const columns = question.columns || [];
-    const correctAnswers = question.correctAnswers || []; // Array of [rowIndex, colIndex] pairs
+    const correctAnswers = question.correctAnswers; // Array [[rowIdx, colIdx], ...] or Object {rowName: colName}
     const userAnswers = attemptAnswer?.answer || {}; // Object: { rowIndex: colIndex }
 
-    // Build correct answers lookup
+    // Build correct answers lookup (normalize both formats to {rowIdx: colIdx})
     const correctLookup = {};
-    correctAnswers.forEach(([rowIdx, colIdx]) => {
-        correctLookup[rowIdx] = colIdx;
-    });
+    if (correctAnswers) {
+        if (Array.isArray(correctAnswers)) {
+            // Array format: [[0, 2], [2, 3]]
+            correctAnswers.forEach(([rowIdx, colIdx]) => {
+                correctLookup[rowIdx] = colIdx;
+            });
+        } else {
+            // Object format: {"Row Name": "Column Name"} - more intuitive for authoring
+            Object.entries(correctAnswers).forEach(([rowName, colName]) => {
+                const rowIdx = rows.indexOf(rowName);
+                const colIdx = columns.indexOf(colName);
+                if (rowIdx !== -1 && colIdx !== -1) {
+                    correctLookup[rowIdx] = colIdx;
+                }
+            });
+        }
+    }
+    const hasCorrectAnswers = Object.keys(correctLookup).length > 0;
 
     let html = '<div class="quiz-grid">';
 
@@ -2421,12 +2497,12 @@ function renderGridAnswer(question, attemptAnswer, isInteractive = false, questi
             } else {
                 // Review mode
                 if (attemptAnswer) {
-                    if (correctAnswers.length > 0 && isCorrect) {
+                    if (hasCorrectAnswers && isCorrect) {
                         cellClass += ' correct';
                     }
                     if (isSelected) {
                         cellClass += ' selected';
-                        if (correctAnswers.length > 0 && !isCorrect) {
+                        if (hasCorrectAnswers && !isCorrect) {
                             cellClass += ' incorrect';
                         }
                     }
@@ -2700,20 +2776,31 @@ function gradeQuizAttempt(card, answers) {
         switch (q.type) {
             case 'multiple_choice':
                 // Auto-grade: compare to correct index(es)
-                if (q.allowMultiple && q.correctMultiple) {
-                    // Checkbox mode: compare arrays
-                    const userArray = Array.isArray(userAnswer) ? userAnswer.sort() : [];
-                    const correctArray = [...q.correctMultiple].sort();
-                    if (userArray.length === correctArray.length &&
-                        userArray.every((v, i) => v === correctArray[i])) {
-                        result.status = 'correct';
-                        correctCount++;
+                if (q.allowMultiple) {
+                    // Checkbox mode
+                    if (q.correctMultiple && q.correctMultiple.length > 0) {
+                        // Compare arrays
+                        const userArray = Array.isArray(userAnswer) ? [...userAnswer].sort() : [];
+                        const correctArray = [...q.correctMultiple].sort();
+                        if (userArray.length === correctArray.length &&
+                            userArray.every((v, i) => v === correctArray[i])) {
+                            result.status = 'correct';
+                            correctCount++;
+                        }
+                    } else {
+                        // No correct answer - survey question (just record response)
+                        result.status = 'answered';
                     }
                 } else {
-                    // Single answer mode
-                    if (userAnswer === q.correct) {
-                        result.status = 'correct';
-                        correctCount++;
+                    // Single answer mode (radio/dropdown)
+                    if (q.correct !== undefined) {
+                        if (userAnswer === q.correct) {
+                            result.status = 'correct';
+                            correctCount++;
+                        }
+                    } else {
+                        // No correct answer - survey question (just record response)
+                        result.status = 'answered';
                     }
                 }
                 break;
@@ -2766,27 +2853,42 @@ function gradeQuizAttempt(card, answers) {
                         correctCount++;
                     }
                 } else {
-                    // No correct answer - just record the response (surveys)
-                    result.status = 'pending_review';
-                    pendingCount++;
+                    // No correct answer - survey question (just record response)
+                    result.status = 'answered';
                 }
                 break;
 
             case 'grid':
                 // Auto-grade if correctAnswers specified
-                const correctAnswers = q.correctAnswers || [];
-                if (correctAnswers.length > 0) {
-                    // Build lookup from correct answers
-                    const correctLookup = {};
-                    correctAnswers.forEach(([rowIdx, colIdx]) => {
-                        correctLookup[rowIdx] = colIdx;
-                    });
+                const gridCorrectAnswers = q.correctAnswers;
+                const gridRows = q.rows || [];
+                const gridColumns = q.columns || [];
 
-                    // Check all rows match
+                // Build lookup (normalize both formats to {rowIdx: colIdx})
+                const gridCorrectLookup = {};
+                if (gridCorrectAnswers) {
+                    if (Array.isArray(gridCorrectAnswers)) {
+                        // Array format: [[0, 2], [2, 3]]
+                        gridCorrectAnswers.forEach(([rowIdx, colIdx]) => {
+                            gridCorrectLookup[rowIdx] = colIdx;
+                        });
+                    } else {
+                        // Object format: {"Row Name": "Column Name"}
+                        Object.entries(gridCorrectAnswers).forEach(([rowName, colName]) => {
+                            const rowIdx = gridRows.indexOf(rowName);
+                            const colIdx = gridColumns.indexOf(colName);
+                            if (rowIdx !== -1 && colIdx !== -1) {
+                                gridCorrectLookup[rowIdx] = colIdx;
+                            }
+                        });
+                    }
+                }
+
+                if (Object.keys(gridCorrectLookup).length > 0) {
+                    // Check all specified rows match
                     let gridAllCorrect = true;
-                    const rows = q.rows || [];
-                    rows.forEach((_, rowIdx) => {
-                        if (userAnswer?.[rowIdx] !== correctLookup[rowIdx]) {
+                    Object.entries(gridCorrectLookup).forEach(([rowIdx, expectedColIdx]) => {
+                        if (userAnswer?.[rowIdx] !== expectedColIdx) {
                             gridAllCorrect = false;
                         }
                     });
@@ -2796,9 +2898,8 @@ function gradeQuizAttempt(card, answers) {
                         correctCount++;
                     }
                 } else {
-                    // No correct answers - just record the response (surveys)
-                    result.status = 'pending_review';
-                    pendingCount++;
+                    // No correct answers - survey question (just record response)
+                    result.status = 'answered';
                 }
                 break;
 

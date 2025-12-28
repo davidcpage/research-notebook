@@ -1,0 +1,244 @@
+{
+  "id": "question-types-test",
+  "title": "Course Feedback Survey",
+  "author": "Claude",
+  "topic": "Student Feedback",
+  "description": "A survey demonstrating scale, grid, checkbox, and dropdown question types. No grading - just collecting feedback.",
+  "questions": [
+    {
+      "type": "scale",
+      "question": "How confident do you feel about this topic?",
+      "low": 1,
+      "high": 5,
+      "lowLabel": "Not confident",
+      "highLabel": "Very confident"
+    },
+    {
+      "type": "scale",
+      "question": "Rate the difficulty of the material so far:",
+      "low": 1,
+      "high": 10,
+      "lowLabel": "Too easy",
+      "highLabel": "Too difficult",
+      "hint": "5-6 is ideal - challenging but manageable."
+    },
+    {
+      "type": "grid",
+      "question": "Rate each aspect of the learning experience:",
+      "rows": [
+        "Clarity of explanations",
+        "Pace of instruction",
+        "Quality of examples",
+        "Usefulness of quizzes"
+      ],
+      "columns": [
+        "Poor",
+        "Fair",
+        "Good",
+        "Excellent"
+      ]
+    },
+    {
+      "type": "multiple_choice",
+      "question": "Which learning resources have you found most helpful? (Select all that apply)",
+      "options": [
+        "Written explanations",
+        "Code examples",
+        "Practice quizzes",
+        "Worked problems",
+        "Visual diagrams"
+      ],
+      "allowMultiple": true
+    },
+    {
+      "type": "multiple_choice",
+      "question": "What is your preferred learning style?",
+      "options": [
+        "Visual (diagrams, charts)",
+        "Reading/Writing (text-based)",
+        "Auditory (listening, discussion)",
+        "Kinesthetic (hands-on practice)"
+      ],
+      "display": "dropdown"
+    },
+    {
+      "type": "multiple_choice",
+      "question": "Select your current skill level:",
+      "options": [
+        "Beginner",
+        "Intermediate",
+        "Advanced",
+        "Expert"
+      ],
+      "display": "dropdown"
+    },
+    {
+      "type": "grid",
+      "question": "How often do you use each study technique?",
+      "rows": [
+        "Reviewing notes",
+        "Practice problems",
+        "Teaching others",
+        "Spaced repetition"
+      ],
+      "columns": [
+        "Never",
+        "Rarely",
+        "Sometimes",
+        "Often",
+        "Always"
+      ]
+    },
+    {
+      "type": "multiple_choice",
+      "question": "Which topics would you like to explore next? (Select all that interest you)",
+      "options": [
+        "Advanced algorithms",
+        "Data structures",
+        "System design",
+        "Machine learning",
+        "Web development"
+      ],
+      "allowMultiple": true
+    }
+  ],
+  "created": "2025-12-28T12:00:00Z",
+  "modified": "2025-12-28T17:41:41.266Z",
+  "_subdir": null,
+  "_fileModified": 1766943458716,
+  "attempts": [
+    {
+      "timestamp": "2025-12-28T17:37:38.702Z",
+      "answers": [
+        {
+          "questionIndex": 0,
+          "answer": 2,
+          "status": "answered"
+        },
+        {
+          "questionIndex": 1,
+          "answer": 4,
+          "status": "answered"
+        },
+        {
+          "questionIndex": 2,
+          "answer": {
+            "0": 1,
+            "1": 1,
+            "2": 2,
+            "3": 1
+          },
+          "status": "answered"
+        },
+        {
+          "questionIndex": 3,
+          "answer": [
+            1,
+            3
+          ],
+          "status": "answered"
+        },
+        {
+          "questionIndex": 4,
+          "answer": 1,
+          "status": "answered"
+        },
+        {
+          "questionIndex": 5,
+          "answer": 1,
+          "status": "answered"
+        },
+        {
+          "questionIndex": 6,
+          "answer": {
+            "0": 2,
+            "1": 1,
+            "2": 1,
+            "3": 1
+          },
+          "status": "answered"
+        },
+        {
+          "questionIndex": 7,
+          "answer": [
+            1,
+            3
+          ],
+          "status": "answered"
+        }
+      ],
+      "score": {
+        "correct": 0,
+        "total": 8,
+        "pending_review": 0
+      }
+    },
+    {
+      "timestamp": "2025-12-28T17:41:41.266Z",
+      "answers": [
+        {
+          "questionIndex": 0,
+          "answer": 2,
+          "status": "answered"
+        },
+        {
+          "questionIndex": 1,
+          "answer": 3,
+          "status": "answered"
+        },
+        {
+          "questionIndex": 2,
+          "answer": {
+            "0": 1,
+            "1": 1,
+            "2": 2,
+            "3": 1
+          },
+          "status": "answered"
+        },
+        {
+          "questionIndex": 3,
+          "answer": [
+            1,
+            3
+          ],
+          "status": "answered"
+        },
+        {
+          "questionIndex": 4,
+          "answer": 2,
+          "status": "answered"
+        },
+        {
+          "questionIndex": 5,
+          "answer": 1,
+          "status": "answered"
+        },
+        {
+          "questionIndex": 6,
+          "answer": {
+            "0": 1,
+            "1": 2,
+            "2": 2,
+            "3": 2
+          },
+          "status": "answered"
+        },
+        {
+          "questionIndex": 7,
+          "answer": [
+            1,
+            3
+          ],
+          "status": "answered"
+        }
+      ],
+      "score": {
+        "correct": 0,
+        "total": 8,
+        "pending_review": 0
+      }
+    }
+  ],
+  "type": "quiz"
+}
