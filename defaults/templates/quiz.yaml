@@ -18,7 +18,7 @@ schema:
       properties:
         type:
           type: text
-          enum: [multiple_choice, numeric, short_answer, worked, matching, ordering]
+          enum: [multiple_choice, numeric, short_answer, worked, matching, ordering, scale, grid]
           required: true
         question:
           type: markdown
@@ -29,7 +29,19 @@ schema:
           description: Answer options for multiple_choice
         correct:
           type: number
-          description: Index of correct option (0-based)
+          description: Index of correct option (0-based) for single-answer questions
+        allowMultiple:
+          type: boolean
+          description: If true, multiple options can be selected (checkbox vs radio)
+          default: false
+        correctMultiple:
+          type: array
+          description: Array of correct option indices for checkbox questions
+        display:
+          type: text
+          enum: [radio, dropdown]
+          description: Display style for single-answer multiple_choice
+          default: radio
         # numeric fields
         answer:
           type: number
@@ -38,6 +50,31 @@ schema:
           type: number
           description: Acceptable margin of error
           default: 0
+        # scale fields (maps to Google Forms ScaleQuestion)
+        low:
+          type: number
+          description: Lower bound of scale (typically 1)
+          default: 1
+        high:
+          type: number
+          description: Upper bound of scale (typically 5 or 10)
+          default: 5
+        lowLabel:
+          type: text
+          description: Label for low end (e.g., "Strongly Disagree")
+        highLabel:
+          type: text
+          description: Label for high end (e.g., "Strongly Agree")
+        # grid fields (maps to Google Forms Grid/RowQuestion)
+        rows:
+          type: array
+          description: Row labels for grid questions
+        columns:
+          type: array
+          description: Column labels for grid questions
+        correctAnswers:
+          type: array
+          description: Array of [rowIndex, colIndex] pairs for correct grid answers
         # matching fields
         pairs:
           type: array

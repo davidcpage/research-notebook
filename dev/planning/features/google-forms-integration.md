@@ -465,18 +465,18 @@ Average: 93.3%  Trend: ↗ Improving
 - [ ] Document setup process in README
 
 ### Phase 2: Quiz Type Extensions
-- [ ] Add `allowMultiple` and `display` to multiple_choice
-- [ ] Add `scale` question type
-- [ ] Add `grid` question type (consider replacing `matching`)
+- [x] Add `allowMultiple` and `display` to multiple_choice
+- [x] Add `scale` question type
+- [x] Add `grid` question type (consider replacing `matching`)
 - [ ] Add import/export warnings for incompatible types
-- [ ] Update quiz template schema
+- [x] Update quiz template schema
 
 ### Phase 3: Response Card Type
-- [ ] Define quiz-response template
-- [ ] Implement response card rendering
-- [ ] Show student answer, auto-grade, Claude grade, teacher grade
-- [ ] Add review UI for teacher grade editing
-- [ ] Track reviewed/unreviewed status
+- [x] Define quiz-response template
+- [x] Implement response card rendering
+- [x] Show student answer, auto-grade, Claude grade, teacher grade
+- [x] Add review UI for teacher grade editing
+- [x] Track reviewed/unreviewed status
 
 ### Phase 4: Claude Code Integration
 - [ ] Detect clasp installation and login status

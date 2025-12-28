@@ -1980,17 +1980,35 @@ function renderQuizAnswerArea(question, attemptAnswer, isInteractive = false, qu
             return renderMatchingAnswer(question, attemptAnswer, isInteractive, questionIndex);
         case 'ordering':
             return renderOrderingAnswer(question, attemptAnswer, isInteractive, questionIndex);
+        case 'scale':
+            return renderScaleAnswer(question, attemptAnswer, isInteractive, questionIndex);
+        case 'grid':
+            return renderGridAnswer(question, attemptAnswer, isInteractive, questionIndex);
         default:
             return '<div class="quiz-unknown-type">Unknown question type</div>';
     }
 }
 
-// Multiple choice: radio button options
+// Multiple choice: radio/checkbox/dropdown options
 function renderMultipleChoiceAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
     const options = question.options || [];
+    const allowMultiple = question.allowMultiple || false;
+    const display = question.display || 'radio';
     const correctIndex = question.correct;
-    const selectedIndex = attemptAnswer?.answer;
+    const correctMultiple = question.correctMultiple || [];
+    const userAnswer = attemptAnswer?.answer;
 
+    // Dropdown mode
+    if (display === 'dropdown' && !allowMultiple) {
+        return renderDropdownAnswer(question, attemptAnswer, isInteractive, questionIndex);
+    }
+
+    // Checkbox mode
+    if (allowMultiple) {
+        return renderCheckboxAnswer(question, attemptAnswer, isInteractive, questionIndex);
+    }
+
+    // Default: Radio button mode
     let html = '<div class="quiz-options">';
     options.forEach((opt, i) => {
         let optClass = 'quiz-option';
@@ -2011,10 +2029,10 @@ function renderMultipleChoiceAnswer(question, attemptAnswer, isInteractive = fal
                     optClass += ' correct';
                     indicator = '<span class="quiz-option-indicator">✓</span>';
                 }
-                if (i === selectedIndex && i !== correctIndex) {
+                if (i === userAnswer && i !== correctIndex) {
                     optClass += ' selected incorrect';
                     indicator = '<span class="quiz-option-indicator">✗</span>';
-                } else if (i === selectedIndex) {
+                } else if (i === userAnswer) {
                     optClass += ' selected';
                 }
             }
@@ -2025,6 +2043,89 @@ function renderMultipleChoiceAnswer(question, attemptAnswer, isInteractive = fal
             </div>`;
         }
     });
+    html += '</div>';
+    return html;
+}
+
+// Checkbox mode: multiple selections allowed
+function renderCheckboxAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
+    const options = question.options || [];
+    const correctMultiple = question.correctMultiple || [];
+    const userAnswers = Array.isArray(attemptAnswer?.answer) ? attemptAnswer.answer : [];
+
+    let html = '<div class="quiz-options quiz-options-checkbox">';
+    options.forEach((opt, i) => {
+        let optClass = 'quiz-option';
+        let indicator = '';
+        const isSelected = userAnswers.includes(i);
+        const isCorrect = correctMultiple.includes(i);
+
+        if (isInteractive) {
+            optClass += ' interactive';
+            html += `<div class="${optClass}" data-option-index="${i}" onclick="toggleQuizCheckbox(this, ${questionIndex}, ${i})">
+                <span class="quiz-option-checkbox"></span>
+                <span class="quiz-option-letter">${String.fromCharCode(65 + i)}</span>
+                <span class="quiz-option-text">${escapeHtml(opt)}</span>
+            </div>`;
+        } else {
+            // Review mode
+            if (attemptAnswer && correctMultiple.length > 0) {
+                if (isCorrect) {
+                    optClass += ' correct';
+                    indicator = '<span class="quiz-option-indicator">✓</span>';
+                }
+                if (isSelected && !isCorrect) {
+                    optClass += ' selected incorrect';
+                    indicator = '<span class="quiz-option-indicator">✗</span>';
+                } else if (isSelected) {
+                    optClass += ' selected';
+                }
+            } else if (isSelected) {
+                optClass += ' selected';
+            }
+            html += `<div class="${optClass}">
+                <span class="quiz-option-letter">${String.fromCharCode(65 + i)}</span>
+                <span class="quiz-option-text">${escapeHtml(opt)}</span>
+                ${indicator}
+            </div>`;
+        }
+    });
+    html += '</div>';
+    return html;
+}
+
+// Dropdown mode: select element
+function renderDropdownAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
+    const options = question.options || [];
+    const correctIndex = question.correct;
+    const userAnswer = attemptAnswer?.answer;
+
+    let html = '<div class="quiz-dropdown">';
+    if (isInteractive) {
+        html += `<select class="quiz-dropdown-select" onchange="updateQuizAnswer(${questionIndex}, parseInt(this.value))">
+            <option value="">Select an answer...</option>`;
+        options.forEach((opt, i) => {
+            html += `<option value="${i}">${String.fromCharCode(65 + i)}. ${escapeHtml(opt)}</option>`;
+        });
+        html += '</select>';
+    } else if (attemptAnswer !== undefined) {
+        // Review mode
+        const selectedOpt = options[userAnswer];
+        const correctOpt = options[correctIndex];
+        const isCorrect = userAnswer === correctIndex;
+
+        html += `<div class="quiz-dropdown-answer ${isCorrect ? 'correct' : 'incorrect'}">
+            <span class="quiz-dropdown-label">Your answer:</span>
+            <span class="quiz-dropdown-value">${userAnswer !== undefined ? `${String.fromCharCode(65 + userAnswer)}. ${escapeHtml(selectedOpt)}` : '(none)'}</span>
+            ${isCorrect ? '<span class="quiz-option-indicator">✓</span>' : '<span class="quiz-option-indicator">✗</span>'}
+        </div>`;
+        if (!isCorrect && correctIndex !== undefined) {
+            html += `<div class="quiz-dropdown-correct">
+                <span class="quiz-dropdown-label">Correct:</span>
+                <span class="quiz-dropdown-value">${String.fromCharCode(65 + correctIndex)}. ${escapeHtml(correctOpt)}</span>
+            </div>`;
+        }
+    }
     html += '</div>';
     return html;
 }
@@ -2225,6 +2326,124 @@ function renderOrderingAnswer(question, attemptAnswer, isInteractive = false, qu
     return html;
 }
 
+// Scale: linear scale selection (maps to Google Forms ScaleQuestion)
+function renderScaleAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
+    const low = question.low || 1;
+    const high = question.high || 5;
+    const lowLabel = question.lowLabel || '';
+    const highLabel = question.highLabel || '';
+    const correctValue = question.correct;
+    const selectedValue = attemptAnswer?.answer;
+
+    let html = '<div class="quiz-scale">';
+
+    // Scale labels
+    if (lowLabel || highLabel) {
+        html += '<div class="quiz-scale-labels">';
+        html += `<span class="quiz-scale-label-low">${escapeHtml(lowLabel)}</span>`;
+        html += `<span class="quiz-scale-label-high">${escapeHtml(highLabel)}</span>`;
+        html += '</div>';
+    }
+
+    // Scale options
+    html += '<div class="quiz-scale-options">';
+    for (let i = low; i <= high; i++) {
+        let optClass = 'quiz-scale-option';
+
+        if (isInteractive) {
+            optClass += ' interactive';
+            html += `<div class="${optClass}" data-value="${i}" onclick="selectScaleOption(this, ${questionIndex}, ${i})">
+                <span class="quiz-scale-radio"></span>
+                <span class="quiz-scale-value">${i}</span>
+            </div>`;
+        } else {
+            // Review mode
+            if (attemptAnswer) {
+                if (correctValue !== undefined && i === correctValue) {
+                    optClass += ' correct';
+                }
+                if (i === selectedValue) {
+                    optClass += ' selected';
+                    if (correctValue !== undefined && i !== correctValue) {
+                        optClass += ' incorrect';
+                    }
+                }
+            }
+            html += `<div class="${optClass}">
+                <span class="quiz-scale-value">${i}</span>
+            </div>`;
+        }
+    }
+    html += '</div>';
+
+    html += '</div>';
+    return html;
+}
+
+// Grid: matrix of radio buttons (maps to Google Forms Grid/RowQuestion)
+function renderGridAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
+    const rows = question.rows || [];
+    const columns = question.columns || [];
+    const correctAnswers = question.correctAnswers || []; // Array of [rowIndex, colIndex] pairs
+    const userAnswers = attemptAnswer?.answer || {}; // Object: { rowIndex: colIndex }
+
+    // Build correct answers lookup
+    const correctLookup = {};
+    correctAnswers.forEach(([rowIdx, colIdx]) => {
+        correctLookup[rowIdx] = colIdx;
+    });
+
+    let html = '<div class="quiz-grid">';
+
+    // Header row with column labels
+    html += '<div class="quiz-grid-header">';
+    html += '<div class="quiz-grid-cell quiz-grid-corner"></div>';
+    columns.forEach(col => {
+        html += `<div class="quiz-grid-cell quiz-grid-col-label">${escapeHtml(col)}</div>`;
+    });
+    html += '</div>';
+
+    // Data rows
+    rows.forEach((row, rowIdx) => {
+        html += '<div class="quiz-grid-row">';
+        html += `<div class="quiz-grid-cell quiz-grid-row-label">${escapeHtml(row)}</div>`;
+
+        columns.forEach((col, colIdx) => {
+            let cellClass = 'quiz-grid-cell quiz-grid-option';
+            const isSelected = userAnswers[rowIdx] === colIdx;
+            const isCorrect = correctLookup[rowIdx] === colIdx;
+
+            if (isInteractive) {
+                cellClass += ' interactive';
+                html += `<div class="${cellClass}" onclick="selectGridOption(this, ${questionIndex}, ${rowIdx}, ${colIdx})">
+                    <span class="quiz-grid-radio"></span>
+                </div>`;
+            } else {
+                // Review mode
+                if (attemptAnswer) {
+                    if (correctAnswers.length > 0 && isCorrect) {
+                        cellClass += ' correct';
+                    }
+                    if (isSelected) {
+                        cellClass += ' selected';
+                        if (correctAnswers.length > 0 && !isCorrect) {
+                            cellClass += ' incorrect';
+                        }
+                    }
+                }
+                html += `<div class="${cellClass}">
+                    ${isSelected ? '<span class="quiz-grid-selected">●</span>' : ''}
+                </div>`;
+            }
+        });
+
+        html += '</div>';
+    });
+
+    html += '</div>';
+    return html;
+}
+
 // Helper: shuffle array (Fisher-Yates)
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -2264,6 +2483,31 @@ function selectQuizOption(element, questionIndex, optionIndex) {
     // Store answer
     if (!quizAnswers[quizId]) quizAnswers[quizId] = {};
     quizAnswers[quizId][questionIndex] = optionIndex;
+}
+
+// Quiz interaction: toggle checkbox option (multiple selection)
+function toggleQuizCheckbox(element, questionIndex, optionIndex) {
+    const quizViewer = element.closest('.quiz-viewer');
+    const quizId = quizViewer?.dataset.quizId;
+    if (!quizId) return;
+
+    // Toggle selection
+    element.classList.toggle('selected');
+
+    // Initialize array if needed
+    if (!quizAnswers[quizId]) quizAnswers[quizId] = {};
+    if (!Array.isArray(quizAnswers[quizId][questionIndex])) {
+        quizAnswers[quizId][questionIndex] = [];
+    }
+
+    // Add or remove from selection
+    const currentAnswers = quizAnswers[quizId][questionIndex];
+    const idx = currentAnswers.indexOf(optionIndex);
+    if (idx >= 0) {
+        currentAnswers.splice(idx, 1);
+    } else {
+        currentAnswers.push(optionIndex);
+    }
 }
 
 // Quiz interaction: update text/numeric answer
@@ -2342,6 +2586,43 @@ function moveQuizOrderingItem(questionIndex, itemIndex, direction) {
     });
 }
 
+// Quiz interaction: select scale option
+function selectScaleOption(element, questionIndex, value) {
+    const quizViewer = element.closest('.quiz-viewer');
+    const quizId = quizViewer?.dataset.quizId;
+    if (!quizId) return;
+
+    // Deselect all options in this scale
+    const scaleContainer = element.closest('.quiz-scale-options');
+    scaleContainer.querySelectorAll('.quiz-scale-option').forEach(opt => opt.classList.remove('selected'));
+
+    // Select this option
+    element.classList.add('selected');
+
+    // Store answer
+    if (!quizAnswers[quizId]) quizAnswers[quizId] = {};
+    quizAnswers[quizId][questionIndex] = value;
+}
+
+// Quiz interaction: select grid option
+function selectGridOption(element, questionIndex, rowIndex, colIndex) {
+    const quizViewer = element.closest('.quiz-viewer');
+    const quizId = quizViewer?.dataset.quizId;
+    if (!quizId) return;
+
+    // Deselect all options in this row
+    const gridRow = element.closest('.quiz-grid-row');
+    gridRow.querySelectorAll('.quiz-grid-option').forEach(opt => opt.classList.remove('selected'));
+
+    // Select this option
+    element.classList.add('selected');
+
+    // Store answer (as object mapping row -> column)
+    if (!quizAnswers[quizId]) quizAnswers[quizId] = {};
+    if (!quizAnswers[quizId][questionIndex]) quizAnswers[quizId][questionIndex] = {};
+    quizAnswers[quizId][questionIndex][rowIndex] = colIndex;
+}
+
 // Quiz interaction: submit quiz
 async function submitQuiz(quizId) {
     const answers = quizAnswers[quizId] || {};
@@ -2418,10 +2699,22 @@ function gradeQuizAttempt(card, answers) {
 
         switch (q.type) {
             case 'multiple_choice':
-                // Auto-grade: compare to correct index
-                if (userAnswer === q.correct) {
-                    result.status = 'correct';
-                    correctCount++;
+                // Auto-grade: compare to correct index(es)
+                if (q.allowMultiple && q.correctMultiple) {
+                    // Checkbox mode: compare arrays
+                    const userArray = Array.isArray(userAnswer) ? userAnswer.sort() : [];
+                    const correctArray = [...q.correctMultiple].sort();
+                    if (userArray.length === correctArray.length &&
+                        userArray.every((v, i) => v === correctArray[i])) {
+                        result.status = 'correct';
+                        correctCount++;
+                    }
+                } else {
+                    // Single answer mode
+                    if (userAnswer === q.correct) {
+                        result.status = 'correct';
+                        correctCount++;
+                    }
                 }
                 break;
 
@@ -2462,6 +2755,50 @@ function gradeQuizAttempt(card, answers) {
                 if (isCorrect) {
                     result.status = 'correct';
                     correctCount++;
+                }
+                break;
+
+            case 'scale':
+                // Auto-grade if correct value specified
+                if (q.correct !== undefined) {
+                    if (userAnswer === q.correct) {
+                        result.status = 'correct';
+                        correctCount++;
+                    }
+                } else {
+                    // No correct answer - just record the response (surveys)
+                    result.status = 'pending_review';
+                    pendingCount++;
+                }
+                break;
+
+            case 'grid':
+                // Auto-grade if correctAnswers specified
+                const correctAnswers = q.correctAnswers || [];
+                if (correctAnswers.length > 0) {
+                    // Build lookup from correct answers
+                    const correctLookup = {};
+                    correctAnswers.forEach(([rowIdx, colIdx]) => {
+                        correctLookup[rowIdx] = colIdx;
+                    });
+
+                    // Check all rows match
+                    let gridAllCorrect = true;
+                    const rows = q.rows || [];
+                    rows.forEach((_, rowIdx) => {
+                        if (userAnswer?.[rowIdx] !== correctLookup[rowIdx]) {
+                            gridAllCorrect = false;
+                        }
+                    });
+
+                    if (gridAllCorrect) {
+                        result.status = 'correct';
+                        correctCount++;
+                    }
+                } else {
+                    // No correct answers - just record the response (surveys)
+                    result.status = 'pending_review';
+                    pendingCount++;
                 }
                 break;
 
