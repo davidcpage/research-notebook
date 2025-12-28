@@ -1,0 +1,15 @@
+created: "2025-01-15T10:00:00Z"
+source: "photosynthesis-quiz-responses.json"
+students:
+  s001:
+    name: "Alice Smith"
+    email: "alice@school.edu"
+    responseId: "2_ABaOnud123456"
+  s002:
+    name: "Bob Jones"
+    email: "bob@school.edu"
+    responseId: "2_ABaOnud234567"
+  s003:
+    name: "Carol Williams"
+    email: "carol@school.edu"
+    responseId: "2_ABaOnud345678"

@@ -1,0 +1,55 @@
+{
+  "quiz": {
+    "id": "photosynthesis-quiz",
+    "title": "Photosynthesis Quiz",
+    "description": "Year 8 Biology - Understanding photosynthesis",
+    "questions": [
+      {
+        "index": 0,
+        "type": "multiple_choice",
+        "text": "What gas do plants absorb during photosynthesis?",
+        "options": ["Oxygen", "Nitrogen", "Carbon Dioxide", "Hydrogen"],
+        "correct": 2,
+        "points": 1
+      },
+      {
+        "index": 1,
+        "type": "short_answer",
+        "text": "Explain the process of photosynthesis in your own words.",
+        "points": 5
+      },
+      {
+        "index": 2,
+        "type": "worked",
+        "text": "A plant absorbs 44g of CO2. Given that the molecular weight of CO2 is 44 g/mol and glucose is 180 g/mol, calculate how many grams of glucose can be produced. Show your working.",
+        "points": 10
+      }
+    ]
+  },
+  "rubric": {
+    "question_1": {
+      "max_score": 5,
+      "criteria": "5 points: Complete explanation including light, CO2, water, and glucose/oxygen output\n3-4 points: Missing one component or minor inaccuracy\n1-2 points: Shows some understanding but incomplete\n0 points: No relevant content or completely incorrect",
+      "model_answer": "Photosynthesis is the process by which plants use sunlight energy to convert carbon dioxide (from the air) and water (from the soil) into glucose (food/energy) and oxygen. The oxygen is released as a byproduct. This occurs mainly in the leaves, specifically in the chloroplasts which contain chlorophyll."
+    },
+    "question_2": {
+      "max_score": 10,
+      "criteria": "10 points: Correct answer (30g) with clear working showing:\n  - Moles of CO2 = 44/44 = 1 mol\n  - Balanced equation: 6CO2 + 6H2O → C6H12O6 + 6O2\n  - Moles of glucose = 1/6 mol\n  - Mass = (1/6) × 180 = 30g\n7-9 points: Correct method with minor calculation error\n4-6 points: Understands stoichiometry but makes significant errors\n1-3 points: Shows some relevant working but major conceptual errors\n0 points: No relevant working or completely incorrect approach",
+      "model_answer": "Moles of CO2 = 44g ÷ 44 g/mol = 1 mol\nFrom balanced equation: 6CO2 → 1 glucose\nMoles of glucose = 1 ÷ 6 = 0.167 mol\nMass of glucose = 0.167 × 180 = 30g"
+    }
+  },
+  "calibration_examples": [
+    {
+      "question_index": 1,
+      "answer": "Plants make food from sunlight",
+      "score": 2,
+      "feedback": "You've identified that plants make food and use sunlight, which shows basic understanding. However, you haven't mentioned the key inputs (carbon dioxide and water) or outputs (glucose and oxygen). Try to include all the components of the photosynthesis equation."
+    },
+    {
+      "question_index": 1,
+      "answer": "Photosynthesis is when chloroplasts in plant cells use light energy to convert carbon dioxide and water into glucose and oxygen. The glucose is used for energy and growth.",
+      "score": 5,
+      "feedback": "Excellent! You've correctly identified all the key components: the location (chloroplasts), energy source (light), inputs (CO2 and water), and outputs (glucose and oxygen). You've also noted what happens to the glucose."
+    }
+  ]
+}
