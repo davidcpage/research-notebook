@@ -78,6 +78,40 @@ function updateForm(formId, quizJSON) {
 }
 
 /**
+ * Test wrapper - run this from the editor to test exportForm.
+ * Check View → Logs to see the output.
+ */
+function testExportForm() {
+  const formId = '1RngF_To92ruobGsA18nyAypZDJnkiBbTsFL8Zwzj37g';
+  const result = exportForm(formId);
+  console.log(JSON.stringify(result, null, 2));
+  return result;
+}
+
+/**
+ * Test wrapper - run this from the editor to test createForm.
+ * Check View → Logs to see the output.
+ */
+function testCreateForm() {
+  const quiz = {
+    title: 'Test Quiz',
+    description: 'A simple test quiz',
+    questions: [
+      {
+        type: 'multiple_choice',
+        question: 'What is 2 + 2?',
+        options: ['3', '4', '5', '6'],
+        correct: 1,
+        points: 1
+      }
+    ]
+  };
+  const result = createForm(quiz);
+  console.log(JSON.stringify(result, null, 2));
+  return result;
+}
+
+/**
  * Test function - verify the script can access a form.
  *
  * @param {string} formId - The Google Form ID
