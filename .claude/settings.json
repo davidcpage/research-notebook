@@ -5,5 +5,10 @@
       "Bash(sessions:*)",
       "Bash(adr:*)"
     ]
+  },
+  "sandbox": {
+    "filesystem": {
+      "writePaths": ["/tmp"]
+    }
   }
 }

@@ -8,7 +8,9 @@ Apps Script bridge for exporting/importing quiz data between Google Forms and th
 google-forms-bridge/
 ├── appsscript.json      # Manifest with OAuth scopes
 ├── Code.gs              # Main entry points
+├── ExportForm.gs        # Export form structure to quiz JSON
 ├── ExportResponses.gs   # Export form responses to JSON
+├── ImportQuiz.gs        # Create/update forms from quiz JSON
 ├── ImportGrades.gs      # Import grades back to form
 └── README.md
 ```
@@ -61,6 +63,116 @@ clasp deployments
 Go to https://script.google.com, open your project, and enable any required services.
 
 ## Usage
+
+### Export Form Structure
+
+Export a Google Form as quiz-compatible JSON (for importing into notebook):
+
+```bash
+clasp run exportForm -p '["FORM_ID"]'
+```
+
+Output:
+```json
+{
+  "title": "Photosynthesis Quiz",
+  "description": "Test your knowledge...",
+  "questions": [
+    {
+      "type": "multiple_choice",
+      "question": "What gas do plants absorb?",
+      "options": ["Oxygen", "Carbon Dioxide", "Nitrogen"],
+      "correct": 1,
+      "points": 1
+    },
+    {
+      "type": "worked",
+      "question": "Explain the process of photosynthesis.",
+      "points": 5
+    }
+  ],
+  "_import": {
+    "source": "google_forms",
+    "formId": "1FAIpQLSe...",
+    "formUrl": "https://docs.google.com/forms/d/.../edit",
+    "isQuiz": true,
+    "importedAt": "2025-01-15T10:00:00.000Z",
+    "warnings": []
+  }
+}
+```
+
+**Type mapping:**
+| Google Forms | Quiz Schema |
+|--------------|-------------|
+| Multiple Choice (radio) | `multiple_choice` |
+| Checkboxes | `checkbox` |
+| Dropdown | `dropdown` |
+| Short Answer | `short_answer` |
+| Paragraph | `worked` |
+| Linear Scale | `scale` |
+| Multiple Choice Grid | `grid` |
+| Checkbox Grid | `grid` (with warning) |
+| Date/Time/Duration | `short_answer` (with warning) |
+
+### Create Form from Quiz
+
+Create a new Google Form from quiz JSON:
+
+```bash
+clasp run createForm -p '[{
+  "title": "Photosynthesis Quiz",
+  "description": "Test your knowledge of plant biology",
+  "questions": [
+    {
+      "type": "multiple_choice",
+      "question": "What gas do plants absorb during photosynthesis?",
+      "options": ["Oxygen", "Carbon Dioxide", "Nitrogen", "Hydrogen"],
+      "correct": 1,
+      "points": 1
+    },
+    {
+      "type": "worked",
+      "question": "Explain the light-dependent reactions.",
+      "points": 5
+    }
+  ]
+}]'
+```
+
+Output:
+```json
+{
+  "formId": "1FAIpQLSe...",
+  "editUrl": "https://docs.google.com/forms/d/.../edit",
+  "publishedUrl": "https://docs.google.com/forms/d/.../viewform",
+  "shortenedUrl": "https://forms.gle/...",
+  "questionCount": 2,
+  "warnings": []
+}
+```
+
+### Update Existing Form
+
+Update an existing form (replaces all questions):
+
+```bash
+clasp run updateForm -p '["FORM_ID", {...quizJSON}]'
+```
+
+**Warning:** This deletes all existing questions and recreates them from the JSON.
+
+**Type mapping (quiz → Google Forms):**
+| Quiz Schema | Google Forms |
+|-------------|--------------|
+| `multiple_choice` | Multiple Choice (radio) |
+| `checkbox` | Checkboxes |
+| `dropdown` | Dropdown |
+| `short_answer` | Short Answer |
+| `worked` | Paragraph |
+| `numeric` | Short Answer (with warning) |
+| `scale` | Linear Scale |
+| `grid` | Multiple Choice Grid |
 
 ### Export Responses
 
@@ -127,6 +239,9 @@ clasp run testAccess -p '["FORM_ID"]'
 
 | Function | Description |
 |----------|-------------|
+| `exportForm(formId)` | Export form structure as quiz JSON |
+| `createForm(quizJSON)` | Create new form from quiz JSON |
+| `updateForm(formId, quizJSON)` | Update form from quiz JSON (replaces questions) |
 | `exportResponses(formId)` | Export all responses as JSON |
 | `importGrades(formId, grades)` | Import grades to form |
 | `getFormMetadata(formId)` | Get questions without responses |
@@ -148,8 +263,16 @@ When exporting responses:
 ## Workflow Integration
 
 ```
+Import existing form:
+1. Export Google Form structure            → clasp run exportForm
+2. Create quiz card from JSON              → .quiz.json file
+3. Teacher adds rubrics/model answers      → Edit in notebook
+
+Create new quiz:
 1. Teacher creates quiz in notebook        → .quiz.json file
-2. (Future) Export quiz to Google Forms    → clasp run createForm
+2. Create Google Form from quiz            → clasp run createForm
+
+Collect and grade:
 3. Students take quiz                      → Google Forms
 4. Export responses                        → clasp run exportResponses > responses.json
 5. Create roster (anonymize)               → python manage_roster.py create responses.json

@@ -45,6 +45,39 @@ function getFormMetadata(formId) {
 }
 
 /**
+ * Export form structure to quiz-compatible JSON.
+ * Use this to import a Google Form as a quiz card.
+ *
+ * @param {string} formId - The Google Form ID
+ * @returns {Object} Quiz-compatible JSON with questions array
+ */
+function exportForm(formId) {
+  return ExportForm.exportToJSON(formId);
+}
+
+/**
+ * Create a new Google Form from quiz JSON.
+ *
+ * @param {Object} quizJSON - Quiz data with title, description, questions[]
+ * @returns {Object} { formId, editUrl, publishedUrl, warnings[] }
+ */
+function createForm(quizJSON) {
+  return ImportQuiz.createFromJSON(quizJSON);
+}
+
+/**
+ * Update an existing Google Form from quiz JSON.
+ * WARNING: This replaces all existing questions!
+ *
+ * @param {string} formId - The Google Form ID to update
+ * @param {Object} quizJSON - Quiz data
+ * @returns {Object} { formId, editUrl, publishedUrl, warnings[] }
+ */
+function updateForm(formId, quizJSON) {
+  return ImportQuiz.updateFromJSON(formId, quizJSON);
+}
+
+/**
  * Test function - verify the script can access a form.
  *
  * @param {string} formId - The Google Form ID
