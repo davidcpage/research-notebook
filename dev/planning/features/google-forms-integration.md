@@ -471,6 +471,15 @@ Average: 93.3%  Trend: ↗ Improving
 - [ ] Add import/export warnings for incompatible types
 - [x] Update quiz template schema
 
+### Phase 2b: Quiz Editor (dp-072) ✅
+Design doc: [quiz-editor.md](quiz-editor.md)
+
+- [x] Core editor with question list UI (dp-073)
+- [x] Additional types: numeric, scale (dp-074)
+- [x] Grid type editor (dp-075)
+- [x] Deprecated matching/ordering (not supported by Google Forms)
+- [x] Add `modelAnswer` and `rubric` fields to question schema
+
 ### Phase 3: Response Card Type
 - [x] Define quiz-response template
 - [x] Implement response card rendering

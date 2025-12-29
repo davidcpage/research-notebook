@@ -36,41 +36,6 @@
       "question": "Solve the equation: $2x + 5 = 13$\n\nShow your work step by step.",
       "hint": "Start by isolating the variable term.",
       "explanation": "Step 1: Subtract 5 from both sides: 2x = 8\nStep 2: Divide both sides by 2: x = 4"
-    },
-    {
-      "type": "matching",
-      "question": "Match each programming language with its primary use case:",
-      "pairs": [
-        [
-          "Python",
-          "Data Science"
-        ],
-        [
-          "JavaScript",
-          "Web Development"
-        ],
-        [
-          "SQL",
-          "Database Queries"
-        ],
-        [
-          "CSS",
-          "Styling"
-        ]
-      ],
-      "hint": "Think about what each language is most commonly associated with."
-    },
-    {
-      "type": "ordering",
-      "question": "Arrange these steps for making tea in the correct order:",
-      "correctOrder": [
-        "Boil water",
-        "Add tea bag to cup",
-        "Pour hot water",
-        "Steep for 3-5 minutes",
-        "Remove tea bag"
-      ],
-      "hint": "Start with the preparation step."
     }
   ],
   "attempts": [
@@ -106,26 +71,11 @@
             "reviewer": "Claude",
             "reviewedAt": "2025-12-26T20:55:00Z"
           }
-        },
-        {
-          "questionIndex": 4,
-          "status": "incorrect"
-        },
-        {
-          "questionIndex": 5,
-          "answer": [
-            "Add tea bag to cup",
-            "Remove tea bag",
-            "Pour hot water",
-            "Boil water",
-            "Steep for 3-5 minutes"
-          ],
-          "status": "incorrect"
         }
       ],
       "score": {
         "correct": 3,
-        "total": 6,
+        "total": 4,
         "pending_review": 0
       }
     },
@@ -161,26 +111,11 @@
             "reviewer": "Claude",
             "reviewedAt": "2025-12-26T21:05:00Z"
           }
-        },
-        {
-          "questionIndex": 4,
-          "status": "incorrect"
-        },
-        {
-          "questionIndex": 5,
-          "answer": [
-            "Add tea bag to cup",
-            "Steep for 3-5 minutes",
-            "Boil water",
-            "Pour hot water",
-            "Remove tea bag"
-          ],
-          "status": "incorrect"
         }
       ],
       "score": {
         "correct": 3,
-        "total": 6,
+        "total": 4,
         "pending_review": 0
       }
     },
@@ -222,43 +157,14 @@
             "score": null,
             "maxScore": 1
           }
-        },
-        {
-          "questionIndex": 4,
-          "answer": [
-            "Web Development",
-            "Web Development",
-            "Database Queries",
-            "Data Science"
-          ],
-          "autoGrade": {
-            "status": "partial",
-            "score": 0.5,
-            "maxScore": 1
-          }
-        },
-        {
-          "questionIndex": 5,
-          "answer": [
-            "Boil water",
-            "Remove tea bag",
-            "Steep for 3-5 minutes",
-            "Pour hot water",
-            "Add tea bag to cup"
-          ],
-          "autoGrade": {
-            "status": "partial",
-            "score": 0.2,
-            "maxScore": 1
-          }
         }
       ],
       "score": {
-        "earned": 1.7,
-        "possible": 6,
-        "percentage": 28,
+        "earned": 1,
+        "possible": 4,
+        "percentage": 25,
         "correct": 1,
-        "total": 6,
+        "total": 4,
         "pending_review": 2
       }
     }

@@ -21,7 +21,7 @@ schema:
       properties:
         type:
           type: text
-          enum: [multiple_choice, checkbox, dropdown, numeric, short_answer, worked, matching, ordering, scale, grid]
+          enum: [multiple_choice, checkbox, dropdown, numeric, short_answer, worked, scale, grid]
           required: true
         question:
           type: markdown
@@ -78,14 +78,6 @@ schema:
         correctAnswers:
           type: array
           description: Array of [rowIndex, colIndex] pairs for correct grid answers
-        # matching fields
-        pairs:
-          type: array
-          description: Array of [left, right] pairs to match
-        # ordering fields
-        correctOrder:
-          type: array
-          description: Items in correct order
         # Scoring fields
         points:
           type: number
@@ -93,20 +85,8 @@ schema:
           default: 1
         partialCredit:
           type: boolean
-          description: Allow partial credit for applicable types (checkbox, grid, matching, ordering). Default true.
+          description: Allow partial credit for applicable types (checkbox, grid). Default true.
           default: true
-        toleranceBands:
-          type: array
-          description: For numeric questions - additional tolerance bands for partial credit
-          items:
-            type: object
-            properties:
-              tolerance:
-                type: number
-                description: Tolerance range for this band
-              credit:
-                type: number
-                description: Credit multiplier (0-1) for answers within this tolerance
         # Common optional fields
         hint:
           type: markdown

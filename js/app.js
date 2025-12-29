@@ -1829,16 +1829,16 @@ function quizHasGradedQuestions(questions) {
     return questions.some(q => {
         switch (q.type) {
             case 'multiple_choice':
-                return q.correct !== undefined || (q.correctMultiple && q.correctMultiple.length > 0);
+            case 'dropdown':
+                return q.correct !== undefined;
+            case 'checkbox':
+                return q.correctMultiple && q.correctMultiple.length > 0;
             case 'scale':
                 return q.correct !== undefined;
             case 'grid':
                 return q.correctAnswers && (Array.isArray(q.correctAnswers) ? q.correctAnswers.length > 0 : Object.keys(q.correctAnswers).length > 0);
             case 'numeric':
                 return q.answer !== undefined;
-            case 'matching':
-            case 'ordering':
-                return true; // Always graded
             case 'short_answer':
             case 'worked':
                 return true; // Needs review
@@ -2054,16 +2054,16 @@ function renderQuizAnswerArea(question, attemptAnswer, isInteractive = false, qu
     switch (type) {
         case 'multiple_choice':
             return renderMultipleChoiceAnswer(question, attemptAnswer, isInteractive, questionIndex);
+        case 'checkbox':
+            return renderCheckboxAnswer(question, attemptAnswer, isInteractive, questionIndex);
+        case 'dropdown':
+            return renderDropdownAnswer(question, attemptAnswer, isInteractive, questionIndex);
         case 'numeric':
             return renderNumericAnswer(question, attemptAnswer, isInteractive, questionIndex);
         case 'short_answer':
             return renderShortAnswer(question, attemptAnswer, isInteractive, questionIndex);
         case 'worked':
             return renderWorkedAnswer(question, attemptAnswer, isInteractive, questionIndex);
-        case 'matching':
-            return renderMatchingAnswer(question, attemptAnswer, isInteractive, questionIndex);
-        case 'ordering':
-            return renderOrderingAnswer(question, attemptAnswer, isInteractive, questionIndex);
         case 'scale':
             return renderScaleAnswer(question, attemptAnswer, isInteractive, questionIndex);
         case 'grid':
@@ -2306,125 +2306,6 @@ function renderWorkedAnswer(question, attemptAnswer, isInteractive = false, ques
     return html;
 }
 
-// Matching: pairs to connect
-function renderMatchingAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
-    const pairs = question.pairs || [];
-    const userPairs = attemptAnswer?.answer || [];
-
-    // Get all right-side items, shuffled for interactive mode
-    const rightItems = pairs.map(p => p[1]);
-    if (isInteractive) {
-        // Fisher-Yates shuffle
-        for (let i = rightItems.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [rightItems[i], rightItems[j]] = [rightItems[j], rightItems[i]];
-        }
-    }
-
-    let html = '<div class="quiz-matching">';
-
-    if (isInteractive) {
-        // Interactive mode: dropdowns for matching
-        html += '<div class="quiz-matching-interactive">';
-        pairs.forEach((pair, i) => {
-            const [left] = pair;
-            html += `<div class="quiz-matching-row" data-pair-index="${i}">
-                <span class="quiz-matching-left">${escapeHtml(left)}</span>
-                <span class="quiz-matching-arrow">→</span>
-                <select class="quiz-matching-select" data-pair-index="${i}"
-                        onchange="updateQuizMatchingAnswer(${questionIndex}, ${i}, this.value)">
-                    <option value="">Select...</option>
-                    ${rightItems.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('')}
-                </select>
-            </div>`;
-        });
-        html += '</div>';
-    } else {
-        // Review mode: show results
-        html += '<div class="quiz-matching-pairs">';
-        pairs.forEach((pair, i) => {
-            const [left, right] = pair;
-            const userRight = userPairs[i];
-            const isCorrect = userRight === right;
-            let pairClass = 'quiz-matching-pair';
-
-            if (attemptAnswer) {
-                pairClass += isCorrect ? ' correct' : ' incorrect';
-            }
-
-            let rightContent = '';
-            if (attemptAnswer) {
-                rightContent = escapeHtml(userRight || '?');
-                if (!isCorrect) {
-                    rightContent += ` <span class="quiz-correct-answer">(${escapeHtml(right)})</span>`;
-                }
-            } else {
-                rightContent = escapeHtml(right);
-            }
-
-            html += `<div class="${pairClass}">
-                <span class="quiz-matching-left">${escapeHtml(left)}</span>
-                <span class="quiz-matching-arrow">→</span>
-                <span class="quiz-matching-right">${rightContent}</span>
-            </div>`;
-        });
-        html += '</div>';
-    }
-
-    html += '</div>';
-    return html;
-}
-
-// Ordering: items to arrange in sequence
-function renderOrderingAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
-    const correctOrder = question.correctOrder || [];
-    const userOrder = attemptAnswer?.answer || [];
-
-    let html = '<div class="quiz-ordering">';
-
-    if (isInteractive) {
-        // Interactive mode: reorderable list with up/down buttons
-        // Initialize with shuffled order (stored in data attribute for retrieval)
-        const shuffled = shuffleArray([...correctOrder]);
-        html += `<div class="quiz-ordering-interactive" data-question-index="${questionIndex}" data-items='${JSON.stringify(shuffled)}'>
-            <div class="quiz-ordering-label">Drag to reorder (or use arrows):</div>`;
-        shuffled.forEach((item, i) => {
-            html += `<div class="quiz-ordering-item interactive" data-item-index="${i}">
-                <span class="quiz-ordering-number">${i + 1}</span>
-                <span class="quiz-ordering-text">${escapeHtml(item)}</span>
-                <span class="quiz-ordering-controls">
-                    <button class="quiz-ordering-btn" onclick="moveQuizOrderingItem(${questionIndex}, ${i}, -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
-                    <button class="quiz-ordering-btn" onclick="moveQuizOrderingItem(${questionIndex}, ${i}, 1)" ${i === shuffled.length - 1 ? 'disabled' : ''}>↓</button>
-                </span>
-            </div>`;
-        });
-        html += '</div>';
-    } else if (attemptAnswer) {
-        // Review mode: show user order vs correct order
-        html += '<div class="quiz-ordering-user"><div class="quiz-ordering-label">Your order:</div>';
-        userOrder.forEach((item, i) => {
-            const isCorrectPosition = correctOrder[i] === item;
-            html += `<div class="quiz-ordering-item ${isCorrectPosition ? 'correct' : 'incorrect'}">
-                <span class="quiz-ordering-number">${i + 1}</span>
-                <span class="quiz-ordering-text">${escapeHtml(item)}</span>
-            </div>`;
-        });
-        html += '</div>';
-
-        html += '<div class="quiz-ordering-correct"><div class="quiz-ordering-label">Correct order:</div>';
-        correctOrder.forEach((item, i) => {
-            html += `<div class="quiz-ordering-item correct">
-                <span class="quiz-ordering-number">${i + 1}</span>
-                <span class="quiz-ordering-text">${escapeHtml(item)}</span>
-            </div>`;
-        });
-        html += '</div>';
-    }
-
-    html += '</div>';
-    return html;
-}
-
 // Scale: linear scale selection (maps to Google Forms ScaleQuestion)
 function renderScaleAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
     const low = question.low || 1;
@@ -2642,64 +2523,6 @@ function updateQuizAnswer(questionIndex, value) {
     }
 }
 
-// Quiz interaction: update matching answer
-function updateQuizMatchingAnswer(questionIndex, pairIndex, value) {
-    const quizViewer = document.querySelector('.quiz-viewer[data-interactive="true"]');
-    const quizId = quizViewer?.dataset.quizId;
-    if (!quizId) return;
-
-    if (!quizAnswers[quizId]) quizAnswers[quizId] = {};
-    if (!quizAnswers[quizId][questionIndex]) quizAnswers[quizId][questionIndex] = [];
-
-    // Store as array of matched values
-    quizAnswers[quizId][questionIndex][pairIndex] = value;
-}
-
-// Quiz interaction: move ordering item up or down
-function moveQuizOrderingItem(questionIndex, itemIndex, direction) {
-    const quizViewer = document.querySelector('.quiz-viewer[data-interactive="true"]');
-    const quizId = quizViewer?.dataset.quizId;
-    if (!quizId) return;
-
-    const orderingContainer = quizViewer.querySelector(`.quiz-ordering-interactive[data-question-index="${questionIndex}"]`);
-    if (!orderingContainer) return;
-
-    // Get current items array from data attribute
-    let items = JSON.parse(orderingContainer.dataset.items);
-    const newIndex = itemIndex + direction;
-
-    if (newIndex < 0 || newIndex >= items.length) return;
-
-    // Swap items
-    [items[itemIndex], items[newIndex]] = [items[newIndex], items[itemIndex]];
-
-    // Update data attribute
-    orderingContainer.dataset.items = JSON.stringify(items);
-
-    // Store answer
-    if (!quizAnswers[quizId]) quizAnswers[quizId] = {};
-    quizAnswers[quizId][questionIndex] = [...items];
-
-    // Re-render the ordering items
-    const itemElements = orderingContainer.querySelectorAll('.quiz-ordering-item');
-    items.forEach((item, i) => {
-        const el = itemElements[i];
-        el.querySelector('.quiz-ordering-number').textContent = i + 1;
-        el.querySelector('.quiz-ordering-text').textContent = item;
-        el.dataset.itemIndex = i;
-
-        // Update button states
-        const upBtn = el.querySelector('.quiz-ordering-btn:first-child');
-        const downBtn = el.querySelector('.quiz-ordering-btn:last-child');
-        upBtn.disabled = i === 0;
-        downBtn.disabled = i === items.length - 1;
-
-        // Update onclick handlers
-        upBtn.onclick = () => moveQuizOrderingItem(questionIndex, i, -1);
-        downBtn.onclick = () => moveQuizOrderingItem(questionIndex, i, 1);
-    });
-}
-
 // Quiz interaction: select scale option
 function selectScaleOption(element, questionIndex, value) {
     const quizViewer = element.closest('.quiz-viewer');
@@ -2758,17 +2581,6 @@ async function submitQuiz(quizId) {
         }
     }
 
-    // Also collect ordering answers that weren't explicitly moved (still at initial shuffle)
-    const quizViewer = document.querySelector('.quiz-viewer[data-interactive="true"]');
-    questions.forEach((q, i) => {
-        if (q.type === 'ordering' && answers[i] === undefined) {
-            const orderingContainer = quizViewer?.querySelector(`.quiz-ordering-interactive[data-question-index="${i}"]`);
-            if (orderingContainer) {
-                answers[i] = JSON.parse(orderingContainer.dataset.items);
-            }
-        }
-    });
-
     // Grade and save the attempt
     const attempt = gradeQuizAttempt(card, answers);
     await saveQuizAttempt(card, attempt);
@@ -2822,64 +2634,64 @@ function gradeQuizAttempt(card, answers) {
 
         switch (q.type) {
             case 'multiple_choice':
-                // Auto-grade: compare to correct index(es)
-                if (q.allowMultiple) {
-                    // Checkbox mode
-                    if (q.correctMultiple && q.correctMultiple.length > 0) {
-                        const userArray = Array.isArray(userAnswer) ? userAnswer : [];
-                        const correctSet = new Set(q.correctMultiple);
-
-                        // Count correct selections
-                        let correctSelections = 0;
-                        userArray.forEach(selection => {
-                            if (correctSet.has(selection)) {
-                                correctSelections++;
-                            }
-                        });
-
-                        const totalCorrect = correctSet.size;
-
-                        if (correctSelections === totalCorrect && userArray.length === totalCorrect) {
-                            // Perfect score: all correct, no extras
-                            result.autoGrade.status = 'correct';
-                            result.autoGrade.score = maxPoints;
-                            correctCount++;
-                        } else if (allowPartial && correctSelections > 0) {
-                            // Partial credit: correct / max(selected, required)
-                            // This penalizes over-selection without double-counting
-                            const denominator = Math.max(userArray.length, totalCorrect);
-                            const partialRatio = correctSelections / denominator;
-                            const partialScore = Math.round(maxPoints * partialRatio * 100) / 100;
-                            if (partialScore > 0) {
-                                result.autoGrade.status = 'partial';
-                                result.autoGrade.score = partialScore;
-                            }
-                        }
-                    } else {
-                        // No correct answer - survey question (just record response)
-                        result.autoGrade.status = 'answered';
-                        result.autoGrade.score = null;
-                        result.autoGrade.maxScore = null;
+            case 'dropdown':
+                // Auto-grade: compare to correct index
+                if (q.correct !== undefined) {
+                    if (userAnswer === q.correct) {
+                        result.autoGrade.status = 'correct';
+                        result.autoGrade.score = maxPoints;
+                        correctCount++;
                     }
                 } else {
-                    // Single answer mode (radio/dropdown)
-                    if (q.correct !== undefined) {
-                        if (userAnswer === q.correct) {
-                            result.autoGrade.status = 'correct';
-                            result.autoGrade.score = maxPoints;
-                            correctCount++;
+                    // No correct answer - survey question (just record response)
+                    result.autoGrade.status = 'answered';
+                    result.autoGrade.score = null;
+                    result.autoGrade.maxScore = null;
+                }
+                break;
+
+            case 'checkbox':
+                // Auto-grade: compare to correct indices
+                if (q.correctMultiple && q.correctMultiple.length > 0) {
+                    const userArray = Array.isArray(userAnswer) ? userAnswer : [];
+                    const correctSet = new Set(q.correctMultiple);
+
+                    // Count correct selections
+                    let correctSelections = 0;
+                    userArray.forEach(selection => {
+                        if (correctSet.has(selection)) {
+                            correctSelections++;
                         }
-                    } else {
-                        // No correct answer - survey question (just record response)
-                        result.autoGrade.status = 'answered';
-                        result.autoGrade.score = null;
-                        result.autoGrade.maxScore = null;
+                    });
+
+                    const totalCorrect = correctSet.size;
+
+                    if (correctSelections === totalCorrect && userArray.length === totalCorrect) {
+                        // Perfect score: all correct, no extras
+                        result.autoGrade.status = 'correct';
+                        result.autoGrade.score = maxPoints;
+                        correctCount++;
+                    } else if (allowPartial && correctSelections > 0) {
+                        // Partial credit: correct / max(selected, required)
+                        // This penalizes over-selection without double-counting
+                        const denominator = Math.max(userArray.length, totalCorrect);
+                        const partialRatio = correctSelections / denominator;
+                        const partialScore = Math.round(maxPoints * partialRatio * 100) / 100;
+                        if (partialScore > 0) {
+                            result.autoGrade.status = 'partial';
+                            result.autoGrade.score = partialScore;
+                        }
                     }
+                } else {
+                    // No correct answer - survey question (just record response)
+                    result.autoGrade.status = 'answered';
+                    result.autoGrade.score = null;
+                    result.autoGrade.maxScore = null;
                 }
                 break;
 
             case 'numeric':
-                // Auto-grade: check within tolerance (with optional tolerance bands for partial credit)
+                // Auto-grade: check within tolerance
                 if (userAnswer !== null && userAnswer !== undefined && q.answer !== undefined) {
                     const expected = q.answer;
                     const tolerance = q.tolerance || 0;
@@ -2889,69 +2701,6 @@ function gradeQuizAttempt(card, answers) {
                         result.autoGrade.status = 'correct';
                         result.autoGrade.score = maxPoints;
                         correctCount++;
-                    } else if (allowPartial && q.toleranceBands) {
-                        // Check tolerance bands for partial credit
-                        // Format: [{tolerance: 0.5, credit: 0.5}, {tolerance: 1.0, credit: 0.25}]
-                        const bands = [...q.toleranceBands].sort((a, b) => a.tolerance - b.tolerance);
-                        for (const band of bands) {
-                            if (diff <= band.tolerance) {
-                                const partialScore = Math.round(maxPoints * band.credit * 100) / 100;
-                                result.autoGrade.status = 'partial';
-                                result.autoGrade.score = partialScore;
-                                break;
-                            }
-                        }
-                    }
-                }
-                break;
-
-            case 'matching':
-                // Auto-grade: compare each pair (with optional partial credit)
-                const pairs = q.pairs || [];
-                if (pairs.length > 0) {
-                    let correctPairs = 0;
-                    pairs.forEach((pair, i) => {
-                        const [, correctRight] = pair;
-                        if (userAnswer?.[i] === correctRight) {
-                            correctPairs++;
-                        }
-                    });
-
-                    if (correctPairs === pairs.length) {
-                        result.autoGrade.status = 'correct';
-                        result.autoGrade.score = maxPoints;
-                        correctCount++;
-                    } else if (allowPartial && correctPairs > 0) {
-                        const partialRatio = correctPairs / pairs.length;
-                        const partialScore = Math.round(maxPoints * partialRatio * 100) / 100;
-                        result.autoGrade.status = 'partial';
-                        result.autoGrade.score = partialScore;
-                    }
-                }
-                break;
-
-            case 'ordering':
-                // Auto-grade: compare order (with optional partial credit for position accuracy)
-                const correctOrder = q.correctOrder || [];
-                if (correctOrder.length > 0 && Array.isArray(userAnswer)) {
-                    let correctPositions = 0;
-                    const len = Math.min(userAnswer.length, correctOrder.length);
-
-                    for (let i = 0; i < len; i++) {
-                        if (userAnswer[i] === correctOrder[i]) {
-                            correctPositions++;
-                        }
-                    }
-
-                    if (correctPositions === correctOrder.length && userAnswer.length === correctOrder.length) {
-                        result.autoGrade.status = 'correct';
-                        result.autoGrade.score = maxPoints;
-                        correctCount++;
-                    } else if (allowPartial && correctPositions > 0) {
-                        const partialRatio = correctPositions / correctOrder.length;
-                        const partialScore = Math.round(maxPoints * partialRatio * 100) / 100;
-                        result.autoGrade.status = 'partial';
-                        result.autoGrade.score = partialScore;
                     }
                 }
                 break;
@@ -4898,8 +4647,8 @@ function updateRecordsEditorIndices(field) {
     });
 }
 
-// Question types supported in Phase 1
-const PHASE1_QUESTION_TYPES = ['multiple_choice', 'checkbox', 'dropdown', 'short_answer', 'worked'];
+// Question types supported in the editor
+const SUPPORTED_QUESTION_TYPES = ['multiple_choice', 'checkbox', 'dropdown', 'short_answer', 'worked', 'numeric', 'scale', 'grid'];
 
 // Types that share the same options structure (can convert between without losing data)
 const OPTIONS_BASED_TYPES = ['multiple_choice', 'checkbox', 'dropdown'];
@@ -4933,7 +4682,7 @@ function createQuestionEditor(question, index, total) {
     // Type badge/selector
     const typeSelect = document.createElement('select');
     typeSelect.className = 'quiz-question-type';
-    PHASE1_QUESTION_TYPES.forEach(t => {
+    SUPPORTED_QUESTION_TYPES.forEach(t => {
         const opt = document.createElement('option');
         opt.value = t;
         opt.textContent = t.replace('_', ' ');
@@ -5168,6 +4917,342 @@ function renderQuestionTypeFields(container, type, question) {
             ? 'Short answer questions are graded using the model answer and rubric in the Advanced section.'
             : 'Worked problems show work area for students. Grade using model answer and rubric in the Advanced section.';
         container.appendChild(infoText);
+
+    } else if (type === 'numeric') {
+        // Numeric: answer + tolerance
+        const typeDesc = document.createElement('p');
+        typeDesc.className = 'quiz-type-info';
+        typeDesc.textContent = 'Numeric answer - student enters a number, graded within tolerance';
+        container.appendChild(typeDesc);
+
+        // Answer and tolerance in a row
+        const answerRow = document.createElement('div');
+        answerRow.className = 'quiz-field quiz-numeric-row';
+
+        // Expected answer
+        const answerField = document.createElement('div');
+        answerField.className = 'quiz-numeric-field';
+        answerField.innerHTML = `
+            <label>Answer</label>
+            <input type="number" class="quiz-numeric-answer" value="${question.answer ?? ''}" step="any" placeholder="Expected answer">
+        `;
+        answerRow.appendChild(answerField);
+
+        // Tolerance
+        const toleranceField = document.createElement('div');
+        toleranceField.className = 'quiz-numeric-field';
+        toleranceField.innerHTML = `
+            <label>Tolerance (±)</label>
+            <input type="number" class="quiz-numeric-tolerance" value="${question.tolerance ?? 0}" min="0" step="any" placeholder="0">
+        `;
+        answerRow.appendChild(toleranceField);
+
+        container.appendChild(answerRow);
+
+    } else if (type === 'scale') {
+        // Scale: low/high bounds + labels + optional correct value
+        const typeDesc = document.createElement('p');
+        typeDesc.className = 'quiz-type-info';
+        typeDesc.textContent = 'Scale rating - student selects a value on a linear scale';
+        container.appendChild(typeDesc);
+
+        // Bounds row
+        const boundsRow = document.createElement('div');
+        boundsRow.className = 'quiz-field quiz-scale-row';
+
+        // Low bound
+        const lowField = document.createElement('div');
+        lowField.className = 'quiz-scale-field';
+        lowField.innerHTML = `
+            <label>Low value</label>
+            <input type="number" class="quiz-scale-low" value="${question.low ?? 1}" step="1">
+        `;
+        boundsRow.appendChild(lowField);
+
+        // High bound
+        const highField = document.createElement('div');
+        highField.className = 'quiz-scale-field';
+        highField.innerHTML = `
+            <label>High value</label>
+            <input type="number" class="quiz-scale-high" value="${question.high ?? 5}" step="1">
+        `;
+        boundsRow.appendChild(highField);
+
+        container.appendChild(boundsRow);
+
+        // Labels row
+        const labelsRow = document.createElement('div');
+        labelsRow.className = 'quiz-field quiz-scale-row';
+
+        // Low label
+        const lowLabelField = document.createElement('div');
+        lowLabelField.className = 'quiz-scale-field';
+        lowLabelField.innerHTML = `
+            <label>Low label</label>
+            <input type="text" class="quiz-scale-low-label" value="${escapeHtml(question.lowLabel || '')}" placeholder="e.g., Strongly disagree">
+        `;
+        labelsRow.appendChild(lowLabelField);
+
+        // High label
+        const highLabelField = document.createElement('div');
+        highLabelField.className = 'quiz-scale-field';
+        highLabelField.innerHTML = `
+            <label>High label</label>
+            <input type="text" class="quiz-scale-high-label" value="${escapeHtml(question.highLabel || '')}" placeholder="e.g., Strongly agree">
+        `;
+        labelsRow.appendChild(highLabelField);
+
+        container.appendChild(labelsRow);
+
+        // Optional correct value (for graded scales)
+        const correctField = document.createElement('div');
+        correctField.className = 'quiz-field quiz-scale-correct';
+        correctField.innerHTML = `
+            <label>Expected answer <span class="quiz-field-hint">(optional, for graded scales)</span></label>
+            <input type="number" class="quiz-scale-correct" value="${question.correct ?? ''}" step="1" placeholder="Leave blank for survey-style">
+        `;
+        container.appendChild(correctField);
+
+    } else if (type === 'grid') {
+        // Grid: rows + columns + optional correct answers matrix
+        const typeDesc = document.createElement('p');
+        typeDesc.className = 'quiz-type-info';
+        typeDesc.textContent = 'Grid/matrix - student selects one option per row (Likert scales, matching, etc.)';
+        container.appendChild(typeDesc);
+
+        const rows = question.rows || ['Row 1', 'Row 2'];
+        const columns = question.columns || ['Column 1', 'Column 2', 'Column 3'];
+
+        // Build correct answers lookup from question data
+        const correctAnswers = question.correctAnswers || [];
+        const correctLookup = {};
+        if (Array.isArray(correctAnswers)) {
+            correctAnswers.forEach(([rowIdx, colIdx]) => {
+                correctLookup[rowIdx] = colIdx;
+            });
+        }
+
+        // Rows editor
+        const rowsField = document.createElement('div');
+        rowsField.className = 'quiz-field quiz-grid-rows-field';
+        rowsField.innerHTML = `<label>Rows</label>`;
+
+        const rowsList = document.createElement('div');
+        rowsList.className = 'quiz-grid-items-list';
+        rows.forEach((row, idx) => {
+            rowsList.appendChild(createGridItemRow(row, idx, 'row'));
+        });
+        rowsField.appendChild(rowsList);
+
+        const addRowBtn = document.createElement('button');
+        addRowBtn.type = 'button';
+        addRowBtn.className = 'quiz-grid-add-item';
+        addRowBtn.textContent = '+ Add row';
+        addRowBtn.onclick = () => {
+            const newIdx = rowsList.children.length;
+            rowsList.appendChild(createGridItemRow(`Row ${newIdx + 1}`, newIdx, 'row'));
+            updateGridMatrix(container);
+        };
+        rowsField.appendChild(addRowBtn);
+        container.appendChild(rowsField);
+
+        // Columns editor
+        const colsField = document.createElement('div');
+        colsField.className = 'quiz-field quiz-grid-cols-field';
+        colsField.innerHTML = `<label>Columns</label>`;
+
+        const colsList = document.createElement('div');
+        colsList.className = 'quiz-grid-items-list';
+        columns.forEach((col, idx) => {
+            colsList.appendChild(createGridItemRow(col, idx, 'col'));
+        });
+        colsField.appendChild(colsList);
+
+        const addColBtn = document.createElement('button');
+        addColBtn.type = 'button';
+        addColBtn.className = 'quiz-grid-add-item';
+        addColBtn.textContent = '+ Add column';
+        addColBtn.onclick = () => {
+            const newIdx = colsList.children.length;
+            colsList.appendChild(createGridItemRow(`Column ${newIdx + 1}`, newIdx, 'col'));
+            updateGridMatrix(container);
+        };
+        colsField.appendChild(addColBtn);
+        container.appendChild(colsField);
+
+        // Correct answers matrix (collapsible)
+        const matrixSection = document.createElement('div');
+        matrixSection.className = 'quiz-grid-matrix-section';
+
+        const hasCorrect = Object.keys(correctLookup).length > 0;
+        const matrixToggle = document.createElement('button');
+        matrixToggle.type = 'button';
+        matrixToggle.className = 'quiz-grid-matrix-toggle';
+        matrixToggle.innerHTML = hasCorrect ? '▾ Correct answers (for grading)' : '▸ Correct answers (for grading)';
+        matrixToggle.onclick = () => {
+            matrixSection.classList.toggle('expanded');
+            matrixToggle.innerHTML = matrixSection.classList.contains('expanded')
+                ? '▾ Correct answers (for grading)'
+                : '▸ Correct answers (for grading)';
+        };
+        matrixSection.appendChild(matrixToggle);
+
+        const matrixContent = document.createElement('div');
+        matrixContent.className = 'quiz-grid-matrix-content';
+
+        const matrixHint = document.createElement('p');
+        matrixHint.className = 'quiz-grid-matrix-hint';
+        matrixHint.textContent = 'Click cells to mark correct answers. Leave empty for survey-style questions.';
+        matrixContent.appendChild(matrixHint);
+
+        // Build the matrix grid
+        const matrix = buildGridMatrix(rows, columns, correctLookup);
+        matrixContent.appendChild(matrix);
+
+        matrixSection.appendChild(matrixContent);
+        container.appendChild(matrixSection);
+
+        if (hasCorrect) {
+            matrixSection.classList.add('expanded');
+        }
+    }
+}
+
+// Create a row/column item for grid editor
+function createGridItemRow(value, index, type) {
+    const row = document.createElement('div');
+    row.className = `quiz-grid-item-row quiz-grid-${type}-item`;
+    row.setAttribute('data-index', index);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = `quiz-grid-item-input quiz-grid-${type}-input`;
+    input.value = value || '';
+    input.placeholder = type === 'row' ? `Row ${index + 1}` : `Column ${index + 1}`;
+    input.oninput = () => {
+        // Update matrix labels when input changes
+        const container = row.closest('.quiz-type-fields');
+        if (container) updateGridMatrix(container);
+    };
+    row.appendChild(input);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'quiz-grid-item-delete';
+    deleteBtn.innerHTML = '×';
+    deleteBtn.title = `Remove ${type}`;
+    deleteBtn.onclick = () => {
+        const list = row.parentElement;
+        if (list.children.length > 1) {
+            row.remove();
+            const container = row.closest('.quiz-type-fields') || list.closest('.quiz-type-fields');
+            if (container) updateGridMatrix(container);
+        } else {
+            showToast(`Need at least 1 ${type}`, true);
+        }
+    };
+    row.appendChild(deleteBtn);
+
+    return row;
+}
+
+// Build the clickable matrix for marking correct answers
+function buildGridMatrix(rows, columns, correctLookup) {
+    const matrix = document.createElement('div');
+    matrix.className = 'quiz-grid-matrix';
+
+    // Header row
+    const headerRow = document.createElement('div');
+    headerRow.className = 'quiz-grid-matrix-row quiz-grid-matrix-header';
+    headerRow.innerHTML = '<div class="quiz-grid-matrix-cell quiz-grid-matrix-corner"></div>';
+    columns.forEach((col, colIdx) => {
+        const cell = document.createElement('div');
+        cell.className = 'quiz-grid-matrix-cell quiz-grid-matrix-col-label';
+        cell.textContent = col || `Col ${colIdx + 1}`;
+        headerRow.appendChild(cell);
+    });
+    matrix.appendChild(headerRow);
+
+    // Data rows
+    rows.forEach((row, rowIdx) => {
+        const matrixRow = document.createElement('div');
+        matrixRow.className = 'quiz-grid-matrix-row';
+
+        const rowLabel = document.createElement('div');
+        rowLabel.className = 'quiz-grid-matrix-cell quiz-grid-matrix-row-label';
+        rowLabel.textContent = row || `Row ${rowIdx + 1}`;
+        matrixRow.appendChild(rowLabel);
+
+        columns.forEach((col, colIdx) => {
+            const cell = document.createElement('div');
+            cell.className = 'quiz-grid-matrix-cell quiz-grid-matrix-option';
+            cell.setAttribute('data-row', rowIdx);
+            cell.setAttribute('data-col', colIdx);
+
+            if (correctLookup[rowIdx] === colIdx) {
+                cell.classList.add('selected');
+                cell.innerHTML = '✓';
+            }
+
+            cell.onclick = () => {
+                // Toggle selection (one per row)
+                const currentRow = matrixRow;
+                currentRow.querySelectorAll('.quiz-grid-matrix-option').forEach(c => {
+                    c.classList.remove('selected');
+                    c.innerHTML = '';
+                });
+
+                if (correctLookup[rowIdx] !== colIdx) {
+                    cell.classList.add('selected');
+                    cell.innerHTML = '✓';
+                    correctLookup[rowIdx] = colIdx;
+                } else {
+                    delete correctLookup[rowIdx];
+                }
+            };
+
+            matrixRow.appendChild(cell);
+        });
+
+        matrix.appendChild(matrixRow);
+    });
+
+    return matrix;
+}
+
+// Update the grid matrix when rows/columns change
+function updateGridMatrix(container) {
+    const rowInputs = container.querySelectorAll('.quiz-grid-row-input');
+    const colInputs = container.querySelectorAll('.quiz-grid-col-input');
+    const matrixContent = container.querySelector('.quiz-grid-matrix-content');
+
+    if (!matrixContent) return;
+
+    const rows = Array.from(rowInputs).map(input => input.value);
+    const columns = Array.from(colInputs).map(input => input.value);
+
+    // Preserve existing correct answers where possible
+    const oldMatrix = matrixContent.querySelector('.quiz-grid-matrix');
+    const correctLookup = {};
+    if (oldMatrix) {
+        oldMatrix.querySelectorAll('.quiz-grid-matrix-option.selected').forEach(cell => {
+            const rowIdx = parseInt(cell.getAttribute('data-row'));
+            const colIdx = parseInt(cell.getAttribute('data-col'));
+            // Only keep if still valid
+            if (rowIdx < rows.length && colIdx < columns.length) {
+                correctLookup[rowIdx] = colIdx;
+            }
+        });
+        oldMatrix.remove();
+    }
+
+    // Find hint and insert matrix after it
+    const hint = matrixContent.querySelector('.quiz-grid-matrix-hint');
+    const newMatrix = buildGridMatrix(rows, columns, correctLookup);
+    if (hint) {
+        hint.after(newMatrix);
+    } else {
+        matrixContent.appendChild(newMatrix);
     }
 }
 
@@ -5256,9 +5341,27 @@ function handleQuestionTypeChange(questionEl, newType) {
     const oldIsOptions = OPTIONS_BASED_TYPES.includes(oldType);
     const newIsOptions = OPTIONS_BASED_TYPES.includes(newType);
 
-    // Warn only if changing FROM options-based TO non-options (will lose options)
+    // Warn if changing FROM options-based TO non-options (will lose options)
     if (oldIsOptions && !newIsOptions && currentData.options && currentData.options.some(o => o.trim())) {
         if (!confirm('Changing type will remove your options. Continue?')) {
+            const select = questionEl.querySelector('.quiz-question-type');
+            select.value = oldType;
+            return;
+        }
+    }
+
+    // Warn if changing FROM numeric (will lose answer/tolerance)
+    if (oldType === 'numeric' && newType !== 'numeric' && currentData.answer !== undefined) {
+        if (!confirm('Changing type will remove your numeric answer and tolerance. Continue?')) {
+            const select = questionEl.querySelector('.quiz-question-type');
+            select.value = oldType;
+            return;
+        }
+    }
+
+    // Warn if changing FROM scale (will lose scale settings)
+    if (oldType === 'scale' && newType !== 'scale' && (currentData.lowLabel || currentData.highLabel)) {
+        if (!confirm('Changing type will remove your scale settings. Continue?')) {
             const select = questionEl.querySelector('.quiz-question-type');
             select.value = oldType;
             return;
@@ -5311,6 +5414,23 @@ function handleQuestionTypeChange(questionEl, newType) {
                 newData.correct = 0;
             }
         }
+    }
+
+    // Handle numeric type defaults
+    if (newType === 'numeric') {
+        newData.tolerance = 0;
+    }
+
+    // Handle scale type defaults
+    if (newType === 'scale') {
+        newData.low = 1;
+        newData.high = 5;
+    }
+
+    // Handle grid type defaults
+    if (newType === 'grid') {
+        newData.rows = ['Row 1', 'Row 2'];
+        newData.columns = ['Column 1', 'Column 2', 'Column 3'];
     }
 
     questionEl.setAttribute('data-question', JSON.stringify(newData));
@@ -5426,6 +5546,62 @@ function getQuestionsEditorValue() {
                 question.correctMultiple = correctIndices;
             } else {
                 question.correct = correctIndices.length > 0 ? correctIndices[0] : 0;
+            }
+        }
+
+        // Get numeric-specific fields
+        if (question.type === 'numeric') {
+            const answer = questionEl.querySelector('.quiz-numeric-answer');
+            if (answer && answer.value !== '') {
+                question.answer = parseFloat(answer.value);
+            }
+
+            const tolerance = questionEl.querySelector('.quiz-numeric-tolerance');
+            question.tolerance = tolerance ? parseFloat(tolerance.value) || 0 : 0;
+        }
+
+        // Get scale-specific fields
+        if (question.type === 'scale') {
+            const low = questionEl.querySelector('.quiz-scale-low');
+            question.low = low ? parseInt(low.value) || 1 : 1;
+
+            const high = questionEl.querySelector('.quiz-scale-high');
+            question.high = high ? parseInt(high.value) || 5 : 5;
+
+            const lowLabel = questionEl.querySelector('.quiz-scale-low-label');
+            if (lowLabel && lowLabel.value.trim()) {
+                question.lowLabel = lowLabel.value.trim();
+            }
+
+            const highLabel = questionEl.querySelector('.quiz-scale-high-label');
+            if (highLabel && highLabel.value.trim()) {
+                question.highLabel = highLabel.value.trim();
+            }
+
+            const correct = questionEl.querySelector('.quiz-scale-correct');
+            if (correct && correct.value !== '') {
+                question.correct = parseInt(correct.value);
+            }
+        }
+
+        // Get grid-specific fields
+        if (question.type === 'grid') {
+            const rowInputs = questionEl.querySelectorAll('.quiz-grid-row-input');
+            const colInputs = questionEl.querySelectorAll('.quiz-grid-col-input');
+
+            question.rows = Array.from(rowInputs).map(input => input.value || '');
+            question.columns = Array.from(colInputs).map(input => input.value || '');
+
+            // Get correct answers from matrix
+            const selectedCells = questionEl.querySelectorAll('.quiz-grid-matrix-option.selected');
+            if (selectedCells.length > 0) {
+                const correctAnswers = [];
+                selectedCells.forEach(cell => {
+                    const rowIdx = parseInt(cell.getAttribute('data-row'));
+                    const colIdx = parseInt(cell.getAttribute('data-col'));
+                    correctAnswers.push([rowIdx, colIdx]);
+                });
+                question.correctAnswers = correctAnswers;
             }
         }
 

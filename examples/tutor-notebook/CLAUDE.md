@@ -65,11 +65,13 @@ Create `.quiz.json` files in the `quizzes/` folder (or any subject folder):
 | Type | Fields | Auto-graded? |
 |------|--------|--------------|
 | `multiple_choice` | `options`, `correct` (index) | Yes |
+| `checkbox` | `options`, `correctMultiple` (indices) | Yes |
+| `dropdown` | `options`, `correct` (index) | Yes |
 | `numeric` | `answer`, `tolerance` | Yes |
 | `short_answer` | (none required) | No - requires review |
 | `worked` | (none required) | No - requires review |
-| `matching` | `pairs` (array of [left, right]) | Yes |
-| `ordering` | `correctOrder` (array) | Yes |
+| `scale` | `low`, `high`, `lowLabel`, `highLabel` | Optional (`correct`) |
+| `grid` | `rows`, `columns`, `correctAnswers` | Optional |
 
 All questions can have optional `hint` and `explanation` fields.
 
