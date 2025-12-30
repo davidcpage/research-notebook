@@ -100,11 +100,11 @@ notebook/
 │
 ├── photosynthesis-quiz-responses/          # Section per quiz
 │   ├── class-8a/                           # Subsection per cohort
-│   │   ├── _summary.response.json          # Cohort summary card
+│   │   ├── summary.response.json           # Cohort summary card
 │   │   ├── s001.response.json              # Individual student cards
 │   │   └── s002.response.json
 │   └── class-8b/                           # Another cohort
-│       ├── _summary.response.json
+│       ├── summary.response.json
 │       ├── s003.response.json
 │       └── s004.response.json
 │
@@ -163,7 +163,7 @@ notebook/
 
 ### Summary Response Card (Cohort View)
 
-Each cohort has a `_summary.response.json` card that provides **question-level grading** similar to Google Forms' "Question" view. This aligns with batch grading (grade all Q3 answers together with same rubric).
+Each cohort has a `summary.response.json` card that provides **question-level grading** similar to Google Forms' "Question" view. This aligns with batch grading (grade all Q3 answers together with same rubric).
 
 **UI Mockup:**
 ```

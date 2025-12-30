@@ -3071,14 +3071,36 @@ function renderResponseAnswer(answer, question, index) {
     let statusClass = 'response-answer-pending';
     let statusBadge = '<span class="response-answer-badge pending">⏳ Pending</span>';
 
-    if (answer.teacherGrade) {
+    const autoStatus = answer.autoGrade?.status;
+    const isAutoGraded = autoStatus === 'correct' || autoStatus === 'incorrect' || autoStatus === 'partial';
+
+    // Objective types have deterministic answers - no teacher override needed
+    // Short answer allows override since acceptedAnswers matching might miss valid variations
+    const objectiveTypes = ['multiple_choice', 'checkbox', 'dropdown', 'numeric', 'scale', 'grid'];
+    const isObjective = objectiveTypes.includes(question?.type);
+    const skipReviewUI = isAutoGraded && isObjective;
+
+    if (skipReviewUI) {
+        // Objective auto-graded questions - show auto status (no teacher override possible)
+        if (autoStatus === 'correct') {
+            statusClass = 'response-answer-correct';
+            statusBadge = '<span class="response-answer-badge correct">✓ Correct</span>';
+        } else if (autoStatus === 'incorrect') {
+            statusClass = 'response-answer-incorrect';
+            statusBadge = '<span class="response-answer-badge incorrect">✗ Incorrect</span>';
+        } else if (autoStatus === 'partial') {
+            statusClass = 'response-answer-partial';
+            statusBadge = '<span class="response-answer-badge partial">◐ Partial</span>';
+        }
+    } else if (answer.teacherGrade) {
+        // Teacher reviewed (including short_answer overrides)
         statusClass = 'response-answer-reviewed';
         statusBadge = '<span class="response-answer-badge reviewed">✓ Reviewed</span>';
     } else if (answer.claudeGrade) {
         statusClass = 'response-answer-ai-graded';
         statusBadge = '<span class="response-answer-badge ai-graded">🤖 AI Graded</span>';
-    } else if (answer.autoGrade) {
-        const autoStatus = answer.autoGrade.status;
+    } else if (isAutoGraded) {
+        // Short answer auto-graded but not yet reviewed - show auto status
         if (autoStatus === 'correct') {
             statusClass = 'response-answer-correct';
             statusBadge = '<span class="response-answer-badge correct">✓ Correct</span>';
@@ -3111,20 +3133,23 @@ function renderResponseAnswer(answer, question, index) {
         <div class="response-answer-content">${formatStudentAnswer(answer.answer, question?.type, question)}</div>
     </div>`;
 
-    // Show grade hierarchy if present
-    if (answer.autoGrade) {
-        html += renderGradeCard('Auto', answer.autoGrade, 'auto');
-    }
-    if (answer.claudeGrade) {
-        html += renderGradeCard('AI Suggestion', answer.claudeGrade, 'claude');
-    }
-    if (answer.teacherGrade) {
-        html += renderGradeCard('Teacher Review', answer.teacherGrade, 'teacher');
-    }
+    // Show grade cards only for questions that need review
+    // Skip for objective auto-graded questions (multiple choice, etc.) but allow for short_answer
+    if (!skipReviewUI) {
+        if (answer.claudeGrade) {
+            html += renderGradeCard('AI Suggestion', answer.claudeGrade, 'claude');
+        }
+        if (answer.teacherGrade) {
+            html += renderGradeCard('Teacher Review', answer.teacherGrade, 'teacher');
+        }
 
-    // If no teacher grade yet, show grading UI
-    if (!answer.teacherGrade && (answer.claudeGrade || answer.autoGrade?.status === 'pending' || !answer.autoGrade)) {
-        html += renderTeacherGradeUI(index, answer.claudeGrade);
+        // If no teacher grade yet, show grading UI for questions that need review
+        // For short_answer: show if auto-graded incorrect (teacher might override) or pending
+        const needsReview = answer.claudeGrade || autoStatus === 'pending_review' ||
+            (question?.type === 'short_answer' && autoStatus === 'incorrect');
+        if (!answer.teacherGrade && needsReview) {
+            html += renderTeacherGradeUI(index, answer.claudeGrade);
+        }
     }
 
     html += '</div>';
@@ -5351,9 +5376,12 @@ function createQuestionEditor(question, index, total) {
     const advancedSection = document.createElement('div');
     advancedSection.className = 'quiz-advanced-section';
 
-    const advancedLabel = needsAIGrading
-        ? 'Advanced (hint, explanation, model answer, rubric)'
-        : 'Advanced (hint, explanation)';
+    // Label varies by type: worked gets AI grading fields only, others get feedback fields
+    const advancedLabel = question.type === 'worked'
+        ? 'Advanced (model answer, rubric)'
+        : needsAIGrading
+            ? 'Advanced (feedback, model answer, rubric)'
+            : 'Advanced (feedback)';
 
     const advancedToggle = document.createElement('button');
     advancedToggle.type = 'button';
@@ -5370,29 +5398,33 @@ function createQuestionEditor(question, index, total) {
     const advancedContent = document.createElement('div');
     advancedContent.className = 'quiz-advanced-content';
 
-    // Feedback when correct (maps to Google Forms whenRight)
-    const whenRightField = document.createElement('div');
-    whenRightField.className = 'quiz-field';
-    whenRightField.innerHTML = `<label>Feedback when correct</label>`;
-    const whenRightTextarea = document.createElement('textarea');
-    whenRightTextarea.className = 'quiz-when-right';
-    whenRightTextarea.value = question.whenRight || '';
-    whenRightTextarea.rows = 2;
-    whenRightTextarea.placeholder = 'Shown when answer is correct';
-    whenRightField.appendChild(whenRightTextarea);
-    advancedContent.appendChild(whenRightField);
+    // Feedback when correct/wrong - only for auto-gradable types (not worked)
+    // worked questions get personalized feedback from the grader, not pre-written feedback
+    if (question.type !== 'worked') {
+        // Feedback when correct (maps to Google Forms whenRight)
+        const whenRightField = document.createElement('div');
+        whenRightField.className = 'quiz-field';
+        whenRightField.innerHTML = `<label>Feedback when correct</label>`;
+        const whenRightTextarea = document.createElement('textarea');
+        whenRightTextarea.className = 'quiz-when-right';
+        whenRightTextarea.value = question.whenRight || '';
+        whenRightTextarea.rows = 2;
+        whenRightTextarea.placeholder = 'Shown when answer is correct';
+        whenRightField.appendChild(whenRightTextarea);
+        advancedContent.appendChild(whenRightField);
 
-    // Feedback when wrong (maps to Google Forms whenWrong)
-    const whenWrongField = document.createElement('div');
-    whenWrongField.className = 'quiz-field';
-    whenWrongField.innerHTML = `<label>Feedback when wrong</label>`;
-    const whenWrongTextarea = document.createElement('textarea');
-    whenWrongTextarea.className = 'quiz-when-wrong';
-    whenWrongTextarea.value = question.whenWrong || '';
-    whenWrongTextarea.rows = 2;
-    whenWrongTextarea.placeholder = 'Shown when answer is incorrect';
-    whenWrongField.appendChild(whenWrongTextarea);
-    advancedContent.appendChild(whenWrongField);
+        // Feedback when wrong (maps to Google Forms whenWrong)
+        const whenWrongField = document.createElement('div');
+        whenWrongField.className = 'quiz-field';
+        whenWrongField.innerHTML = `<label>Feedback when wrong</label>`;
+        const whenWrongTextarea = document.createElement('textarea');
+        whenWrongTextarea.className = 'quiz-when-wrong';
+        whenWrongTextarea.value = question.whenWrong || '';
+        whenWrongTextarea.rows = 2;
+        whenWrongTextarea.placeholder = 'Shown when answer is incorrect';
+        whenWrongField.appendChild(whenWrongTextarea);
+        advancedContent.appendChild(whenWrongField);
+    }
 
     // Model answer and rubric only for types needing AI grading
     if (needsAIGrading) {
@@ -9036,7 +9068,8 @@ function renderItemsWithSubsections(items, sectionId, getSubdir = item => item._
         return '<p style="color: var(--text-muted); grid-column: 1/-1;">No items yet. Add a bookmark, note, or code!</p>';
     }
 
-    // Group items by subdirectory
+    // Group items by subdirectory, preserving the order from loading
+    // (Items are pre-sorted: quiz first, then summaries, then others by subfolder/date)
     const itemsBySubdir = new Map();
     items.forEach(item => {
         const subdir = getSubdir(item);
@@ -9046,20 +9079,13 @@ function renderItemsWithSubsections(items, sectionId, getSubdir = item => item._
         itemsBySubdir.get(subdir).push(item);
     });
 
-    // Sort items within each group by modified date
-    const sortByModified = (a, b) => {
-        const aTime = a.modified ? new Date(a.modified).getTime() : 0;
-        const bTime = b.modified ? new Date(b.modified).getTime() : 0;
-        return bTime - aTime;
-    };
-
     // Build HTML with subsection headers
     let html = '';
 
     // Render root items first (no subdirectory)
     const rootItems = itemsBySubdir.get(null) || [];
     if (rootItems.length > 0) {
-        html += rootItems.sort(sortByModified).map(item => renderCard(sectionId, item)).join('');
+        html += rootItems.map(item => renderCard(sectionId, item)).join('');
     }
 
     // Render each subdirectory group with a header
@@ -9073,7 +9099,7 @@ function renderItemsWithSubsections(items, sectionId, getSubdir = item => item._
         const subdirItems = itemsBySubdir.get(subdir);
         if (subdirItems.length > 0) {
             html += `<div class="subsection-header">${escapeHtml(subdir)}</div>`;
-            html += subdirItems.sort(sortByModified).map(item => renderCard(sectionId, item)).join('');
+            html += subdirItems.map(item => renderCard(sectionId, item)).join('');
         }
     }
 
