@@ -285,12 +285,21 @@ function convertQuestionToFormRequest(q, index) {
 
   questionItem.question.grading = grading;
 
+  // Google Forms doesn't allow newlines in title - sanitize
+  // If question has newlines, use first line as title and rest as description
+  const questionText = q.question || '';
+  const lines = questionText.split('\n');
+  const title = lines[0].replace(/\n/g, ' ').trim();
+  const description = lines.length > 1 ? lines.slice(1).join('\n').trim() : undefined;
+
+  const item = { title, questionItem };
+  if (description) {
+    item.description = description;
+  }
+
   return {
     createItem: {
-      item: {
-        title: q.question,
-        questionItem
-      },
+      item,
       location: { index }
     }
   };
