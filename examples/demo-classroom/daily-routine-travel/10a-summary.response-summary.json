@@ -1,0 +1,10 @@
+{
+  "id": "10a-summary",
+  "template": "quiz-response-summary",
+  "title": "10A Morning Summary",
+  "quizId": "french-gcse-comprehension",
+  "cohort": "10A Morning",
+  "responseFolder": "10a-morning",
+  "created": "2025-01-10T16:00:00Z",
+  "modified": "2025-01-10T16:00:00Z"
+}

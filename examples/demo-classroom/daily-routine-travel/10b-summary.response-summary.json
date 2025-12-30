@@ -1,0 +1,10 @@
+{
+  "id": "10b-summary",
+  "template": "quiz-response-summary",
+  "title": "10B Afternoon Summary",
+  "quizId": "french-gcse-comprehension",
+  "cohort": "10B Afternoon",
+  "responseFolder": "10b-afternoon",
+  "created": "2025-01-10T17:00:00Z",
+  "modified": "2025-01-10T17:00:00Z"
+}

@@ -1,0 +1,79 @@
+{
+  "id": "french-gcse-comprehension",
+  "type": "quiz",
+  "template": "quiz",
+  "title": "French GCSE: Daily Routine & Travel",
+  "description": "Practice quiz covering daily routine vocabulary, travel phrases, and reading comprehension.",
+  "questions": [
+    {
+      "question": "What does **\"le petit déjeuner\"** mean?",
+      "type": "multiple_choice",
+      "options": [
+        "Lunch",
+        "Breakfast",
+        "Dinner",
+        "Snack"
+      ],
+      "correct": 1,
+      "points": 1,
+      "whenRight": "Correct! 'Le petit déjeuner' literally means 'the little lunch' but refers to breakfast.",
+      "whenWrong": "Not quite. 'Petit' means small/little, and 'déjeuner' on its own means lunch. Together, 'le petit déjeuner' means breakfast."
+    },
+    {
+      "question": "Which sentence correctly uses a reflexive verb?",
+      "type": "multiple_choice",
+      "options": [
+        "Je lève à sept heures",
+        "Je me lève à sept heures",
+        "Je lever à sept heures",
+        "Je suis lève à sept heures"
+      ],
+      "correct": 1,
+      "points": 1,
+      "whenRight": "Excellent! 'Se lever' is reflexive, so we need 'me' before the verb: 'Je me lève'.",
+      "whenWrong": "Remember: reflexive verbs need the reflexive pronoun (me, te, se, nous, vous, se) before the verb."
+    },
+    {
+      "question": "Translate into English: **\"Je voudrais réserver une chambre pour deux nuits.\"**",
+      "type": "short_answer",
+      "points": 2,
+      "acceptedAnswers": [
+        "I would like to reserve a room for two nights",
+        "I would like to book a room for two nights",
+        "I'd like to reserve a room for two nights",
+        "I'd like to book a room for two nights"
+      ],
+      "modelAnswer": "I would like to reserve/book a room for two nights.",
+      "rubric": "2 points: Correct translation with all key elements (would like, reserve/book, room, two nights)\n1 point: Most elements correct with minor errors\n0 points: Major errors or missing key vocabulary"
+    },
+    {
+      "question": "Translate into French: **\"Where is the train station?\"**",
+      "type": "short_answer",
+      "points": 2,
+      "acceptedAnswers": [
+        "Où est la gare?",
+        "Où est la gare ?",
+        "Où se trouve la gare?",
+        "Où se trouve la gare ?"
+      ],
+      "modelAnswer": "Où est la gare?",
+      "rubric": "2 points: Correct word order, correct vocabulary (gare), correct question formation\n1 point: Minor spelling errors or acceptable alternative structures\n0 points: Incorrect vocabulary or incomprehensible structure"
+    },
+    {
+      "question": "Read the passage and answer in English:\n\n> Marie se réveille à six heures et demie. D'abord, elle se douche et s'habille. Ensuite, elle prend son petit déjeuner dans la cuisine avec sa famille. Elle mange des céréales et boit du jus d'orange. À sept heures et quart, elle quitte la maison pour aller au collège.\n\n**What does Marie do immediately after waking up?**",
+      "type": "short_answer",
+      "points": 2,
+      "modelAnswer": "She showers and gets dressed (se douche et s'habille)",
+      "rubric": "2 points: Both actions mentioned (shower AND get dressed)\n1 point: Only one action mentioned correctly\n0 points: Incorrect or no answer"
+    },
+    {
+      "question": "Write 3-4 sentences in French describing your typical morning routine. Use at least TWO reflexive verbs.\n\n*Décrivez votre routine matinale en utilisant au moins deux verbes pronominaux.*",
+      "type": "worked",
+      "points": 5,
+      "modelAnswer": "Example response:\nJe me réveille à sept heures. D'abord, je me lève et je me douche. Ensuite, je m'habille et je prends mon petit déjeuner. Je quitte la maison à huit heures.",
+      "rubric": "5 points: 3-4 well-formed sentences, 2+ reflexive verbs used correctly, good vocabulary range\n4 points: Meets requirements with minor errors\n3 points: 2-3 sentences, reflexive verbs attempted but with errors\n2 points: Basic attempt, significant grammatical issues\n1 point: Minimal effort, mostly incorrect\n0 points: No relevant content"
+    }
+  ],
+  "created": "2025-01-10T09:00:00Z",
+  "modified": "2025-01-10T09:00:00Z"
+}

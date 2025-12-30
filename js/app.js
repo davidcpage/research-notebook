@@ -154,6 +154,10 @@ function getDefaultExtensionRegistry() {
             parser: 'json',
             defaultTemplate: 'quiz-response'
         },
+        '.response-summary.json': {
+            parser: 'json',
+            defaultTemplate: 'quiz-response-summary'
+        },
         '.card.yaml': {
             parser: 'yaml',
             defaultTemplate: null  // Must specify template: in file
@@ -388,7 +392,10 @@ const SETTINGS_SCHEMA = {
     authors: { default: [{ name: 'Claude', icon: 'claude.svg' }] },
     extensions: { default: () => getDefaultExtensionRegistry() },
     theme: { default: null },
-    quiz_self_review: { default: true }  // Allow students to self-mark pending questions
+    quiz_self_review: { default: true },  // Allow students to self-mark pending questions
+    hidden_templates: { default: [] },    // Template names to hide from create buttons
+    quiz_template_mode: { default: false }, // Disable quiz-taking in viewer (for quiz templates)
+    grading: { default: null }            // Grading settings: { roster_path, show_student_names }
 };
 
 // Build settings object from parsed data, filling in defaults
@@ -427,6 +434,9 @@ function getDefaultSettingsContent(title = 'Research Notebook', subtitle = 'Book
 
 // Global settings object (loaded from settings.yaml)
 let notebookSettings = null;
+
+// Global roster object (loaded from roster.yaml, optional)
+let notebookRoster = null;
 
 // Load settings from .notebook/settings.yaml
 async function loadSettings(dirHandle) {
@@ -505,6 +515,31 @@ function getSystemSectionVisible() {
         typeof s === 'object' && sectionPathIncludesRoot(s.path)
     );
     return systemSection?.visible === true;
+}
+
+// Load roster from .notebook/roster.yaml (optional student name mappings)
+async function loadRoster(dirHandle) {
+    if (!dirHandle) {
+        notebookRoster = null;
+        return null;
+    }
+
+    const configDir = await getNotebookConfigDir(dirHandle, false);
+    if (configDir) {
+        try {
+            const rosterFile = await configDir.getFileHandle('roster.yaml');
+            const file = await rosterFile.getFile();
+            const content = await file.text();
+            notebookRoster = jsyaml.load(content);
+            console.log('[Roster] Loaded .notebook/roster.yaml');
+            return notebookRoster;
+        } catch (e) {
+            // roster.yaml doesn't exist (optional)
+            console.log('[Roster] No .notebook/roster.yaml found');
+        }
+    }
+    notebookRoster = null;
+    return null;
 }
 
 // Save settings to .notebook/settings.yaml
@@ -1352,6 +1387,8 @@ function renderCardPreview(card, template) {
             return renderQuizPreview(card, template);
         case 'quiz-response':
             return renderQuizResponsePreview(card, template);
+        case 'quiz-response-summary':
+            return renderQuizResponseSummaryPreview(card, template);
         default:
             return `<div class="preview-placeholder">${placeholder}</div>`;
     }
@@ -1772,6 +1809,8 @@ function renderViewerContent(card, template) {
             return renderQuizViewer(card, template);
         case 'quiz-response':
             return renderQuizResponseViewer(card, template);
+        case 'quiz-response-summary':
+            return renderQuizResponseSummaryViewer(card, template);
         default:
             return renderViewerDocument(card, template);
     }
@@ -1861,7 +1900,8 @@ function renderQuizViewer(card, template) {
     const lastAttempt = attempts.length > 0 ? attempts[attempts.length - 1] : null;
 
     // Interactive mode: no attempts yet, or user clicked "Retake"
-    const isInteractive = !lastAttempt || card._quizRetakeMode;
+    // BUT: if quiz_template_mode is set in settings, never allow interactive mode
+    const isInteractive = !notebookSettings?.quiz_template_mode && (!lastAttempt || card._quizRetakeMode);
 
     // Check if this is a graded quiz or pure survey
     const hasGradedQuestions = quizHasGradedQuestions(questions);
@@ -1873,13 +1913,20 @@ function renderQuizViewer(card, template) {
         html += `<div class="quiz-viewer-topic">${escapeHtml(card.topic)}</div>`;
     }
 
-    // Mode header: Take Quiz vs Review Results
-    if (isInteractive) {
+    // Mode header: Take Quiz vs Review Results vs Template Preview
+    const isTemplateMode = notebookSettings?.quiz_template_mode;
+    if (isTemplateMode && !lastAttempt) {
+        // Template mode: show question preview without interactivity
+        html += `<div class="quiz-mode-header">
+            <span class="quiz-mode-label">Quiz Template</span>
+            <span class="quiz-mode-count">${questions.length} question${questions.length !== 1 ? 's' : ''}</span>
+        </div>`;
+    } else if (isInteractive) {
         html += `<div class="quiz-mode-header">
             <span class="quiz-mode-label">Take Quiz</span>
             <span class="quiz-mode-count">${questions.length} question${questions.length !== 1 ? 's' : ''}</span>
         </div>`;
-    } else {
+    } else if (lastAttempt) {
         // Progress summary for review mode
         const score = lastAttempt.score || {};
         if (hasGradedQuestions) {
@@ -2457,6 +2504,13 @@ function findCardById(cardId) {
     return null;
 }
 
+// Helper: find the section containing a card
+function findSectionByItem(card) {
+    if (!card) return null;
+    const cardIdStr = String(card.id);
+    return data.sections.find(s => s.items.some(i => String(i.id) === cardIdStr));
+}
+
 // Quiz interaction: select multiple choice option
 function selectQuizOption(element, questionIndex, optionIndex) {
     const quizViewer = element.closest('.quiz-viewer');
@@ -2901,6 +2955,18 @@ async function submitQuizReview(questionIndex, status) {
 
 // ===== Quiz Response Layout (Classroom Grading) =====
 
+// Get student display name from roster data
+// Returns "Name (id)" if roster data available and show_student_names is true, else "Student id"
+function getStudentDisplayName(studentId) {
+    const showNames = notebookSettings?.grading?.show_student_names !== false;
+    const roster = notebookRoster;
+
+    if (showNames && roster?.students?.[studentId]?.name) {
+        return `${roster.students[studentId].name} (${studentId})`;
+    }
+    return `Student ${studentId}`;
+}
+
 // Quiz response card preview: shows student ID, score, and status
 function renderQuizResponsePreview(card, template) {
     const placeholder = template.card?.placeholder || '📝';
@@ -2937,7 +3003,7 @@ function renderQuizResponsePreview(card, template) {
 
     return `
         <div class="quiz-response-preview ${statusClass}">
-            <div class="response-student-id">Student ${escapeHtml(studentId)}</div>
+            <div class="response-student-id">${escapeHtml(getStudentDisplayName(studentId))}</div>
             <div class="response-score">${totalScore}/${maxScore}</div>
             ${statusBadge}
         </div>
@@ -2971,7 +3037,7 @@ function renderQuizResponseViewer(card, template) {
 
     // Header with student info
     html += `<div class="response-header">
-        <span class="response-student-label">Student ${escapeHtml(studentId)}</span>
+        <span class="response-student-label">${escapeHtml(getStudentDisplayName(studentId))}</span>
         <span class="response-quiz-ref">Quiz: ${escapeHtml(quiz?.title || quizId || 'Unknown')}</span>
     </div>`;
 
@@ -3042,7 +3108,7 @@ function renderResponseAnswer(answer, question, index) {
     // Student's answer
     html += `<div class="response-student-answer">
         <div class="response-answer-label">Student Answer:</div>
-        <div class="response-answer-content">${formatStudentAnswer(answer.answer, question?.type)}</div>
+        <div class="response-answer-content">${formatStudentAnswer(answer.answer, question?.type, question)}</div>
     </div>`;
 
     // Show grade hierarchy if present
@@ -3066,13 +3132,32 @@ function renderResponseAnswer(answer, question, index) {
 }
 
 // Format student answer for display
-function formatStudentAnswer(answer, questionType) {
+// question parameter is optional but enables showing option text for multiple choice
+function formatStudentAnswer(answer, questionType, question = null) {
     if (answer === null || answer === undefined) {
         return '<span class="response-no-answer">No answer provided</span>';
     }
 
+    // For multiple choice with options, show "A: Option text" format
+    if ((questionType === 'multiple_choice' || questionType === 'dropdown') &&
+        typeof answer === 'number' && question?.options) {
+        const optionLetter = String.fromCharCode(65 + answer); // A, B, C, D
+        const optionText = question.options[answer] || `Option ${answer + 1}`;
+        return `<span class="response-answer-choice">${optionLetter}: ${escapeHtml(optionText)}</span>`;
+    }
+
+    // For checkbox (multi-select), show all selected options
+    if (questionType === 'checkbox' && Array.isArray(answer) && question?.options) {
+        const formatted = answer.map(idx => {
+            const optionLetter = String.fromCharCode(65 + idx);
+            const optionText = question.options[idx] || `Option ${idx + 1}`;
+            return `${optionLetter}: ${escapeHtml(optionText)}`;
+        }).join(', ');
+        return `<span class="response-answer-choice">${formatted}</span>`;
+    }
+
     if (Array.isArray(answer)) {
-        // Ordering or multi-select
+        // Ordering or multi-select without options context
         return `<ol class="response-answer-list">${answer.map(a => `<li>${escapeHtml(String(a))}</li>`).join('')}</ol>`;
     }
 
@@ -3284,6 +3369,504 @@ function updateResponseStatus(card) {
     } else {
         card.status = 'pending';
     }
+}
+
+// ============================================================
+// Quiz Response Summary - Cohort/Question-Level Grading View
+// ============================================================
+
+// Compute summary data dynamically from quiz-response cards
+// Returns: { submittedCount, averageScore, maxScore, questions: [...], responseCards: [...] }
+function computeSummaryData(summaryCard) {
+    const quizId = summaryCard.quizId;
+    // Use responseFolder if set, otherwise use summary's own folder
+    const targetFolder = summaryCard.responseFolder || summaryCard._subdir || null;
+
+    // Find the section containing this summary card
+    const section = findSectionByItem(summaryCard);
+    if (!section) {
+        return { submittedCount: 0, averageScore: 0, maxScore: 0, questions: [], responseCards: [] };
+    }
+
+    // Find all quiz-response cards in the target folder
+    const responseCards = section.items.filter(item => {
+        if (item.template !== 'quiz-response') return false;
+        if (item.quizId !== quizId) return false;
+        // Match folder
+        return (item._subdir || null) === targetFolder;
+    });
+
+    if (responseCards.length === 0) {
+        return { submittedCount: 0, averageScore: 0, maxScore: 0, questions: [], responseCards: [] };
+    }
+
+    // Get quiz for question metadata
+    const quiz = findCardById(quizId);
+    const quizQuestions = quiz?.questions || [];
+
+    // Build question-centric data structure
+    const questions = [];
+    const numQuestions = Math.max(
+        quizQuestions.length,
+        ...responseCards.map(r => r.answers?.length || 0)
+    );
+
+    for (let qIdx = 0; qIdx < numQuestions; qIdx++) {
+        const quizQ = quizQuestions[qIdx] || {};
+        const points = quizQ.points || 1;
+
+        // Collect all answers for this question
+        const answers = [];
+        let correctCount = 0;
+        let scoreSum = 0;
+        let scoredCount = 0;
+        let pendingCount = 0;
+
+        for (const responseCard of responseCards) {
+            const answer = responseCard.answers?.[qIdx];
+            if (!answer) continue;
+
+            const effectiveGrade = getEffectiveGrade(answer);
+
+            answers.push({
+                studentId: responseCard.studentId,
+                responseCardId: responseCard.id,
+                answer: answer.answer,
+                autoGrade: answer.autoGrade,
+                claudeGrade: answer.claudeGrade,
+                teacherGrade: answer.teacherGrade
+            });
+
+            // Compute stats
+            if (effectiveGrade) {
+                scoreSum += effectiveGrade.score || 0;
+                scoredCount++;
+                if (answer.autoGrade?.status === 'correct') correctCount++;
+            } else {
+                pendingCount++;
+            }
+        }
+
+        questions.push({
+            questionIndex: qIdx,
+            questionText: quizQ.question || `Question ${qIdx + 1}`,
+            questionType: quizQ.type || 'short_answer',
+            points: points,
+            stats: {
+                totalAnswers: answers.length,
+                correctCount: correctCount,
+                avgScore: scoredCount > 0 ? scoreSum / scoredCount : 0,
+                pendingCount: pendingCount
+            },
+            answers: answers
+        });
+    }
+
+    // Calculate overall stats
+    const submittedCount = responseCards.length;
+    let totalScore = 0;
+    let maxScore = 0;
+
+    for (const responseCard of responseCards) {
+        totalScore += responseCard.totalScore || 0;
+        maxScore = Math.max(maxScore, responseCard.maxScore || 0);
+    }
+
+    const averageScore = maxScore > 0 && submittedCount > 0
+        ? (totalScore / submittedCount / maxScore) * 100
+        : 0;
+
+    return {
+        submittedCount,
+        averageScore,
+        maxScore,
+        questions,
+        responseCards
+    };
+}
+
+// Quiz response summary card preview: shows cohort overview stats
+function renderQuizResponseSummaryPreview(card, template) {
+    const placeholder = template.card?.placeholder || '📊';
+    const cohort = card.cohort || 'Responses';
+
+    // Compute data dynamically from response cards
+    const computed = computeSummaryData(card);
+    const questions = computed.questions;
+    const submittedCount = computed.submittedCount;
+
+    if (questions.length === 0) {
+        return `<div class="preview-placeholder">${placeholder}</div>`;
+    }
+
+    // Calculate overall stats from computed data
+    const totalPending = questions.reduce((sum, q) => sum + (q.stats?.pendingCount || 0), 0);
+    const avgScore = computed.averageScore > 0 ? Math.round(computed.averageScore) : null;
+
+    // Determine status
+    let statusBadge = '';
+    if (totalPending > 0) {
+        statusBadge = `<span class="summary-status-badge pending">${totalPending} pending</span>`;
+    } else {
+        statusBadge = '<span class="summary-status-badge complete">All graded</span>';
+    }
+
+    return `
+        <div class="quiz-response-summary-preview">
+            <div class="summary-cohort">${escapeHtml(cohort)}</div>
+            <div class="summary-stats">
+                <span class="summary-submitted">${submittedCount} submitted</span>
+                ${avgScore !== null ? `<span class="summary-avg">Avg ${avgScore}%</span>` : ''}
+            </div>
+            ${statusBadge}
+        </div>
+    `;
+}
+
+// Quiz response summary viewer: question-centric grading interface
+function renderQuizResponseSummaryViewer(card, template) {
+    const cohort = card.cohort || 'Responses';
+    const quizId = card.quizId;
+
+    // Compute data dynamically from response cards
+    const computed = computeSummaryData(card);
+    const questions = computed.questions;
+    const submittedCount = computed.submittedCount;
+    const avgScore = computed.averageScore > 0 ? Math.round(computed.averageScore) : null;
+
+    if (questions.length === 0) {
+        return '<div class="viewer-empty">No quiz responses found in this folder</div>';
+    }
+
+    // Get quiz for additional context
+    const quiz = findCardById(quizId);
+
+    let html = `<div class="quiz-response-summary-viewer" data-summary-id="${card.id}">`;
+
+    // Header
+    html += `<div class="summary-header">
+        <div class="summary-cohort-name">${escapeHtml(cohort)}</div>
+        <div class="summary-overview">
+            <span class="summary-stat">${submittedCount} submitted</span>
+            ${avgScore !== null ? `<span class="summary-stat">Avg ${avgScore}%</span>` : ''}
+            ${quiz?.title ? `<span class="summary-quiz-ref">Quiz: ${escapeHtml(quiz.title)}</span>` : ''}
+        </div>
+    </div>`;
+
+    // Question sections
+    html += '<div class="summary-questions">';
+    questions.forEach((q, idx) => {
+        html += renderSummaryQuestionSection(q, idx, quiz);
+    });
+    html += '</div>';
+
+    // Actions
+    const totalPending = questions.reduce((sum, q) => sum + (q.stats?.pendingCount || 0), 0);
+    if (totalPending > 0) {
+        html += `<div class="summary-actions">
+            <button class="summary-bulk-grade-btn" onclick="launchBulkGrading('${escapeHtml(card.id)}')" disabled title="Coming soon (dp-063)">
+                Launch Bulk Grading (${totalPending} pending)
+            </button>
+        </div>`;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+// Render a single collapsible question section
+function renderSummaryQuestionSection(question, index, quiz) {
+    const qNum = index + 1;
+    const stats = question.stats || {};
+    const answers = question.answers || [];
+    const questionText = question.questionText || `Question ${qNum}`;
+    const questionType = question.questionType || 'short_answer';
+    const points = question.points || 1;
+
+    // Build stats display
+    let statsHtml = '';
+    if (questionType === 'multiple_choice' || questionType === 'checkbox' || questionType === 'dropdown') {
+        // Auto-gradeable: show % correct
+        const correctPct = stats.totalAnswers > 0
+            ? Math.round((stats.correctCount || 0) / stats.totalAnswers * 100)
+            : 0;
+        statsHtml = `<span class="summary-q-stat">${correctPct}% correct</span>`;
+    } else {
+        // Manual grading needed: show avg score
+        const avgScore = stats.avgScore !== undefined ? stats.avgScore.toFixed(1) : '—';
+        statsHtml = `<span class="summary-q-stat">avg ${avgScore}/${points}</span>`;
+    }
+
+    // Pending badge
+    if (stats.pendingCount > 0) {
+        statsHtml += `<span class="summary-q-pending">${stats.pendingCount} pending</span>`;
+    }
+
+    // Use details/summary for native collapsible
+    let html = `<details class="summary-question-section" data-question-index="${index}">
+        <summary class="summary-question-header">
+            <span class="summary-q-number">Q${qNum}</span>
+            <span class="summary-q-text">${escapeHtml(truncateText(questionText, 60))}</span>
+            <span class="summary-q-stats">${statsHtml}</span>
+        </summary>
+        <div class="summary-question-content">`;
+
+    // Full question text if truncated
+    if (questionText.length > 60) {
+        html += `<div class="summary-q-full-text md-content">${marked.parse(questionText)}</div>`;
+    }
+
+    // Answers table - pass quiz to get options for multiple choice display
+    const quizQuestion = quiz?.questions?.[index];
+    html += '<div class="summary-answers-list">';
+    answers.forEach(answer => {
+        html += renderSummaryAnswerRow(answer, question, index, quizQuestion);
+    });
+    html += '</div>';
+
+    html += '</div></details>';
+    return html;
+}
+
+// Render a single student answer row in the summary with inline grade editing
+// quizQuestion is optional and provides options for multiple choice display
+function renderSummaryAnswerRow(answer, question, questionIndex, quizQuestion = null) {
+    const studentId = answer.studentId || 'Unknown';
+    const responseCardId = answer.responseCardId || '';
+    const effectiveGrade = getEffectiveGrade(answer);
+    const points = question.points || 1;
+
+    // Determine status
+    let statusClass = 'pending';
+    let statusIcon = '⏳';
+    if (answer.teacherGrade) {
+        statusClass = 'reviewed';
+        statusIcon = '✓';
+    } else if (answer.claudeGrade) {
+        statusClass = 'ai-graded';
+        statusIcon = '🤖';
+    } else if (answer.autoGrade) {
+        const autoStatus = answer.autoGrade.status;
+        if (autoStatus === 'correct') {
+            statusClass = 'correct';
+            statusIcon = '✓';
+        } else if (autoStatus === 'incorrect') {
+            statusClass = 'incorrect';
+            statusIcon = '✗';
+        } else if (autoStatus === 'partial') {
+            statusClass = 'partial';
+            statusIcon = '◐';
+        }
+    }
+
+    // Format score - make editable for unreviewed answers
+    let scoreHtml;
+    if (answer.teacherGrade) {
+        // Already reviewed - show final score
+        scoreHtml = `<span class="summary-answer-score">${effectiveGrade.score}/${effectiveGrade.maxScore || points}</span>`;
+    } else if (answer.autoGrade?.status === 'correct' || answer.autoGrade?.status === 'incorrect') {
+        // Auto-graded objective question - show score (no manual override needed)
+        scoreHtml = `<span class="summary-answer-score">${effectiveGrade?.score || 0}/${points}</span>`;
+    } else {
+        // Needs grading - show inline editing
+        const prefillScore = answer.claudeGrade?.score ?? '';
+        scoreHtml = `<span class="summary-grade-inline">
+            <input type="number" class="summary-score-input"
+                   id="summaryScore_${responseCardId}_${questionIndex}"
+                   value="${prefillScore}" min="0" max="${points}" step="0.5"
+                   placeholder="—">/<span>${points}</span>
+            <button class="summary-save-grade-btn"
+                    onclick="submitSummaryGrade('${escapeHtml(responseCardId)}', ${questionIndex})"
+                    title="Save grade">✓</button>
+            ${answer.claudeGrade ? `<button class="summary-approve-ai-btn"
+                    onclick="approveSummaryClaudeGrade('${escapeHtml(responseCardId)}', ${questionIndex})"
+                    title="Approve AI grade">🤖</button>` : ''}
+        </span>`;
+    }
+
+    // Format answer text (truncated for display)
+    const answerText = formatStudentAnswerCompact(answer.answer, question.questionType, quizQuestion);
+
+    // Make student ID clickable to open response card
+    const studentLink = responseCardId
+        ? `<a href="#" class="summary-answer-student" onclick="openResponseFromSummary('${escapeHtml(responseCardId)}'); return false;">${escapeHtml(getStudentDisplayName(studentId))}</a>`
+        : `<span class="summary-answer-student">${escapeHtml(getStudentDisplayName(studentId))}</span>`;
+
+    return `<div class="summary-answer-row ${statusClass}" data-response-card-id="${escapeHtml(responseCardId)}" data-question-index="${questionIndex}">
+        ${studentLink}
+        <span class="summary-answer-text">${answerText}</span>
+        ${scoreHtml}
+        <span class="summary-answer-status" title="${statusClass}">${statusIcon}</span>
+    </div>`;
+}
+
+// Format student answer compactly for summary table
+// question parameter enables showing "A: Option text" for multiple choice
+function formatStudentAnswerCompact(answer, questionType, question = null) {
+    if (answer === null || answer === undefined) {
+        return '<span class="no-answer">—</span>';
+    }
+
+    // For multiple choice with options, show "A: Option text" format
+    if ((questionType === 'multiple_choice' || questionType === 'dropdown') &&
+        typeof answer === 'number' && question?.options) {
+        const optionLetter = String.fromCharCode(65 + answer); // A, B, C, D
+        const optionText = question.options[answer] || `Option ${answer + 1}`;
+        const formatted = `${optionLetter}: ${optionText}`;
+        // Truncate if needed
+        if (formatted.length > 60) {
+            return `<span title="${escapeHtml(formatted)}">${escapeHtml(formatted.substring(0, 57))}...</span>`;
+        }
+        return escapeHtml(formatted);
+    }
+
+    // For checkbox (multi-select), show all selected options
+    if (questionType === 'checkbox' && Array.isArray(answer) && question?.options) {
+        const formatted = answer.map(idx => {
+            const optionLetter = String.fromCharCode(65 + idx);
+            const optionText = question.options[idx] || `Option ${idx + 1}`;
+            return `${optionLetter}: ${optionText}`;
+        }).join('; ');
+        if (formatted.length > 60) {
+            return `<span title="${escapeHtml(formatted)}">${escapeHtml(formatted.substring(0, 57))}...</span>`;
+        }
+        return escapeHtml(formatted);
+    }
+
+    if (Array.isArray(answer)) {
+        return escapeHtml(answer.join(', '));
+    }
+
+    if (typeof answer === 'object') {
+        return '<span class="complex-answer">[complex]</span>';
+    }
+
+    const text = String(answer);
+    if (text.length > 80) {
+        return `<span title="${escapeHtml(text)}">${escapeHtml(text.substring(0, 77))}...</span>`;
+    }
+
+    return escapeHtml(text);
+}
+
+// Placeholder for bulk grading integration (dp-063)
+function launchBulkGrading(summaryCardId) {
+    showToast('Bulk grading coming soon (dp-063)', 'info');
+}
+
+// Submit a grade from the summary view - writes to the source response card
+async function submitSummaryGrade(responseCardId, questionIndex) {
+    const responseCard = findCardById(responseCardId);
+    if (!responseCard || responseCard.template !== 'quiz-response') {
+        showToast('Response card not found', 'error');
+        return;
+    }
+
+    const scoreEl = document.getElementById(`summaryScore_${responseCardId}_${questionIndex}`);
+    if (!scoreEl || scoreEl.value === '') {
+        showToast('Please enter a score', 'error');
+        return;
+    }
+
+    const score = parseFloat(scoreEl.value);
+    const answer = responseCard.answers?.[questionIndex];
+    if (!answer) {
+        showToast('Answer not found', 'error');
+        return;
+    }
+
+    // Get maxScore from quiz question (most reliable source)
+    const quiz = findCardById(responseCard.quizId);
+    const quizQuestion = quiz?.questions?.[questionIndex];
+    const maxScore = quizQuestion?.points || answer.claudeGrade?.maxScore || answer.autoGrade?.maxScore || 1;
+
+    // Set teacher grade
+    answer.teacherGrade = {
+        score: score,
+        maxScore: maxScore,
+        reviewedAt: new Date().toISOString(),
+        reviewer: notebookSettings?.default_author || 'Teacher'
+    };
+
+    // Recalculate and update status
+    recalculateResponseScore(responseCard);
+    updateResponseStatus(responseCard);
+    responseCard.modified = new Date().toISOString();
+
+    // Save to filesystem
+    const section = findSectionByItem(responseCard);
+    if (section) {
+        await saveCardFile(section.id, responseCard);
+    }
+
+    // Re-render summary viewer (which recomputes from response cards)
+    refreshSummaryViewer();
+    render();
+    showToast('Grade saved', 'success');
+}
+
+// Approve Claude's grade from the summary view
+async function approveSummaryClaudeGrade(responseCardId, questionIndex) {
+    const responseCard = findCardById(responseCardId);
+    if (!responseCard || responseCard.template !== 'quiz-response') {
+        showToast('Response card not found', 'error');
+        return;
+    }
+
+    const answer = responseCard.answers?.[questionIndex];
+    if (!answer?.claudeGrade) {
+        showToast('No AI grade to approve', 'error');
+        return;
+    }
+
+    // Copy Claude grade to teacher grade
+    answer.teacherGrade = {
+        ...answer.claudeGrade,
+        reviewedAt: new Date().toISOString(),
+        reviewer: notebookSettings?.default_author || 'Teacher'
+    };
+    delete answer.teacherGrade.gradedAt;
+
+    // Recalculate and update status
+    recalculateResponseScore(responseCard);
+    updateResponseStatus(responseCard);
+    responseCard.modified = new Date().toISOString();
+
+    // Save to filesystem
+    const section = findSectionByItem(responseCard);
+    if (section) {
+        await saveCardFile(section.id, responseCard);
+    }
+
+    // Re-render summary viewer
+    refreshSummaryViewer();
+    render();
+    showToast('AI grade approved', 'success');
+}
+
+// Open a response card from the summary view
+function openResponseFromSummary(responseCardId) {
+    const responseCard = findCardById(responseCardId);
+    if (!responseCard) {
+        showToast('Response card not found', 'error');
+        return;
+    }
+    openViewer(responseCard);
+}
+
+// Refresh the summary viewer if open (called after grade changes)
+function refreshSummaryViewer() {
+    const viewerContent = document.getElementById('viewerContent');
+    if (viewerContent && currentViewingCard?.template === 'quiz-response-summary') {
+        const template = templateRegistry[currentViewingCard.template];
+        viewerContent.innerHTML = renderQuizResponseSummaryViewer(currentViewingCard, template);
+    }
+}
+
+// Helper: truncate text with ellipsis
+function truncateText(text, maxLength) {
+    if (!text || text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 3) + '...';
 }
 
 // Image viewer: large image with description
@@ -6234,6 +6817,9 @@ async function loadFromFilesystem(dirHandle) {
     // Load settings first (handles migration from legacy format)
     await loadSettings(dirHandle);
 
+    // Load roster (optional student name mappings)
+    await loadRoster(dirHandle);
+
     // Load extension registry (uses settings.extensions), templates, and authors
     await loadExtensionRegistry(dirHandle);
     await loadTemplates(dirHandle);
@@ -6628,8 +7214,31 @@ async function loadFromFilesystem(dirHandle) {
             // Load items from the section
             section.items = await loadSectionItems(handle, dirName);
 
-            // Sort items by modified date (newest first)
+            // Sort items: quiz first, then summaries (by folder), then others (by subfolder, then date)
             section.items.sort((a, b) => {
+                // Template priority: quiz=0, quiz-response-summary=1, others=2
+                const getPriority = (item) => {
+                    if (item.template === 'quiz') return 0;
+                    if (item.template === 'quiz-response-summary') return 1;
+                    return 2;
+                };
+                const aPriority = getPriority(a);
+                const bPriority = getPriority(b);
+                if (aPriority !== bPriority) return aPriority - bPriority;
+
+                // Within summaries, sort by responseFolder or cohort
+                if (aPriority === 1) {
+                    const aFolder = a.responseFolder || a._subdir || '';
+                    const bFolder = b.responseFolder || b._subdir || '';
+                    return aFolder.localeCompare(bFolder);
+                }
+
+                // For other items, sort by subfolder first, then by modified date
+                const aSubdir = a._subdir || '';
+                const bSubdir = b._subdir || '';
+                if (aSubdir !== bSubdir) return aSubdir.localeCompare(bSubdir);
+
+                // Within same subfolder, sort by modified date (newest first)
                 const aTime = a._fileModified || 0;
                 const bTime = b._fileModified || 0;
                 return bTime - aTime;
@@ -7190,6 +7799,24 @@ async function deleteItemFile(sectionId, item) {
     }
 }
 
+// Recursively copy a directory's contents to a new location
+async function copyDirectoryContents(sourceDir, destDir, pathPrefix = '') {
+    for await (const [name, handle] of sourceDir.entries()) {
+        if (handle.kind === 'file') {
+            const file = await handle.getFile();
+            const newFile = await destDir.getFileHandle(name, { create: true });
+            const writable = await newFile.createWritable();
+            await writable.write(await file.arrayBuffer());
+            await writable.close();
+            recordSave(pathPrefix ? `${pathPrefix}/${name}` : name);
+        } else if (handle.kind === 'directory') {
+            // Recursively copy subdirectory
+            const newSubDir = await destDir.getDirectoryHandle(name, { create: true });
+            await copyDirectoryContents(handle, newSubDir, pathPrefix ? `${pathPrefix}/${name}` : name);
+        }
+    }
+}
+
 // Rename a section directory at notebook root
 async function renameSectionDir(oldName, newName, section) {
     if (!filesystemLinked || !notebookDirHandle) return;
@@ -7210,17 +7837,8 @@ async function renameSectionDir(oldName, newName, section) {
         // Create new directory
         const newDir = await notebookDirHandle.getDirectoryHandle(newSlug, { create: true });
 
-        // Copy all files from old to new
-        for await (const [name, handle] of oldDir.entries()) {
-            if (handle.kind === 'file') {
-                const file = await handle.getFile();
-                const newFile = await newDir.getFileHandle(name, { create: true });
-                const writable = await newFile.createWritable();
-                await writable.write(await file.arrayBuffer());
-                await writable.close();
-                recordSave(`${newSlug}/${name}`);
-            }
-        }
+        // Recursively copy all files and subdirectories from old to new
+        await copyDirectoryContents(oldDir, newDir, newSlug);
 
         // Delete old directory
         await notebookDirHandle.removeEntry(oldSlug, { recursive: true });
@@ -8383,9 +9001,13 @@ function getPlainTextPreview(markdown, maxLength = 200) {
 
 // Generate template-driven "New X" buttons for a section
 function renderTemplateButtons(sectionId) {
+    // Get hidden_templates from settings (per-notebook configuration)
+    const hiddenTemplates = notebookSettings?.hidden_templates || [];
+
     // Get templates sorted by sort_order
     const templates = Object.values(templateRegistry)
         .filter(t => t.ui?.show_create_button !== false)
+        .filter(t => !hiddenTemplates.includes(t.name))
         .sort((a, b) => (a.ui?.sort_order || 99) - (b.ui?.sort_order || 99));
 
     // Button styles by template type

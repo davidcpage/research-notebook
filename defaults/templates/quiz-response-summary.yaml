@@ -1,0 +1,37 @@
+name: quiz-response-summary
+description: Cohort summary view that aggregates quiz responses from the same folder dynamically
+schema:
+  quizId:
+    type: text
+    required: true
+    description: ID of the quiz this summary relates to
+  cohort:
+    type: text
+    description: "Display name for this cohort (e.g., 'Year 10A Morning')"
+  responseFolder:
+    type: text
+    description: "Subfolder containing responses (e.g., '10a-morning'). If not set, uses same folder as summary."
+  created:
+    type: datetime
+  modified:
+    type: datetime
+card:
+  layout: quiz-response-summary
+  placeholder: "📊"
+viewer:
+  layout: quiz-response-summary
+editor:
+  layout: yaml
+style:
+  variables:
+    --template-border: "#c9d4d4"
+    --template-bg: "#e8f0f0"
+    --template-preview-bg: "#dfe8e8"
+    --template-title-text: "#2d4a4a"
+    --template-correct-bg: "#e8f5e9"
+    --template-incorrect-bg: "#ffebee"
+    --template-pending-bg: "#fff8e1"
+ui:
+  button_label: null
+  icon: "📊"
+  sort_order: 12

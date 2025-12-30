@@ -1,0 +1,42 @@
+{
+  "id": "s003-french-gcse",
+  "type": "quiz-response",
+  "template": "quiz-response",
+  "title": "Student s003 - French GCSE Quiz",
+  "studentId": "s003",
+  "quizId": "french-gcse-comprehension",
+  "submittedAt": "2025-01-10T09:45:00Z",
+  "answers": [
+    {
+      "questionIndex": 0,
+      "answer": 1,
+      "autoGrade": { "status": "correct", "score": 1, "maxScore": 1 }
+    },
+    {
+      "questionIndex": 1,
+      "answer": 1,
+      "autoGrade": { "status": "correct", "score": 1, "maxScore": 1 }
+    },
+    {
+      "questionIndex": 2,
+      "answer": "I'd like to reserve a room for two nights"
+    },
+    {
+      "questionIndex": 3,
+      "answer": "Où se trouve la gare?"
+    },
+    {
+      "questionIndex": 4,
+      "answer": "First she showers then she gets dressed"
+    },
+    {
+      "questionIndex": 5,
+      "answer": "Je me réveille tôt. Je me brosse les dents et je m'habille. Puis je prends mon petit déjeuner. Je pars à l'école à huit heures moins le quart."
+    }
+  ],
+  "totalScore": 2,
+  "maxScore": 13,
+  "status": "pending",
+  "created": "2025-01-10T09:45:00Z",
+  "modified": "2025-01-10T09:45:00Z"
+}

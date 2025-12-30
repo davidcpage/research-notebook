@@ -1,0 +1,52 @@
+{
+  "id": "s005-french-gcse",
+  "type": "quiz-response",
+  "template": "quiz-response",
+  "title": "Student s005 - French GCSE Quiz",
+  "studentId": "s005",
+  "quizId": "french-gcse-comprehension",
+  "submittedAt": "2025-01-10T14:10:00Z",
+  "answers": [
+    {
+      "questionIndex": 0,
+      "answer": 1,
+      "autoGrade": { "status": "correct", "score": 1, "maxScore": 1 },
+      "teacherGrade": { "score": 1, "maxScore": 1, "reviewedAt": "2025-01-10T16:30:00Z", "reviewer": "Ms. Williams" }
+    },
+    {
+      "questionIndex": 1,
+      "answer": 1,
+      "autoGrade": { "status": "correct", "score": 1, "maxScore": 1 },
+      "teacherGrade": { "score": 1, "maxScore": 1, "reviewedAt": "2025-01-10T16:30:00Z", "reviewer": "Ms. Williams" }
+    },
+    {
+      "questionIndex": 2,
+      "answer": "I would like to reserve a room for two nights.",
+      "autoGrade": { "status": "correct", "score": 2, "maxScore": 2 },
+      "teacherGrade": { "score": 2, "maxScore": 2, "reviewedAt": "2025-01-10T16:31:00Z", "reviewer": "Ms. Williams" }
+    },
+    {
+      "questionIndex": 3,
+      "answer": "Où se trouve la gare?",
+      "autoGrade": { "status": "correct", "score": 2, "maxScore": 2 },
+      "teacherGrade": { "score": 2, "maxScore": 2, "feedback": "Excellent use of 'se trouver'!", "reviewedAt": "2025-01-10T16:31:00Z", "reviewer": "Ms. Williams" }
+    },
+    {
+      "questionIndex": 4,
+      "answer": "She has a shower and then gets dressed.",
+      "claudeGrade": { "score": 2, "maxScore": 2, "feedback": "Correct! Both actions identified in the right order.", "gradedAt": "2025-01-10T15:00:00Z" },
+      "teacherGrade": { "score": 2, "maxScore": 2, "reviewedAt": "2025-01-10T16:32:00Z", "reviewer": "Ms. Williams" }
+    },
+    {
+      "questionIndex": 5,
+      "answer": "Le matin, je me réveille à six heures et demie. Puis, je me lève et je me lave dans la salle de bains. Ensuite, je m'habille et je descends pour prendre le petit déjeuner. Enfin, je quitte la maison à sept heures et demie.",
+      "claudeGrade": { "score": 5, "maxScore": 5, "feedback": "Exceptional response! Four well-structured sentences with multiple reflexive verbs (se réveiller, se lever, se laver, s'habiller). Excellent use of connectives (puis, ensuite, enfin) and specific times. Demonstrates strong command of the topic.", "gradedAt": "2025-01-10T15:00:00Z" },
+      "teacherGrade": { "score": 5, "maxScore": 5, "feedback": "Superbe! This could be a model answer.", "reviewedAt": "2025-01-10T16:35:00Z", "reviewer": "Ms. Williams" }
+    }
+  ],
+  "totalScore": 13,
+  "maxScore": 13,
+  "status": "reviewed",
+  "created": "2025-01-10T14:10:00Z",
+  "modified": "2025-01-10T16:35:00Z"
+}

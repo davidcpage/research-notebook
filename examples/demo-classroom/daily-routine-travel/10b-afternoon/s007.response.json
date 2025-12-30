@@ -1,0 +1,58 @@
+{
+  "id": "s007-french-gcse",
+  "template": "quiz-response",
+  "title": "Student s007 - French GCSE Quiz",
+  "studentId": "s007",
+  "quizId": "french-gcse-comprehension",
+  "submittedAt": "2025-01-10T14:55:00Z",
+  "answers": [
+    {
+      "questionIndex": 0,
+      "answer": 0,
+      "autoGrade": {
+        "status": "incorrect",
+        "score": 0,
+        "maxScore": 1
+      }
+    },
+    {
+      "questionIndex": 1,
+      "answer": 1,
+      "autoGrade": {
+        "status": "correct",
+        "score": 1,
+        "maxScore": 1
+      }
+    },
+    {
+      "questionIndex": 2,
+      "answer": "I'd like to book a room for two nights please",
+      "teacherGrade": {
+        "score": 2,
+        "maxScore": 2,
+        "reviewedAt": "2025-12-30T22:21:05.705Z",
+        "reviewer": "Ms. Johnson"
+      }
+    },
+    {
+      "questionIndex": 3,
+      "answer": "Où est la gare s'il vous plaît?"
+    },
+    {
+      "questionIndex": 4,
+      "answer": "Marie takes a shower and then she gets dressed"
+    },
+    {
+      "questionIndex": 5,
+      "answer": "D'habitude, je me lève vers sept heures moins le quart. Je me douche rapidement et je m'habille. Après ça, je prends mon petit déjeuner - normalement des tartines avec du beurre. Je quitte la maison à huit heures pour aller au lycée."
+    }
+  ],
+  "totalScore": 3,
+  "maxScore": 4,
+  "status": "pending",
+  "created": "2025-01-10T14:55:00Z",
+  "modified": "2025-12-30T22:21:05.705Z",
+  "_subdir": "10b-afternoon",
+  "_fileModified": 1767131803967,
+  "type": "quiz-response"
+}

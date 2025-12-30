@@ -1,0 +1,28 @@
+# Student roster for classroom notebook
+# Maps anonymous student IDs to student details
+# In production, this file should be in ~/.notebook/rosters/ (external to git)
+students:
+  s001:
+    name: Emma Thompson
+    email: emma.thompson@school.edu
+  s002:
+    name: James Wilson
+    email: james.wilson@school.edu
+  s003:
+    name: Sophie Chen
+    email: sophie.chen@school.edu
+  s004:
+    name: Oliver Martinez
+    email: oliver.martinez@school.edu
+  s005:
+    name: Amelia Brown
+    email: amelia.brown@school.edu
+  s006:
+    name: William Taylor
+    email: william.taylor@school.edu
+  s007:
+    name: Isla Davis
+    email: isla.davis@school.edu
+  s008:
+    name: Harry Johnson
+    email: harry.johnson@school.edu

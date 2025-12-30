@@ -1,0 +1,48 @@
+{
+  "id": "s002-french-gcse",
+  "type": "quiz-response",
+  "template": "quiz-response",
+  "title": "Student s002 - French GCSE Quiz",
+  "studentId": "s002",
+  "quizId": "french-gcse-comprehension",
+  "submittedAt": "2025-01-10T09:22:00Z",
+  "answers": [
+    {
+      "questionIndex": 0,
+      "answer": 1,
+      "autoGrade": { "status": "correct", "score": 1, "maxScore": 1 }
+    },
+    {
+      "questionIndex": 1,
+      "answer": 0,
+      "autoGrade": { "status": "incorrect", "score": 0, "maxScore": 1 }
+    },
+    {
+      "questionIndex": 2,
+      "answer": "I want to book a room for two nights",
+      "autoGrade": { "status": "incorrect", "score": 0, "maxScore": 2 },
+      "claudeGrade": { "score": 1, "maxScore": 2, "feedback": "Good attempt! 'Voudrais' is conditional (would like), not simple present (want). The rest is correct.", "gradedAt": "2025-01-10T12:05:00Z" }
+    },
+    {
+      "questionIndex": 3,
+      "answer": "Où est le gare?",
+      "autoGrade": { "status": "incorrect", "score": 0, "maxScore": 2 },
+      "claudeGrade": { "score": 1, "maxScore": 2, "feedback": "Close! 'Gare' is feminine, so it should be 'la gare', not 'le gare'. Good question structure though.", "gradedAt": "2025-01-10T12:05:00Z" }
+    },
+    {
+      "questionIndex": 4,
+      "answer": "She takes a shower and gets dressed",
+      "claudeGrade": { "score": 2, "maxScore": 2, "feedback": "Correct! Both actions identified.", "gradedAt": "2025-01-10T12:05:00Z" }
+    },
+    {
+      "questionIndex": 5,
+      "answer": "Je me leve à sept heures. Je me douche. Je mange le petit déjeuner.",
+      "claudeGrade": { "score": 3, "maxScore": 5, "feedback": "Good use of two reflexive verbs (se lever, se doucher). Missing accent on 'lève'. 'Je mange le petit déjeuner' should be 'je prends mon petit déjeuner'. Three sentences provided.", "gradedAt": "2025-01-10T12:05:00Z" }
+    }
+  ],
+  "totalScore": 8,
+  "maxScore": 13,
+  "status": "graded",
+  "created": "2025-01-10T09:22:00Z",
+  "modified": "2025-01-10T12:05:00Z"
+}

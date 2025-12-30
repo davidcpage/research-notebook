@@ -1,0 +1,48 @@
+{
+  "id": "s006-french-gcse",
+  "type": "quiz-response",
+  "template": "quiz-response",
+  "title": "Student s006 - French GCSE Quiz",
+  "studentId": "s006",
+  "quizId": "french-gcse-comprehension",
+  "submittedAt": "2025-01-10T14:25:00Z",
+  "answers": [
+    {
+      "questionIndex": 0,
+      "answer": 1,
+      "autoGrade": { "status": "correct", "score": 1, "maxScore": 1 }
+    },
+    {
+      "questionIndex": 1,
+      "answer": 1,
+      "autoGrade": { "status": "correct", "score": 1, "maxScore": 1 }
+    },
+    {
+      "questionIndex": 2,
+      "answer": "I would like to reserve a room for 2 nights",
+      "autoGrade": { "status": "incorrect", "score": 0, "maxScore": 2 },
+      "claudeGrade": { "score": 2, "maxScore": 2, "feedback": "Correct translation. Using '2' instead of 'two' doesn't affect the meaning.", "gradedAt": "2025-01-10T15:05:00Z" }
+    },
+    {
+      "questionIndex": 3,
+      "answer": "Ou est la gare?",
+      "autoGrade": { "status": "incorrect", "score": 0, "maxScore": 2 },
+      "claudeGrade": { "score": 1, "maxScore": 2, "feedback": "Almost! Missing the accent grave on 'Où'. Without it, 'ou' means 'or' rather than 'where'.", "gradedAt": "2025-01-10T15:05:00Z" }
+    },
+    {
+      "questionIndex": 4,
+      "answer": "She showers and gets dressed",
+      "claudeGrade": { "score": 2, "maxScore": 2, "feedback": "Perfect!", "gradedAt": "2025-01-10T15:05:00Z" }
+    },
+    {
+      "questionIndex": 5,
+      "answer": "Je me reveille à sept heures. Je me leve et je me habille. Je mange des cereales.",
+      "claudeGrade": { "score": 3, "maxScore": 5, "feedback": "Good attempt with three reflexive verbs! Missing accents on 'réveille', 'lève', and 'céréales'. 'Je me habille' should be 'je m'habille' (elision required). Three sentences, meets basic requirements.", "gradedAt": "2025-01-10T15:05:00Z" }
+    }
+  ],
+  "totalScore": 10,
+  "maxScore": 13,
+  "status": "graded",
+  "created": "2025-01-10T14:25:00Z",
+  "modified": "2025-01-10T15:05:00Z"
+}

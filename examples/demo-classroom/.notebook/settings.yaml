@@ -1,0 +1,73 @@
+notebook_title: Classroom Notebook
+notebook_subtitle: Quizzes and grading.
+sections:
+  - name: Daily Routine & Travel
+    visible: true
+  - name: Assets
+    visible: false
+  - name: System
+    path:
+      - .
+      - .notebook
+      - .notebook/templates
+    visible: false
+default_author: Ms. Johnson
+authors:
+  - name: Claude
+    icon: claude.svg
+extensions:
+  .md:
+    parser: yaml-frontmatter
+    defaultTemplate: note
+    bodyField: content
+  .code.py:
+    parser: comment-frontmatter
+    defaultTemplate: code
+    bodyField: code
+    companionFiles:
+      - suffix: .output.html
+        field: output
+  .bookmark.json:
+    parser: json
+    defaultTemplate: bookmark
+  .quiz.json:
+    parser: json
+    defaultTemplate: quiz
+  .response.json:
+    parser: json
+    defaultTemplate: quiz-response
+  .response-summary.json:
+    parser: json
+    defaultTemplate: quiz-response-summary
+  .card.yaml:
+    parser: yaml
+    defaultTemplate: null
+  .png:
+    parser: binary-image
+    defaultTemplate: image
+  .jpg:
+    parser: binary-image
+    defaultTemplate: image
+  .jpeg:
+    parser: binary-image
+    defaultTemplate: image
+  .gif:
+    parser: binary-image
+    defaultTemplate: image
+  .webp:
+    parser: binary-image
+    defaultTemplate: image
+  .svg:
+    parser: text-image
+    defaultTemplate: image
+theme: friendly
+quiz_self_review: true
+hidden_templates:
+  - code
+  - bookmark
+  - quiz-response
+  - quiz-response-summary
+quiz_template_mode: true
+grading:
+  roster_path: ~/.notebook/rosters/
+  show_student_names: true
