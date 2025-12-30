@@ -33,9 +33,23 @@ The implementation separates general quiz infrastructure from Google-specific in
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | **Quiz grading tools** | `tools/grading/` | Bulk API grading, statistics, roster management - works with any quiz source |
-| **Google Forms bridge** | `google-forms-bridge/` | Apps Script for Form ↔ JSON, clasp orchestration - Google-specific |
+| **Google Forms bridge** | `tools/forms-bridge/` | Node.js CLI using Forms REST API - Google-specific |
 
 This separation means the grading infrastructure can also support manual quiz entry, CSV imports, or future platform integrations (Canvas, Moodle, etc.).
+
+### Why REST API over Apps Script
+
+After evaluating both approaches (see [Decisions](#decisions)), we chose the Google Forms REST API:
+
+| Aspect | Apps Script (clasp) | REST API (Node.js CLI) |
+|--------|---------------------|------------------------|
+| **Setup** | Install clasp, login, create project, push, deploy, authorize | Run `forms-bridge auth`, click Allow |
+| **Reliability** | `clasp run` often fails with "Script function not found" | Standard HTTP calls |
+| **Code location** | Split between Apps Script and notebook | All in one codebase |
+| **Sharing code** | Separate implementation needed | CLI and notebook can share translation layer |
+| **User dependencies** | Node + clasp + Google Cloud project | Node only (already have for Claude Code) |
+
+**Trade-off**: REST API cannot push grades back to existing responses (only Apps Script can do this via `withItemGrade()`). We defer this feature - see [Grade Push-Back](#grade-push-back-deferred).
 
 ### High-Level Data Flow
 
@@ -44,36 +58,40 @@ This separation means the grading infrastructure can also support manual quiz en
 │                           TEACHER'S NOTEBOOK                             │
 │                                                                          │
 │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐      │
-│  │   Quiz Cards    │    │ Response Cards  │    │  Grade Cards    │      │
-│  │  (.quiz.json)   │    │ (per student)   │    │  (reviewed)     │      │
+│  │   Quiz Cards    │    │ Response Cards  │    │  Reviewed       │      │
+│  │  (.quiz.json)   │    │ (per student)   │    │  Grades (CSV)   │      │
 │  └────────┬────────┘    └────────▲────────┘    └────────┬────────┘      │
 │           │                      │                      │               │
 └───────────┼──────────────────────┼──────────────────────┼───────────────┘
             │                      │                      │
-            │ Export Quiz          │ Import Responses     │ Export Grades
+            │ Export Quiz          │ Import Responses     │ Export to
+            │                      │                      │ School System
             ▼                      │                      ▼
 ┌───────────────────────────────────────────────────────────────────────┐
-│                        GOOGLE APPS SCRIPT BRIDGE                       │
+│                     FORMS-BRIDGE CLI (Node.js)                         │
+│                        Uses Google Forms REST API                      │
 │                                                                        │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
-│  │ exportForm  │  │ importQuiz  │  │exportResp.  │  │importGrades │   │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                    │
+│  │   create    │  │   export    │  │  responses  │   (no grade push)  │
+│  └─────────────┘  └─────────────┘  └─────────────┘                    │
 └───────────────────────────────────────────────────────────────────────┘
-            │                      ▲                      │
-            ▼                      │                      ▼
+            │                      ▲
+            ▼                      │
 ┌───────────────────────────────────────────────────────────────────────┐
 │                           GOOGLE FORMS                                 │
 │                                                                        │
-│        Quiz Form ◄──────────────────────────── Graded Responses        │
+│        Quiz Form                              Student Responses        │
 │             │                                        ▲                 │
 │             ▼                                        │                 │
 │        Student takes quiz ──────────────────────────►│                 │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
+**Note**: Grade push-back to Google Forms is deferred. Teachers export final grades to their school's gradebook system (CSV), not back to Forms. See [Grade Push-Back](#grade-push-back-deferred).
+
 ### Notebook Data Model
 
-Each quiz creates a section in the notebook:
+Each quiz creates a section in the notebook, with **subsections per cohort** (class/period):
 
 ```
 notebook/
@@ -81,9 +99,14 @@ notebook/
 │   └── photosynthesis-quiz.quiz.json      # The quiz definition
 │
 ├── photosynthesis-quiz-responses/          # Section per quiz
-│   ├── s001.response.json                  # One card per student (ID only)
-│   ├── s002.response.json
-│   └── s003.response.json
+│   ├── class-8a/                           # Subsection per cohort
+│   │   ├── _summary.response.json          # Cohort summary card
+│   │   ├── s001.response.json              # Individual student cards
+│   │   └── s002.response.json
+│   └── class-8b/                           # Another cohort
+│       ├── _summary.response.json
+│       ├── s003.response.json
+│       └── s004.response.json
 │
 └── .notebook/
     └── settings.yaml                       # Google Forms link settings
@@ -92,6 +115,8 @@ notebook/
 ~/.notebook/rosters/
 └── photosynthesis-quiz-roster.yaml         # Student ID → name/email mapping
 ```
+
+**Why subsections per cohort?** Same quiz given to multiple classes (8A Monday, 8B Tuesday) stays organized. Uses existing notebook subsection feature.
 
 ### Response Card Structure
 
@@ -135,6 +160,45 @@ notebook/
 ```
 
 **Note**: Response cards contain `studentId` only, not student names or emails. See [Privacy & Anonymization](#privacy--anonymization) for the roster-based approach.
+
+### Summary Response Card (Cohort View)
+
+Each cohort has a `_summary.response.json` card that provides **question-level grading** similar to Google Forms' "Question" view. This aligns with batch grading (grade all Q3 answers together with same rubric).
+
+**UI Mockup:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Class 8A - Photosynthesis Quiz                             │
+│  28 submitted · Avg 78% · Jan 15, 2025                      │
+├─────────────────────────────────────────────────────────────┤
+│  ▶ Q1: What is photosynthesis? (92% correct)                │
+│  ▶ Q2: Which gas is released? (85% correct)                 │
+│  ▼ Q3: Explain the light reaction... (avg 3.2/5) [PENDING]  │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │ s001: "Plants use sunlight to..."    [4/5] [✓ reviewed] ││
+│  │ s002: "The light reaction converts..." [3/5] [edit]     ││
+│  │ s003: "Photosynthesis happens when..." [2/5] [edit]     ││
+│  │ ...                                                      ││
+│  └─────────────────────────────────────────────────────────┘│
+│  ▶ Q4: Calculate glucose produced... (avg 7.1/10)           │
+│                                                             │
+│  [Launch Bulk Grading]                                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Design rationale:**
+- **Collapsible question sections**: Expand to see all student answers for one question (like Forms' Question view)
+- **Question-level grading**: Review/calibrate grades consistently across students
+- **Batch grading integration**: "Launch Bulk Grading" button triggers AI grading workflow
+- **Dual views**: Summary card for question-centric work, individual cards for student-centric review
+
+**Workflow:**
+1. AI batch-grades all Q3 answers together (shared rubric/calibration context)
+2. Teacher expands Q3 section, reviews grades side-by-side
+3. Adjusts outliers, approves batch
+4. Moves to Q4
+
+This mirrors how Google Forms presents responses (Summary, Question, Individual views) but optimized for AI-assisted grading.
 
 ### Grade Hierarchy
 
@@ -211,105 +275,79 @@ questions[]:
 ```
 research-notebook/
 ├── tools/
-│   └── grading/
-│       ├── grade_responses.py      # Bulk API grading (Anthropic, OpenAI, etc.)
-│       ├── manage_roster.py        # Student ID ↔ name mapping
-│       ├── generate_stats.py       # Summary statistics generation
-│       └── README.md               # Setup and usage docs
+│   ├── grading/
+│   │   ├── grade_responses.py      # Bulk API grading (Anthropic, OpenAI, etc.)
+│   │   ├── manage_roster.py        # Student ID ↔ name mapping
+│   │   ├── generate_stats.py       # Summary statistics generation
+│   │   └── README.md               # Setup and usage docs
+│   │
+│   └── forms-bridge/               # Node.js CLI for Google Forms REST API
+│       ├── package.json
+│       ├── cli.js                  # CLI entry point
+│       ├── lib/
+│       │   ├── auth.js             # OAuth desktop flow
+│       │   ├── forms-api.js        # Forms REST API calls
+│       │   └── translate.js        # Forms JSON ↔ Quiz schema
+│       └── README.md
 │
-└── google-forms-bridge/
-    ├── appsscript.json             # Manifest with required scopes
-    ├── Code.gs                     # Main entry points
-    ├── ExportForm.gs               # Form structure → JSON
-    ├── ImportQuiz.gs               # JSON → Form questions
-    ├── ExportResponses.gs          # Student answers → JSON
-    ├── ImportGrades.gs             # Grades/feedback → Form
-    ├── Utils.gs                    # Shared helpers
-    └── README.md                   # clasp setup instructions
+└── google-forms-bridge/            # DEPRECATED - Apps Script (kept for reference)
+    └── ...                         # See git history if needed
 ```
 
-## Google Apps Script Bridge
+## Forms Bridge CLI (Node.js)
 
-### Key Functions
+### Architecture
 
-```javascript
-// ExportForm.gs
-function exportFormToJSON(formId) {
-  // Returns: { title, description, questions[], settings }
-}
+The CLI uses the Google Forms REST API directly, with a shared translation layer:
 
-// ImportQuiz.gs
-function createFormFromJSON(quizJSON) {
-  // Creates new Form, returns formId and editUrl
-}
-
-function updateFormFromJSON(formId, quizJSON) {
-  // Updates existing Form
-}
-
-// ExportResponses.gs
-function exportResponsesToJSON(formId) {
-  // Returns: { responses: [{ student, answers[], submittedAt }] }
-}
-
-// ImportGrades.gs
-function submitGradesToForm(formId, grades) {
-  // grades: [{ responseId, scores: [{ questionIndex, score, feedback }] }]
-  // Calls Form.submitGrades() to persist
-}
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Notebook (browser JS)                        │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │   Translation Layer (Forms JSON ↔ Quiz Schema)          │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│         ▲                              ▲                        │
+│         │                              │                        │
+│  ┌──────┴──────┐              ┌───────┴────────┐               │
+│  │  Notebook   │              │   CLI Output   │               │
+│  │  Buttons    │              │   (file I/O)   │               │
+│  │  (future)   │              │                │               │
+│  └─────────────┘              └───────┬────────┘               │
+└───────────────────────────────────────┼─────────────────────────┘
+                                        │
+                                        ▼
+                                 CLI Tool (Node.js)
+                                 (desktop OAuth)
 ```
 
-### Required OAuth Scopes
+**Key insight**: Translation logic lives in one place. The CLI outputs/accepts Forms-native JSON, and the same translation code can be used by both CLI and future notebook buttons.
 
-```json
-{
-  "oauthScopes": [
-    "https://www.googleapis.com/auth/forms",
-    "https://www.googleapis.com/auth/forms.responses.readonly"
-  ]
-}
-```
-
----
-
-## CLI Workflow (via clasp)
-
-### One-Time Setup
+### CLI Commands
 
 ```bash
-# 1. Install clasp
-npm install -g @google/clasp
+# One-time setup (opens browser for OAuth consent)
+forms-bridge auth
 
-# 2. Login (opens browser for OAuth)
-clasp login
+# Create Google Form from quiz JSON
+forms-bridge create quiz.json
+# Returns: { formId, editUrl, viewUrl }
 
-# 3. Clone the bridge project (or create new)
-clasp clone <SCRIPT_ID>
-# OR
-clasp create --type standalone --title "Research Notebook Forms Bridge"
+# Export Google Form structure to JSON
+forms-bridge export <form-id> --output form.json
 
-# 4. Push the scripts
-clasp push
-
-# 5. Deploy as API executable
-clasp deploy --description "v1"
+# Get responses from Google Form
+forms-bridge responses <form-id> --output responses.json
+# Or CSV: forms-bridge responses <form-id> --format csv --output responses.csv
 ```
 
-### Runtime Commands
+### OAuth Scopes
 
-```bash
-# Export form structure to JSON
-clasp run exportFormToJSON -p '["FORM_ID"]' > form.json
-
-# Create form from notebook quiz
-clasp run createFormFromJSON -p '[{...quizJSON}]'
-
-# Get student responses
-clasp run exportResponsesToJSON -p '["FORM_ID"]' > responses.json
-
-# Submit grades (after teacher review)
-clasp run submitGradesToForm -p '["FORM_ID", [...grades]]'
 ```
+https://www.googleapis.com/auth/forms.body
+https://www.googleapis.com/auth/forms.responses.readonly
+```
+
+Token stored locally in `~/.forms-bridge/token.json` (auto-refreshes).
 
 ---
 
@@ -337,9 +375,10 @@ Teacher: "Export this quiz to Google Forms"
 Claude:
 1. Reads the .quiz.json file
 2. Checks for incompatible question types (warns about `ordering`)
-3. Calls: clasp run createFormFromJSON
-4. Returns: Form URL for sharing with students
-5. Stores formId in quiz metadata for later sync
+3. Translates to Forms-native JSON
+4. Calls: forms-bridge create quiz-forms.json
+5. Returns: Form URL for sharing with students
+6. Stores formId in quiz metadata for later sync
 ```
 
 ### Phase 3: Import Responses
@@ -349,7 +388,7 @@ Teacher: "Import the responses from the photosynthesis quiz"
 
 Claude:
 1. Reads formId from quiz metadata
-2. Calls: clasp run exportResponsesToJSON
+2. Calls: forms-bridge responses <form-id> --output responses.json
 3. Creates section: photosynthesis-quiz-responses/
 4. Creates one .response.json card per student
 5. Auto-grades objective questions immediately
@@ -381,19 +420,20 @@ Teacher reviews in notebook UI:
 - Approved grades stored as teacherGrade (final)
 ```
 
-### Phase 6: Export Grades to Google Forms
+### Phase 6: Export Grades (to School System)
 
 ```
-Teacher: "Export the grades to Google Forms"
+Teacher: "Export the grades"
 
 Claude:
 1. Checks all responses have teacherGrade (or approved claudeGrade)
 2. Warns about any unreviewed responses
-3. Builds grades array from FINAL grades only
-4. Calls: clasp run submitGradesToForm
-5. Marks each response as exportedToForms: true
-6. Students can now view their grades in Google Forms
+3. Generates CSV with: StudentID, Q1, Q2, ..., Total, Percentage
+4. Optionally includes student names (--include-names, requires roster)
+5. Teacher imports CSV to school gradebook (Canvas, PowerSchool, etc.)
 ```
+
+**Note**: We do not push grades back to Google Forms. The REST API cannot update grades on existing responses (only Apps Script can via `withItemGrade()`). See [Grade Push-Back](#grade-push-back-deferred) for rationale and future options.
 
 ---
 
@@ -449,20 +489,22 @@ Average: 93.3%  Trend: ↗ Improving
 | **Response cards** | Per-student detail, teacher review | Auto-created on import |
 | **Summary card** | In-notebook class overview | Claude generates as markdown/code card |
 | **CSV/Spreadsheet** | External analysis, school records | Export command, compatible with Excel/Sheets |
-| **Google Forms grades** | Student-facing results | Export via Apps Script bridge |
+| ~~Google Forms grades~~ | ~~Student-facing results~~ | Deferred - see [Grade Push-Back](#grade-push-back-deferred) |
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: Apps Script Bridge (Foundation)
-- [ ] Create google-forms-bridge project structure
-- [ ] Implement exportFormToJSON
-- [ ] Implement createFormFromJSON
-- [ ] Implement exportResponsesToJSON
-- [ ] Implement submitGradesToForm
-- [ ] Test all functions via clasp run
+### Phase 1: Forms Bridge CLI (Foundation) ✅
+- [x] Create `tools/forms-bridge/` project structure
+- [x] Implement OAuth desktop flow (`lib/auth.js`)
+- [x] Implement Forms API wrapper (`lib/forms-api.js`)
+- [x] Implement translation layer (`lib/translate.js`)
+- [x] CLI commands: `auth`, `create`, `export`, `responses`
+- [x] Test all commands manually
 - [ ] Document setup process in README
+
+**Completed 2025-12-30** (dp-081)
 
 ### Phase 2: Quiz Type Extensions
 - [x] Add `allowMultiple` and `display` to multiple_choice
@@ -482,17 +524,20 @@ Design doc: [quiz-editor.md](quiz-editor.md)
 
 ### Phase 3: Response Card Type
 - [x] Define quiz-response template
-- [x] Implement response card rendering
-- [x] Show student answer, auto-grade, Claude grade, teacher grade
-- [x] Add review UI for teacher grade editing
-- [x] Track reviewed/unreviewed status
+- [ ] Implement individual response card rendering
+- [ ] Show student answer, auto-grade, Claude grade, teacher grade
+- [ ] Add review UI for teacher grade editing
+- [ ] Track reviewed/unreviewed status
+- [ ] Implement summary response card (cohort view)
+- [ ] Collapsible question sections with all student answers
+- [ ] "Launch Bulk Grading" button integration
 
 ### Phase 4: Claude Code Integration
-- [ ] Detect clasp installation and login status
-- [ ] Implement quiz export workflow
-- [ ] Implement response import workflow
+- [ ] Detect forms-bridge CLI and auth status
+- [ ] Implement quiz export workflow (quiz → Forms)
+- [ ] Implement response import workflow (Forms → response cards)
 - [ ] Implement AI grading workflow
-- [ ] Implement grade export workflow
+- [ ] Implement CSV grade export
 - [ ] Add appropriate confirmations and warnings
 
 ### Phase 5: Analytics
@@ -501,37 +546,88 @@ Design doc: [quiz-editor.md](quiz-editor.md)
 - [ ] Question difficulty analysis
 - [ ] Export to spreadsheet format
 
+### Phase 6: Notebook Buttons (Future)
+- [ ] Add Google's JS client library for browser OAuth
+- [ ] "Export to Google Form" button in quiz viewer
+- [ ] "Import from Google Form" in create menu
+- [ ] Share translation layer with CLI
+
 ---
 
 ## Decisions
 
 1. **Repo structure**: Keep all components within research-notebook repo.
    - `tools/grading/` - General quiz infrastructure (bulk API grading, roster management, statistics)
-   - `google-forms-bridge/` - Google-specific Apps Script bridge
+   - `tools/forms-bridge/` - Google Forms REST API CLI
    - Separation allows grading tools to work with any quiz source (manual entry, CSV, future platforms)
-   - The bridge is thin (~200-300 lines) - not a standalone project
    - Design iteration is easier when components evolve together
-   - Can always extract later if there's genuine external demand
+
+2. **REST API over Apps Script** (decided 2025-12-29):
+   - Google Forms REST API instead of Apps Script + clasp
+   - Simpler setup: single OAuth flow vs clasp install/login/deploy
+   - More reliable: `clasp run` often fails with "Script function not found"
+   - Shared codebase: translation layer usable by both CLI and notebook buttons
+   - Node.js CLI (not Python): can share code with browser JS
+   - Trade-off: cannot push grades back to Forms (REST API limitation)
+   - See research notes: [Google Forms API docs](https://developers.google.com/forms/api/guides), [REST vs Apps Script comparison](https://developers.google.com/workspace/forms/api/guides/compare-rest-apps-script)
+
+3. **Grade push-back deferred**: See [Grade Push-Back](#grade-push-back-deferred) section.
+
+---
+
+## Grade Push-Back (Deferred)
+
+### The Limitation
+
+The Google Forms REST API **cannot update grades on existing responses**. Only Apps Script can do this via `FormResponse.withItemGrade()`.
+
+### Research Findings (2025-12-29)
+
+| Approach | Can Push Grades? |
+|----------|:----------------:|
+| REST API | ❌ |
+| Linked Sheet (edit) | ❌ (one-way sync, Forms→Sheet only) |
+| Manual Forms UI | ⚠️ One-at-a-time only, no bulk paste |
+| Apps Script `withItemGrade()` | ✅ |
+
+### Current Workflow (Without Grade Push)
+
+1. Teacher creates quiz in notebook, exports to Google Forms
+2. Students take quiz in Google Forms
+3. Teacher imports responses, grades in notebook (AI + review)
+4. Teacher exports final grades as CSV
+5. Teacher imports CSV to school gradebook (Canvas, PowerSchool, etc.)
+
+**Google Forms is used for collection only.** The notebook is the grading hub.
+
+### Future Options
+
+If grade push-back becomes essential:
+
+1. **Optional Apps Script add-on**: Keep minimal `.gs` file for `withItemGrade()` only
+2. **Teacher enters manually**: Viable for small classes, but tedious
+3. **Alternative student notification**: Email grades directly, or use school LMS
+
+For now, we proceed without grade push-back. Teachers already export to school gradebooks anyway.
 
 ---
 
 ## Open Questions
 
-1. **Response card vs attempts array**: Currently quizzes store attempts in the quiz card. Should student responses be:
-   - Separate cards in a section (proposed above) - better for many students
-   - Attempts array in quiz card - current pattern, simpler for self-study
+1. ~~**Response card vs attempts array**~~: Resolved - separate cards in a section for bulk grading.
 
-2. **Matching → Grid migration**: Should we deprecate `matching` in favor of `grid`, or keep both?
+2. ~~**Matching → Grid migration**~~: Resolved - deprecated matching/ordering, use grid instead.
 
 3. **Numeric questions**: Accept loss of tolerance on Google Forms export, or find workaround?
 
-4. **Ordering questions**: Accept they can't export, or remove from quiz types entirely?
+4. ~~**Ordering questions**~~: Resolved - deprecated, cannot export to Google Forms.
 
 ---
 
 ## Security Considerations
 
-- OAuth tokens stored locally in `.clasprc.json` (user's home directory)
+- OAuth tokens stored locally in `~/.forms-bridge/token.json`
+- Tokens auto-refresh, user re-authorizes if revoked
 - Form IDs stored in quiz metadata - not sensitive
 - Teacher must explicitly trigger each export
 - No automatic sync - all operations are manual

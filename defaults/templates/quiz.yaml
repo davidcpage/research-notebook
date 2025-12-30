@@ -87,13 +87,18 @@ schema:
           type: boolean
           description: Allow partial credit for applicable types (checkbox, grid). Default true.
           default: true
-        # Common optional fields
-        hint:
+        # Feedback fields (maps to Google Forms whenRight/whenWrong)
+        whenRight:
           type: markdown
-          description: Hint shown on request
-        explanation:
+          description: Feedback shown when answer is correct
+        whenWrong:
           type: markdown
-          description: Shown after answering
+          description: Feedback shown when answer is wrong
+        # Short answer auto-grading
+        acceptedAnswers:
+          type: array
+          description: Acceptable text answers for short_answer type (case-insensitive match)
+        # AI grading fields (not in Google Forms - our extension)
         modelAnswer:
           type: markdown
           description: Model answer for AI grading (short_answer, worked types)

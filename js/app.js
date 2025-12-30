@@ -1972,20 +1972,15 @@ function renderQuizQuestion(question, index, attempt, isInteractive = false) {
     // Render answer area based on question type
     html += renderQuizAnswerArea(question, attemptAnswer, isInteractive, index);
 
-    // Hint (if available) - always shown in interactive mode, collapsible
-    if (question.hint) {
-        html += `<details class="quiz-hint">
-            <summary>Hint</summary>
-            <div class="md-content">${marked.parse(question.hint)}</div>
-        </details>`;
-    }
-
-    // Explanation (shown after attempt in review mode)
-    if (attemptAnswer && question.explanation) {
-        html += `<div class="quiz-explanation">
-            <div class="quiz-explanation-label">Explanation</div>
-            <div class="md-content">${marked.parse(question.explanation)}</div>
-        </div>`;
+    // Feedback based on answer correctness (maps to Google Forms whenRight/whenWrong)
+    if (attemptAnswer) {
+        const isCorrect = attemptAnswer?.autoGrade?.status === 'correct' || attemptAnswer?.status === 'correct';
+        const feedback = isCorrect ? question.whenRight : question.whenWrong;
+        if (feedback) {
+            html += `<div class="quiz-feedback quiz-feedback-${isCorrect ? 'correct' : 'incorrect'}">
+                <div class="md-content">${marked.parse(feedback)}</div>
+            </div>`;
+        }
     }
 
     // Review UI for pending_review questions
@@ -4792,29 +4787,29 @@ function createQuestionEditor(question, index, total) {
     const advancedContent = document.createElement('div');
     advancedContent.className = 'quiz-advanced-content';
 
-    // Hint field (all types)
-    const hintField = document.createElement('div');
-    hintField.className = 'quiz-field';
-    hintField.innerHTML = `<label>Hint</label>`;
-    const hintTextarea = document.createElement('textarea');
-    hintTextarea.className = 'quiz-hint';
-    hintTextarea.value = question.hint || '';
-    hintTextarea.rows = 2;
-    hintTextarea.placeholder = 'Optional hint shown on request';
-    hintField.appendChild(hintTextarea);
-    advancedContent.appendChild(hintField);
+    // Feedback when correct (maps to Google Forms whenRight)
+    const whenRightField = document.createElement('div');
+    whenRightField.className = 'quiz-field';
+    whenRightField.innerHTML = `<label>Feedback when correct</label>`;
+    const whenRightTextarea = document.createElement('textarea');
+    whenRightTextarea.className = 'quiz-when-right';
+    whenRightTextarea.value = question.whenRight || '';
+    whenRightTextarea.rows = 2;
+    whenRightTextarea.placeholder = 'Shown when answer is correct';
+    whenRightField.appendChild(whenRightTextarea);
+    advancedContent.appendChild(whenRightField);
 
-    // Explanation field (all types)
-    const explanationField = document.createElement('div');
-    explanationField.className = 'quiz-field';
-    explanationField.innerHTML = `<label>Explanation</label>`;
-    const explanationTextarea = document.createElement('textarea');
-    explanationTextarea.className = 'quiz-explanation';
-    explanationTextarea.value = question.explanation || '';
-    explanationTextarea.rows = 2;
-    explanationTextarea.placeholder = 'Explanation shown after answering';
-    explanationField.appendChild(explanationTextarea);
-    advancedContent.appendChild(explanationField);
+    // Feedback when wrong (maps to Google Forms whenWrong)
+    const whenWrongField = document.createElement('div');
+    whenWrongField.className = 'quiz-field';
+    whenWrongField.innerHTML = `<label>Feedback when wrong</label>`;
+    const whenWrongTextarea = document.createElement('textarea');
+    whenWrongTextarea.className = 'quiz-when-wrong';
+    whenWrongTextarea.value = question.whenWrong || '';
+    whenWrongTextarea.rows = 2;
+    whenWrongTextarea.placeholder = 'Shown when answer is incorrect';
+    whenWrongField.appendChild(whenWrongTextarea);
+    advancedContent.appendChild(whenWrongField);
 
     // Model answer and rubric only for types needing AI grading
     if (needsAIGrading) {
@@ -5373,8 +5368,8 @@ function handleQuestionTypeChange(questionEl, newType) {
         type: newType,
         question: currentData.question || '',
         points: currentData.points || 1,
-        hint: currentData.hint,
-        explanation: currentData.explanation,
+        whenRight: currentData.whenRight,
+        whenWrong: currentData.whenWrong,
         modelAnswer: currentData.modelAnswer,
         rubric: currentData.rubric
     };
@@ -5605,12 +5600,12 @@ function getQuestionsEditorValue() {
             }
         }
 
-        // Get advanced fields
-        const hint = questionEl.querySelector('.quiz-hint');
-        if (hint && hint.value.trim()) question.hint = hint.value.trim();
+        // Get feedback fields
+        const whenRight = questionEl.querySelector('.quiz-when-right');
+        if (whenRight && whenRight.value.trim()) question.whenRight = whenRight.value.trim();
 
-        const explanation = questionEl.querySelector('.quiz-explanation');
-        if (explanation && explanation.value.trim()) question.explanation = explanation.value.trim();
+        const whenWrong = questionEl.querySelector('.quiz-when-wrong');
+        if (whenWrong && whenWrong.value.trim()) question.whenWrong = whenWrong.value.trim();
 
         const modelAnswer = questionEl.querySelector('.quiz-model-answer');
         if (modelAnswer && modelAnswer.value.trim()) question.modelAnswer = modelAnswer.value.trim();
