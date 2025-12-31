@@ -1,0 +1,477 @@
+{
+  "id": "french-gcse-module-3",
+  "title": "French GCSE Module 3: My Neighbourhood (Mon quartier)",
+  "author": "Claude",
+  "topic": "Edexcel GCSE French 2026 - Thematic Context 3: My Neighbourhood",
+  "questions": [
+    {
+      "type": "multiple_choice",
+      "question": "Comment dit-on \"the bakery\" en français?",
+      "options": [
+        "la boucherie",
+        "la boulangerie",
+        "la pâtisserie",
+        "la pharmacie"
+      ],
+      "correct": 1,
+      "hint": "C'est l'endroit où on achète du pain.",
+      "explanation": "La boulangerie = the bakery (where you buy bread). La boucherie = butcher's, la pâtisserie = cake shop, la pharmacie = pharmacy."
+    },
+    {
+      "type": "multiple_choice",
+      "question": "Que veut dire \"le quartier\"?",
+      "options": [
+        "the quarter (1/4)",
+        "the neighbourhood",
+        "the square",
+        "the street"
+      ],
+      "correct": 1,
+      "hint": "C'est la zone où tu habites.",
+      "explanation": "Le quartier = the neighbourhood/area. Although 'quartier' can mean 'quarter' in some contexts, in the context of where you live, it means neighbourhood."
+    },
+    {
+      "type": "multiple_choice",
+      "question": "Pour aller à la gare, il faut tourner...",
+      "options": [
+        "tout droit",
+        "à gauche",
+        "en face",
+        "à côté"
+      ],
+      "correct": 1,
+      "hint": "\"Tourner\" means to turn. Which option is a direction you can turn?",
+      "explanation": "Tourner à gauche = turn left. Tout droit = straight ahead (you don't turn), en face = opposite, à côté = next to."
+    },
+    {
+      "type": "checkbox",
+      "question": "Quels sont des magasins? (Sélectionnez toutes les bonnes réponses)",
+      "options": [
+        "la librairie",
+        "la bibliothèque",
+        "le supermarché",
+        "l'hôtel de ville"
+      ],
+      "correctMultiple": [
+        0,
+        2
+      ],
+      "hint": "Un magasin est un endroit où on achète des choses.",
+      "explanation": "La librairie (bookshop) and le supermarché are shops. La bibliothèque is a library (not a shop - you borrow, not buy). L'hôtel de ville is the town hall."
+    },
+    {
+      "type": "dropdown",
+      "question": "Complétez: \"J'habite _____ un petit village.\"",
+      "options": [
+        "à",
+        "dans",
+        "en",
+        "sur"
+      ],
+      "correct": 1,
+      "hint": "Quand on parle d'habiter dans un endroit, on utilise quelle préposition?",
+      "explanation": "J'habite dans = I live in. With villages and towns, we typically use 'dans' or 'à'. 'Dans un village' emphasizes being inside/within the village."
+    },
+    {
+      "type": "multiple_choice",
+      "question": "Où est-ce qu'on peut acheter des médicaments?",
+      "options": [
+        "à la poste",
+        "à la pharmacie",
+        "au commissariat",
+        "à l'épicerie"
+      ],
+      "correct": 1,
+      "hint": "Les médicaments sont vendus dans un endroit médical.",
+      "explanation": "On achète des médicaments à la pharmacie. La poste = post office, le commissariat = police station, l'épicerie = grocery shop."
+    },
+    {
+      "type": "multiple_choice",
+      "question": "Que veut dire \"la banlieue\"?",
+      "options": [
+        "the city centre",
+        "the suburbs",
+        "the countryside",
+        "the coast"
+      ],
+      "correct": 1,
+      "hint": "C'est la zone autour d'une grande ville.",
+      "explanation": "La banlieue = the suburbs/outskirts. Le centre-ville = city centre, la campagne = countryside, la côte = coast."
+    },
+    {
+      "type": "short_answer",
+      "question": "Décris ton quartier en 2-3 phrases. Utilise des adjectifs comme: calme, bruyant, animé, tranquille, industriel, historique.",
+      "hint": "Commence avec \"Mon quartier est...\" ou \"J'habite dans un quartier...\"",
+      "explanation": "A good answer might be: 'Mon quartier est assez calme et tranquille. Il y a beaucoup d'espaces verts et un petit parc. C'est un quartier résidentiel près du centre-ville.'"
+    },
+    {
+      "type": "multiple_choice",
+      "question": "\"Il y a un cinéma en face de la mairie.\" Que veut dire \"en face de\"?",
+      "options": [
+        "next to",
+        "behind",
+        "opposite",
+        "near"
+      ],
+      "correct": 2,
+      "hint": "Imagine-toi debout devant la mairie. Où est le cinéma?",
+      "explanation": "En face de = opposite/in front of. À côté de = next to, derrière = behind, près de = near."
+    },
+    {
+      "type": "checkbox",
+      "question": "Quels moyens de transport sont mentionnés correctement en français?",
+      "options": [
+        "le bus",
+        "le tram",
+        "le voiture",
+        "la métro"
+      ],
+      "correctMultiple": [
+        0,
+        1
+      ],
+      "hint": "Attention au genre (masculin/féminin) des noms!",
+      "explanation": "Le bus and le tram are correct. It should be LA voiture (feminine) and LE métro (masculine). Gender is important in French!"
+    },
+    {
+      "type": "multiple_choice",
+      "question": "Comment dit-on \"to go straight ahead\"?",
+      "options": [
+        "tourner à droite",
+        "continuer tout droit",
+        "prendre la première rue",
+        "traverser le pont"
+      ],
+      "correct": 1,
+      "hint": "\"Straight\" = tout droit",
+      "explanation": "Continuer tout droit = to go/continue straight ahead. Tourner à droite = turn right, prendre la première rue = take the first street, traverser le pont = cross the bridge."
+    },
+    {
+      "type": "multiple_choice",
+      "question": "Quel est le contraire de \"bruyant\"?",
+      "options": [
+        "animé",
+        "pollué",
+        "calme",
+        "sale"
+      ],
+      "correct": 2,
+      "hint": "Bruyant = noisy. Quel est le contraire?",
+      "explanation": "Calme (quiet/calm) is the opposite of bruyant (noisy). Animé = lively, pollué = polluted, sale = dirty."
+    },
+    {
+      "type": "dropdown",
+      "question": "Complétez: \"Il y a _____ de pollution dans les grandes villes.\"",
+      "options": [
+        "peu",
+        "beaucoup",
+        "trop",
+        "assez"
+      ],
+      "correct": 2,
+      "hint": "La pollution est un problème dans les grandes villes.",
+      "explanation": "Trop de (too much) pollution is typically the issue in big cities. While 'beaucoup de' (a lot of) could work, 'trop de' better expresses the problem. Peu de = little, assez de = enough."
+    },
+    {
+      "type": "multiple_choice",
+      "question": "Où est-ce qu'on peut emprunter des livres?",
+      "options": [
+        "à la librairie",
+        "à la bibliothèque",
+        "à la papeterie",
+        "au tabac"
+      ],
+      "correct": 1,
+      "hint": "Emprunter = to borrow (not buy!).",
+      "explanation": "À la bibliothèque = at the library. This is a common false friend: la librairie = bookshop (where you BUY books), la bibliothèque = library (where you BORROW books)."
+    },
+    {
+      "type": "worked",
+      "question": "Traduis en français:\n\n\"In my town, there is a swimming pool next to the park. It's very practical because I like to swim.\"",
+      "hint": "Utilise: dans ma ville, il y a, une piscine, à côté de, le parc, c'est pratique, parce que, j'aime nager",
+      "explanation": "Model answer: \"Dans ma ville, il y a une piscine à côté du parc. C'est très pratique parce que j'aime nager.\" Note: à côté de + le = à côté du (contraction)."
+    },
+    {
+      "type": "multiple_choice",
+      "question": "\"Le marché a lieu le samedi.\" Que veut dire \"avoir lieu\"?",
+      "options": [
+        "to be located",
+        "to take place",
+        "to have space",
+        "to be closed"
+      ],
+      "correct": 1,
+      "hint": "C'est une expression qui parle de quand quelque chose se passe.",
+      "explanation": "Avoir lieu = to take place. 'Le marché a lieu le samedi' = The market takes place on Saturday."
+    },
+    {
+      "type": "checkbox",
+      "question": "Quels problèmes environnementaux sont mentionnés correctement?",
+      "options": [
+        "la pollution de l'air",
+        "les embouteillages",
+        "le réchauffement climatique",
+        "le manque d'espaces verts"
+      ],
+      "correctMultiple": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "hint": "Tous ces termes sont liés à l'environnement.",
+      "explanation": "All are correct environmental issues: air pollution, traffic jams, climate change, and lack of green spaces. These are all key vocabulary for the environmental issues sub-topic."
+    },
+    {
+      "type": "multiple_choice",
+      "question": "Comment dit-on \"at the corner of the street\"?",
+      "options": [
+        "au bout de la rue",
+        "au coin de la rue",
+        "au milieu de la rue",
+        "au début de la rue"
+      ],
+      "correct": 1,
+      "hint": "\"Corner\" = le coin",
+      "explanation": "Au coin de la rue = at the corner of the street. Au bout de = at the end of, au milieu de = in the middle of, au début de = at the beginning of."
+    },
+    {
+      "type": "short_answer",
+      "question": "Quels sont les avantages et les inconvénients d'habiter en ville? Donne 2 avantages et 2 inconvénients.",
+      "hint": "Pense aux transports, aux magasins, au bruit, à la pollution...",
+      "explanation": "Example: Avantages - il y a beaucoup de magasins et de restaurants, les transports en commun sont pratiques. Inconvénients - il y a trop de bruit et de pollution, la vie est stressante."
+    },
+    {
+      "type": "multiple_choice",
+      "question": "\"Je voudrais habiter à la campagne.\" Que veut dire \"la campagne\"?",
+      "options": [
+        "the city",
+        "the coast",
+        "the countryside",
+        "the mountains"
+      ],
+      "correct": 2,
+      "hint": "C'est le contraire de la ville.",
+      "explanation": "La campagne = the countryside. La ville = city, la côte = coast, la montagne = mountains."
+    }
+  ],
+  "created": "2025-12-30T10:00:00Z",
+  "modified": "2025-12-30T23:20:09.301Z",
+  "_subdir": null,
+  "_fileModified": 1767136781228,
+  "attempts": [
+    {
+      "timestamp": "2025-12-30T23:19:27.474Z",
+      "answers": [
+        {
+          "questionIndex": 0,
+          "answer": 1,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 1,
+          "answer": 1,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 2,
+          "answer": 1,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 3,
+          "answer": [
+            2,
+            0
+          ],
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 4,
+          "answer": 1,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 5,
+          "answer": 1,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 6,
+          "answer": 1,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 7,
+          "answer": "Non.",
+          "autoGrade": {
+            "status": "pending_review",
+            "score": null,
+            "maxScore": 1
+          },
+          "status": "incorrect",
+          "review": {
+            "reviewedAt": "2025-12-30T23:19:41.217Z"
+          }
+        },
+        {
+          "questionIndex": 8,
+          "answer": 2,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 9,
+          "answer": [
+            0,
+            1
+          ],
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 10,
+          "answer": 1,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 11,
+          "answer": 2,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 12,
+          "answer": 1,
+          "autoGrade": {
+            "status": "incorrect",
+            "score": 0,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 13,
+          "answer": 1,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 14,
+          "answer": "Dans ma ville, il y a une piscine a cote du park. C'est tres pratique pas que j'aime nager.",
+          "autoGrade": {
+            "status": "pending_review",
+            "score": null,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 15,
+          "answer": 1,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 16,
+          "answer": [
+            1,
+            2,
+            3,
+            0
+          ],
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 17,
+          "answer": 1,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        },
+        {
+          "questionIndex": 18,
+          "answer": "-",
+          "autoGrade": {
+            "status": "pending_review",
+            "score": null,
+            "maxScore": 1
+          },
+          "status": "incorrect",
+          "review": {
+            "reviewedAt": "2025-12-30T23:20:09.301Z"
+          }
+        },
+        {
+          "questionIndex": 19,
+          "answer": 2,
+          "autoGrade": {
+            "status": "correct",
+            "score": 1,
+            "maxScore": 1
+          }
+        }
+      ],
+      "score": {
+        "earned": 16,
+        "possible": 20,
+        "percentage": 80,
+        "correct": 0,
+        "total": 20,
+        "pending_review": 0
+      }
+    }
+  ],
+  "type": "quiz"
+}
