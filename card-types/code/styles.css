@@ -1,0 +1,106 @@
+/* Code template: define colors once, used by both card and viewer.
+   Default is light card with dark code areas. Themes can override --template-* variables. */
+.card[data-template="code"],
+.modal.viewer[data-template="code"] {
+    --template-border: #d0dcd0;
+    --template-bg: white;
+    --template-output-bg: #eef4ee;
+    --template-code-bg: var(--code-bg);
+    --template-code-text: var(--code-text);
+    --template-title-text: var(--text-primary);
+    --template-meta-text: var(--text-muted);
+}
+
+.card[data-template="code"] {
+    border-color: var(--template-border);
+    background: var(--template-bg);
+}
+
+.card[data-template="code"] .card-preview {
+    background: var(--template-code-bg);
+}
+
+.card[data-template="code"] .card-content {
+    background: var(--template-bg);
+}
+
+.card[data-template="code"] .card-title {
+    color: var(--template-title-text);
+}
+
+.card[data-template="code"] .card-meta {
+    background: var(--template-bg);
+    color: var(--template-meta-text);
+}
+
+.card[data-template="code"] .preview-split-left {
+    background: var(--template-output-bg);
+    border-right: 1px solid var(--template-border);
+}
+
+.card[data-template="code"] .preview-split-right {
+    background: var(--template-code-bg);
+}
+
+/* Code-only viewer - dark background (when no output) */
+.viewer-code-only {
+    padding: 2rem;
+    background: var(--code-bg);
+}
+
+.viewer-code-only pre {
+    margin: 0;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--code-text);
+}
+
+.viewer-code-only code {
+    background: transparent;
+    color: var(--code-text);
+    padding: 0;  /* Override hljs padding:1em */
+}
+
+/* Viewer styles */
+.modal.viewer[data-template="code"] {
+    background: var(--template-bg);
+    border: 1px solid var(--template-border);
+}
+
+.modal.viewer[data-template="code"] .modal-header {
+    background: var(--template-bg);
+}
+
+.modal.viewer[data-template="code"] .modal-header h2 {
+    color: var(--template-title-text);
+}
+
+.modal.viewer[data-template="code"] .viewer-split-left {
+    background: var(--template-output-bg);
+}
+
+.modal.viewer[data-template="code"] .viewer-split-right {
+    background: var(--template-code-bg);
+}
+
+.modal.viewer[data-template="code"] .viewer-footer {
+    background: var(--template-bg);
+    border-top-color: var(--template-border);
+}
+
+.modal.viewer[data-template="code"] .viewer-meta {
+    color: var(--template-meta-text);
+}
+
+.modal.viewer[data-template="code"] .viewer-actions .btn-secondary {
+    color: var(--template-title-text);
+    border-color: var(--template-border);
+}
+
+.modal.viewer[data-template="code"] .viewer-actions .btn-secondary:hover {
+    background: var(--template-output-bg);
+    border-color: var(--template-title-text);
+}

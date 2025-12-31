@@ -3,6 +3,10 @@
   "modules": [
     "note",
     "bookmark",
-    "image"
+    "image",
+    "code",
+    "quiz",
+    "quiz-response",
+    "quiz-response-summary"
   ]
 }
