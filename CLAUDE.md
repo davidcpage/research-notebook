@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Navigating the Application
 
-**Structure**: The app is split into three files:
+**Structure**: The app is split into three core files plus modular card types:
 - `index.html` - HTML shell (~210 lines)
-- `css/app.css` - All styles (~2800 lines)
+- `css/app.css` - Core application styles (~2200 lines)
 - `js/app.js` - All JavaScript (~6500 lines)
+- `card-types/` - Self-contained card type modules (template.yaml + styles.css)
 
 ### How to Navigate
 
@@ -26,13 +27,13 @@ Add a comment above new functions describing their purpose (parsed by generate_i
 
 ### Tracing Card/Viewer Rendering
 
-To find CSS or modify rendering for a card type, trace from template to render function:
+To find CSS or modify rendering for a card type:
 
-1. Find template definition in `getDefaultTemplates()` (or `.notebook/templates/*.yaml` file)
+1. Find template in `card-types/{type}/template.yaml`
 2. Note the `card.layout` and `viewer.layout` values (e.g., `image`, `document`, `split-pane`)
 3. Search for render function: `render{Layout}Preview` for cards, `render{Layout}Viewer` for viewers
 4. The render function shows exact HTML structure and CSS class names
-5. Search for those classes in `css/app.css` for styling
+5. Find styles in `card-types/{type}/styles.css` (card-specific) or `css/app.css` (generic layouts)
 
 Example: Bookmark uses `layout: 'image'` → `renderImagePreview()` / `renderImageViewer()` → classes like `.viewer-image-container`, `.viewer-thumbnail`, `.viewer-url`, `.viewer-description`
 
@@ -52,31 +53,35 @@ Example: Bookmark uses `layout: 'image'` → `renderImagePreview()` / `renderIma
 3. Update `render()` and card render functions
 4. Update filesystem read/write functions if format changes
 
-### Adding a new item type (Template System)
-The app uses a template system defined in TEMPLATE_SYSTEM and GENERIC_EDITOR sections:
-- `extensionRegistry`: Maps file extensions to parsers (e.g., `.md` → yaml-frontmatter parser)
-- `templateRegistry`: Defines card types with schema, layout, styling, and editor configuration
-- Templates stored in `.notebook/templates/*.yaml`
-- Settings in `.notebook/settings.yaml`
+### Adding a new item type (Card Type Modules)
+Card types are self-contained modules in `card-types/{type}/`:
+- `template.yaml` - Schema, layout config, editor fields (required)
+- `styles.css` - Card and viewer CSS (optional)
+- `index.js` - Custom render functions (optional, for complex types)
 
 To add a new card type:
-1. Add template to `getDefaultTemplates()` in TEMPLATE_SYSTEM (or create `.notebook/templates/*.yaml` file)
-2. Add extension mapping to `getDefaultExtensionRegistry()` if using new file format
-3. Define in template: `schema`, `card.layout`, `viewer.layout`, `editor.fields`, `editor.actions`, `ui`
+1. Create `card-types/{type}/template.yaml` with schema, card.layout, viewer.layout, editor.fields
+2. Add `{type}` to `card-types/index.json` modules array
+3. Add CSS in `card-types/{type}/styles.css` if custom styling needed
+4. Add extension mapping to `getDefaultExtensionRegistry()` if using new file format
 
-Card rendering, viewer display, and editing all work automatically via templates.
+Card rendering, viewer display, and editing all work automatically via templates. CSS is injected into `@layer templates` at runtime.
+
+User overrides: Notebooks can override templates via `.notebook/templates/{type}.yaml`.
 
 ### Troubleshooting: "Unknown template" errors
-If cards fail to render with `[Render] Unknown template: X` in the console, the cause is almost always a **YAML syntax error** in `/defaults/templates/X.yaml`, not a missing template file.
+If cards fail to render with `[Render] Unknown template: X` in the console, check for **YAML syntax errors** in the template file.
 
-**Why**: Templates are fetched from `/defaults/templates/` at startup via `fetchDefaultTemplates()`. If a YAML file has a syntax error, `jsyaml.load()` fails silently and that template isn't registered. The app then falls back gracefully but cards of that type won't render.
+**Where templates live**:
+- Card types: `card-types/{type}/template.yaml`
+- System types: `defaults/templates/{type}.yaml` (settings, template, theme only)
 
 **Diagnosis**:
-1. Check the browser console for YAML parsing errors
-2. Validate the template file: `python3 -c "import yaml; yaml.safe_load(open('defaults/templates/X.yaml'))"`
+1. Check the browser console for YAML parsing errors or 404s
+2. Validate the template file: `python3 -c "import yaml; yaml.safe_load(open('card-types/X/template.yaml'))"`
 3. Common culprits: unquoted colons in descriptions (e.g., `description: Array of {foo: bar}` needs quotes)
 
-**Do NOT** create `.notebook/templates/X.yaml` in a user's notebook to "fix" this - that just works around a broken default template. Fix the source file in `/defaults/templates/`.
+**Do NOT** create `.notebook/templates/X.yaml` in a user's notebook to "fix" this - that just works around a broken default template. Fix the source file in `card-types/{type}/template.yaml`.
 
 ### System cards (settings, templates, theme)
 - `.notebook/settings.yaml` and `.notebook/templates/*.yaml` are system cards with special templates using `yaml` layout
@@ -138,7 +143,7 @@ The `image` template supports image files (.png, .jpg, .jpeg, .gif, .webp, .svg)
 ```
 repo/
 ├── index.html          # HTML shell with CDN imports (~210 lines)
-├── css/app.css         # All application styles (~2800 lines)
+├── css/app.css         # Core application styles (~2200 lines)
 ├── js/app.js           # All application JavaScript (~6500 lines)
 ├── js/framework.js     # ES module: utilities for card type modules
 ├── cli.js              # Node.js static server (required for themes)
@@ -157,7 +162,7 @@ repo/
 │       └── index.js        # Custom render functions (optional)
 ├── defaults/           # Default files for new notebooks
 │   ├── theme.css       # Starter customization template
-│   └── templates/      # Legacy template definitions (being migrated to card-types/)
+│   └── templates/      # System templates only (settings, template, theme)
 └── examples/           # Example notebooks
 ```
 - External CDN dependencies: PDF.js, Marked.js, KaTeX, Pyodide, Highlight.js, CodeMirror 6
@@ -237,33 +242,23 @@ notebook-folder/
 ## CSS Patterns
 
 ### Template CSS Variables
-Templates define CSS custom properties that both card and viewer inherit, ensuring consistency:
+Each card type module (`card-types/{type}/styles.css`) defines CSS custom properties that both card and viewer inherit:
 
 ```css
-/* Note template - parchment style */
+/* From card-types/note/styles.css */
 .card[data-template="note"],
 .modal.viewer[data-template="note"] {
-    --template-border: #d9d0be;
-    --template-bg: #f6f0e2;
-    --template-preview-bg: #f0ebe0;
-    --template-title-text: #4a4138;
-    --template-heading-font: Georgia, serif;
-}
-
-/* Code template - dark terminal style */
-.card[data-template="code"],
-.modal.viewer[data-template="code"] {
-    --template-border: #3a3f4a;
-    --template-bg: #282c34;
-    --template-output-bg: #2c323c;
-    --template-code-bg: #282c34;
-    --template-code-text: #abb2bf;
-    --template-title-text: #e0e4eb;
-    --template-meta-text: #7a8292;
+    --template-border: var(--note-border);
+    --template-bg: #f0ebe0;
+    --template-preview-bg: #e8e3d8;
+    --template-title-text: var(--text-primary);
+    --template-heading-font: 'Playfair Display', serif;
 }
 ```
 
 **Standard variables**: `--template-border`, `--template-bg`, `--template-preview-bg`, `--template-title-text`, `--template-meta-text`, `--template-heading-font`, `--template-output-bg`, `--template-code-bg`, `--template-code-text`
+
+Card type CSS is injected into `@layer templates` at runtime, giving it higher precedence than base styles.
 
 ### Card/Viewer Consistency Pattern
 - **Cards**: 180px preview frame at top, title/metadata below

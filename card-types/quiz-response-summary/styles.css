@@ -9,6 +9,17 @@
     --template-preview-bg: #dfeadf;
     --template-title-text: #2d4a2d;
     --template-meta-text: #5a785a;
+    /* Response status colors (shared with quiz-response) */
+    --response-correct-bg: #e8f5e9;
+    --response-correct-text: #2e7d32;
+    --response-incorrect-bg: #ffebee;
+    --response-incorrect-text: #c62828;
+    --response-pending-bg: #fff8e1;
+    --response-pending-text: #f57c00;
+    --response-reviewed-bg: #e3f2fd;
+    --response-reviewed-text: #1565c0;
+    --response-ai-graded-bg: #f3e5f5;
+    --response-ai-graded-text: #7b1fa2;
 }
 
 /* Card styling */
