@@ -85,6 +85,22 @@ function isSubdirExpanded(sectionId, subdirPath) {
     return expandedSubdirs.has(key);
 }
 
+// Path helpers for unified _path field
+// _path stores full path from notebook root (e.g., 'research/responses/batch1')
+
+// Get subdirectory portion (everything after first segment, i.e., within section)
+function getSubdirFromPath(path) {
+    if (!path) return null;
+    const parts = path.split('/');
+    return parts.length > 1 ? parts.slice(1).join('/') : null;
+}
+
+// Get section name (first segment of path)
+function getSectionFromPath(path) {
+    if (!path) return null;
+    return path.split('/')[0];
+}
+
 // Pyodide state
 let pyodide = null;
 let pyodideLoading = false;
@@ -3450,8 +3466,8 @@ function updateResponseStatus(card) {
 // Returns: { submittedCount, averageScore, maxScore, questions: [...], responseCards: [...] }
 function computeSummaryData(summaryCard) {
     const quizId = summaryCard.quizId;
-    // Use responseFolder if set, otherwise use summary's own folder
-    const targetFolder = summaryCard.responseFolder || summaryCard._subdir || null;
+    // Use responseFolder if set, otherwise use summary's own folder (subdir within section)
+    const targetFolder = summaryCard.responseFolder || getSubdirFromPath(summaryCard._path) || null;
 
     // Find the section containing this summary card
     const section = findSectionByItem(summaryCard);
@@ -3463,8 +3479,8 @@ function computeSummaryData(summaryCard) {
     const responseCards = section.items.filter(item => {
         if (item.template !== 'quiz-response') return false;
         if (item.quizId !== quizId) return false;
-        // Match folder
-        return (item._subdir || null) === targetFolder;
+        // Match folder (subdir within section)
+        return (getSubdirFromPath(item._path) || null) === targetFolder;
     });
 
     if (responseCards.length === 0) {
@@ -4543,11 +4559,11 @@ function openEditor(templateName, sectionId, card = null) {
 
         // Subdirectory selector (if section has subdirectories)
         const section = data.sections.find(s => s.id === sectionId);
-        const subdirs = section ? [...new Set(section.items.map(i => i._subdir).filter(Boolean))].sort() : [];
+        const subdirs = section ? [...new Set(section.items.map(i => getSubdirFromPath(i._path)).filter(Boolean))].sort() : [];
         if (subdirs.length > 0) {
             const subdirGroup = document.createElement('div');
             subdirGroup.className = 'form-group';
-            const currentSubdir = card?._subdir || '';
+            const currentSubdir = getSubdirFromPath(card?._path) || '';
             subdirGroup.innerHTML = `
                 <label for="editorSubdir">Subdirectory</label>
                 <select id="editorSubdir">
@@ -6602,10 +6618,13 @@ async function saveEditor() {
     const sectionSelect = document.getElementById('editorSection');
     const newSectionId = sectionSelect ? sectionSelect.value : sectionId;
 
-    // Get selected subdirectory (if any)
+    // Get selected subdirectory (if any) and build full _path
     const subdirSelect = document.getElementById('editorSubdir');
-    const newSubdir = subdirSelect ? (subdirSelect.value || null) : (card._subdir || null);
-    cardData._subdir = newSubdir;
+    const newSubdir = subdirSelect ? (subdirSelect.value || null) : getSubdirFromPath(card._path);
+    // Build full _path from section directory name + subdirectory
+    const targetSection = data.sections.find(s => s.id === newSectionId);
+    const sectionDirName = targetSection?._dirName || newSectionId.replace('section-', '');
+    cardData._path = newSubdir ? `${sectionDirName}/${newSubdir}` : sectionDirName;
 
     // Set timestamps
     const now = new Date().toISOString();
@@ -6653,6 +6672,11 @@ async function saveEditor() {
         // Handle system notes
         if (sectionId === '_system') {
             cardData.system = true;
+            // Get selected location for system notes (root, .notebook, .notebook/templates)
+            const subdirSelect = document.getElementById('editorSubdir');
+            const selectedLocation = subdirSelect ? subdirSelect.value : (card._path || 'root');
+            cardData._path = selectedLocation === 'root' ? null : selectedLocation;
+
             const idx = data.systemNotes.findIndex(n => n.id === card.id);
             if (idx >= 0) {
                 // Update existing system note
@@ -7169,7 +7193,7 @@ async function loadFromFilesystem(dirHandle) {
                             path: relativePath,  // Relative path for referencing
                             filesize: formatFileSize(file.size),
                             src: dataUrl,
-                            _subdir: subdirPath,  // Track full subdirectory path
+                            _path: subdirPath ? `${sectionDirName}/${subdirPath}` : sectionDirName,  // Full path from notebook root
                             _source: {
                                 filename,
                                 format: filename.toLowerCase().endsWith('.svg') ? 'text-image' : 'binary-image',
@@ -7192,8 +7216,8 @@ async function loadFromFilesystem(dirHandle) {
                         if (companionData.thumbnail) {
                             card.thumbnail = companionData.thumbnail;
                         }
-                        // Store full subdirectory path and file modified time
-                        card._subdir = subdirPath;
+                        // Store full path from notebook root and file modified time
+                        card._path = subdirPath ? `${sectionDirName}/${subdirPath}` : sectionDirName;
                         if (card._source) {
                             card._source.subdir = subdirPath;
                         }
@@ -7306,14 +7330,14 @@ async function loadFromFilesystem(dirHandle) {
 
                 // Within summaries, sort by responseFolder or cohort
                 if (aPriority === 1) {
-                    const aFolder = a.responseFolder || a._subdir || '';
-                    const bFolder = b.responseFolder || b._subdir || '';
+                    const aFolder = a.responseFolder || getSubdirFromPath(a._path) || '';
+                    const bFolder = b.responseFolder || getSubdirFromPath(b._path) || '';
                     return aFolder.localeCompare(bFolder);
                 }
 
                 // For other items, sort by subfolder first, then by modified date
-                const aSubdir = a._subdir || '';
-                const bSubdir = b._subdir || '';
+                const aSubdir = getSubdirFromPath(a._path) || '';
+                const bSubdir = getSubdirFromPath(b._path) || '';
                 if (aSubdir !== bSubdir) return aSubdir.localeCompare(bSubdir);
 
                 // Within same subfolder, sort by modified date (newest first)
@@ -7659,11 +7683,13 @@ async function saveCardFile(sectionId, card) {
         let targetDir, savedPath;
 
         // Handle location selection: 'root', '.notebook', '.notebook/templates', or null
-        if (card._subdir === '.notebook/templates') {
+        // System cards use _path for location (e.g., '.notebook/templates', '.notebook', or root)
+        const systemPath = card._path || null;
+        if (systemPath === '.notebook/templates') {
             // Save to .notebook/templates/ directory
             targetDir = await getNotebookTemplatesDir(notebookDirHandle, true);
             savedPath = `.notebook/templates/${baseFilename}`;
-        } else if (card._subdir === '.notebook') {
+        } else if (systemPath === '.notebook') {
             // Save to .notebook/ directory
             targetDir = await getNotebookConfigDir(notebookDirHandle, true);
             savedPath = `.notebook/${baseFilename}`;
@@ -7709,12 +7735,14 @@ async function saveCardFile(sectionId, card) {
     }
 
     // Handle subdirectory if specified (supports nested paths like 'responses/batch1')
-    if (card._subdir) {
-        const subdirParts = card._subdir.split('/');
+    // Extract subdir from _path (everything after the section name)
+    const subdir = getSubdirFromPath(card._path);
+    if (subdir) {
+        const subdirParts = subdir.split('/');
         for (const part of subdirParts) {
             sectionDir = await sectionDir.getDirectoryHandle(part, { create: true });
         }
-        sectionPath = `${sectionPath}/${card._subdir}`;
+        sectionPath = `${sectionPath}/${subdir}`;
     }
 
     // Use serializeCard to get the file content and extension
@@ -9112,9 +9140,10 @@ function renderTemplateButtons(sectionId) {
     }).join('');
 }
 
-// Helper: build a tree structure from flat items with _subdir paths
+// Helper: build a tree structure from flat items with _path field
 // Returns { items: [...], subdirs: { name: { items: [...], subdirs: {...} } } }
-function buildSubdirTree(items, getSubdir = item => item._subdir || null) {
+// getSubdir extracts the subdirectory portion (within section) from an item
+function buildSubdirTree(items, getSubdir = item => getSubdirFromPath(item._path)) {
     const tree = { items: [], subdirs: {} };
 
     items.forEach(item => {
@@ -9189,8 +9218,8 @@ function renderSubdirNode(sectionId, subdirName, node, parentPath, depth) {
 }
 
 // Helper: render items grouped by subdirectory with collapsible nested subdirs
-// getSubdir is a function that extracts subdirectory from an item
-function renderItemsWithSubsections(items, sectionId, getSubdir = item => item._subdir || null) {
+// getSubdir is a function that extracts subdirectory (within section) from an item
+function renderItemsWithSubsections(items, sectionId, getSubdir = item => getSubdirFromPath(item._path)) {
     if (items.length === 0) {
         return '<p style="color: var(--text-muted); grid-column: 1/-1;">No items yet. Add a bookmark, note, or code!</p>';
     }
