@@ -39,6 +39,52 @@ function restoreCollapsedSections() {
     }
 }
 
+// Track expanded subdirectories (collapsed by default, persisted per-notebook)
+// Keys are in format: "sectionId/subdirPath" (e.g., "section-research/responses/batch1")
+let expandedSubdirs = new Set();
+
+// Get localStorage key for expanded subdirectories (notebook-specific)
+function getExpandedSubdirsKey() {
+    const notebookName = notebookDirHandle?.name || 'default';
+    return `expandedSubdirs_${notebookName}`;
+}
+
+// Save expanded subdirectories to localStorage
+function saveExpandedSubdirs() {
+    localStorage.setItem(getExpandedSubdirsKey(), JSON.stringify([...expandedSubdirs]));
+}
+
+// Restore expanded subdirectories from localStorage
+function restoreExpandedSubdirs() {
+    expandedSubdirs = new Set();
+    const saved = localStorage.getItem(getExpandedSubdirsKey());
+    if (saved) {
+        try {
+            expandedSubdirs = new Set(JSON.parse(saved));
+        } catch (e) {
+            console.warn('Failed to restore expanded subdirs:', e);
+        }
+    }
+}
+
+// Toggle subdirectory expanded state
+function toggleSubdir(sectionId, subdirPath) {
+    const key = `${sectionId}/${subdirPath}`;
+    if (expandedSubdirs.has(key)) {
+        expandedSubdirs.delete(key);
+    } else {
+        expandedSubdirs.add(key);
+    }
+    saveExpandedSubdirs();
+    render();
+}
+
+// Check if subdirectory is expanded
+function isSubdirExpanded(sectionId, subdirPath) {
+    const key = `${sectionId}/${subdirPath}`;
+    return expandedSubdirs.has(key);
+}
+
 // Pyodide state
 let pyodide = null;
 let pyodideLoading = false;
@@ -7004,8 +7050,8 @@ async function loadFromFilesystem(dirHandle) {
         }
 
         // Helper function to load cards from a section directory
-        // subdir parameter is for one-level-deep subdirectory loading
-        async function loadSectionItems(sectionHandle, sectionDirName, subdir = null) {
+        // subdirPath parameter tracks full path for nested directories (e.g., 'responses/batch1')
+        async function loadSectionItems(sectionHandle, sectionDirName, subdirPath = null) {
             const items = [];
 
             // First pass: collect all files, directories, and identify companion files
@@ -7016,10 +7062,8 @@ async function loadFromFilesystem(dirHandle) {
                 if (name.startsWith('_') || name.startsWith('.')) continue;  // Skip metadata/hidden files
 
                 if (handle.kind === 'directory') {
-                    // Only process subdirectories from root level (one level deep)
-                    if (!subdir) {
-                        subdirs[name] = handle;
-                    }
+                    // Collect all subdirectories for recursive loading
+                    subdirs[name] = handle;
                     continue;
                 }
 
@@ -7111,9 +7155,9 @@ async function loadFromFilesystem(dirHandle) {
                             return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
                         };
 
-                        // Build relative path: section/subdir/filename or section/filename
-                        const relativePath = subdir
-                            ? `${sectionDirName}/${subdir}/${filename}`
+                        // Build relative path: section/subdirPath/filename or section/filename
+                        const relativePath = subdirPath
+                            ? `${sectionDirName}/${subdirPath}/${filename}`
                             : `${sectionDirName}/${filename}`;
 
                         // Create image card directly (no frontmatter to parse)
@@ -7125,19 +7169,19 @@ async function loadFromFilesystem(dirHandle) {
                             path: relativePath,  // Relative path for referencing
                             filesize: formatFileSize(file.size),
                             src: dataUrl,
-                            _subdir: subdir,  // Track subdirectory
+                            _subdir: subdirPath,  // Track full subdirectory path
                             _source: {
                                 filename,
                                 format: filename.toLowerCase().endsWith('.svg') ? 'text-image' : 'binary-image',
                                 section: sectionDirName,
-                                subdir: subdir,
+                                subdir: subdirPath,
                                 extension: filename.match(/\.[^.]+$/)?.[0]?.toLowerCase() || ''
                             },
                             _fileModified: file.lastModified,
                             modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
                         };
                         items.push(card);
-                        console.log(`[Filesystem] Loaded image: ${subdir ? subdir + '/' : ''}${filename}`);
+                        console.log(`[Filesystem] Loaded image: ${subdirPath ? subdirPath + '/' : ''}${filename}`);
                         continue;
                     }
 
@@ -7148,10 +7192,10 @@ async function loadFromFilesystem(dirHandle) {
                         if (companionData.thumbnail) {
                             card.thumbnail = companionData.thumbnail;
                         }
-                        // Store subdirectory and file modified time
-                        card._subdir = subdir;
+                        // Store full subdirectory path and file modified time
+                        card._subdir = subdirPath;
                         if (card._source) {
-                            card._source.subdir = subdir;
+                            card._source.subdir = subdirPath;
                         }
                         card._fileModified = file.lastModified;
                         items.push(card);
@@ -7161,12 +7205,14 @@ async function loadFromFilesystem(dirHandle) {
                 }
             }
 
-            // Third pass: recursively load from subdirectories (one level only)
+            // Third pass: recursively load from subdirectories (arbitrary depth)
             for (const [subdirName, subdirHandle] of Object.entries(subdirs)) {
-                const subdirItems = await loadSectionItems(subdirHandle, sectionDirName, subdirName);
+                // Build full path for nested subdirectories
+                const newSubdirPath = subdirPath ? `${subdirPath}/${subdirName}` : subdirName;
+                const subdirItems = await loadSectionItems(subdirHandle, sectionDirName, newSubdirPath);
                 items.push(...subdirItems);
                 if (subdirItems.length > 0) {
-                    console.log(`[Filesystem] Loaded ${subdirItems.length} items from ${sectionDirName}/${subdirName}/`);
+                    console.log(`[Filesystem] Loaded ${subdirItems.length} items from ${sectionDirName}/${newSubdirPath}/`);
                 }
             }
 
@@ -7662,9 +7708,12 @@ async function saveCardFile(sectionId, card) {
         sectionPath = sectionInfo.path;
     }
 
-    // Handle subdirectory if specified
+    // Handle subdirectory if specified (supports nested paths like 'responses/batch1')
     if (card._subdir) {
-        sectionDir = await sectionDir.getDirectoryHandle(card._subdir, { create: true });
+        const subdirParts = card._subdir.split('/');
+        for (const part of subdirParts) {
+            sectionDir = await sectionDir.getDirectoryHandle(part, { create: true });
+        }
         sectionPath = `${sectionPath}/${card._subdir}`;
     }
 
@@ -7931,6 +7980,7 @@ async function linkNotebookFolder() {
             const fsData = await loadFromFilesystem(handle);
             data = fsData;
             restoreCollapsedSections();
+            restoreExpandedSubdirs();
             render();
             showToast(`📁 Linked to folder (loaded ${data.sections.length} sections)`);
         } else {
@@ -7943,6 +7993,7 @@ async function linkNotebookFolder() {
             const fsData = await loadFromFilesystem(handle);
             data = fsData;
             restoreCollapsedSections();
+            restoreExpandedSubdirs();
             render();
             showToast('📁 Linked to folder (new notebook created)');
         }
@@ -9061,46 +9112,109 @@ function renderTemplateButtons(sectionId) {
     }).join('');
 }
 
-// Helper: render items grouped by subdirectory with subsection headers
+// Helper: build a tree structure from flat items with _subdir paths
+// Returns { items: [...], subdirs: { name: { items: [...], subdirs: {...} } } }
+function buildSubdirTree(items, getSubdir = item => item._subdir || null) {
+    const tree = { items: [], subdirs: {} };
+
+    items.forEach(item => {
+        const subdirPath = getSubdir(item);
+        if (!subdirPath) {
+            // Root item
+            tree.items.push(item);
+        } else {
+            // Navigate/create tree path
+            const parts = subdirPath.split('/');
+            let current = tree;
+            for (const part of parts) {
+                if (!current.subdirs[part]) {
+                    current.subdirs[part] = { items: [], subdirs: {} };
+                }
+                current = current.subdirs[part];
+            }
+            current.items.push(item);
+        }
+    });
+
+    return tree;
+}
+
+// Helper: count total items in a subtree (for showing count when collapsed)
+function countSubtreeItems(node) {
+    let count = node.items.length;
+    for (const subdir of Object.values(node.subdirs)) {
+        count += countSubtreeItems(subdir);
+    }
+    return count;
+}
+
+// Helper: render a subdirectory node with its items and nested subdirs
+function renderSubdirNode(sectionId, subdirName, node, parentPath, depth) {
+    const subdirPath = parentPath ? `${parentPath}/${subdirName}` : subdirName;
+    const isExpanded = isSubdirExpanded(sectionId, subdirPath);
+    const itemCount = countSubtreeItems(node);
+
+    // Subdirectory header with toggle
+    let html = `
+        <div class="subdir-node" data-depth="${depth}" style="--subdir-depth: ${depth}">
+            <div class="subdir-header" onclick="toggleSubdir('${escapeJsAttr(sectionId)}', '${escapeJsAttr(subdirPath)}')">
+                <button class="subdir-toggle ${isExpanded ? '' : 'collapsed'}" title="${isExpanded ? 'Collapse' : 'Expand'}">▼</button>
+                <span class="subdir-name">${escapeHtml(subdirName)}</span>
+                ${!isExpanded ? `<span class="subdir-count">(${itemCount})</span>` : ''}
+            </div>
+            <div class="subdir-content ${isExpanded ? '' : 'collapsed'}">
+    `;
+
+    if (isExpanded) {
+        // Render items at this level
+        if (node.items.length > 0) {
+            html += `<div class="subdir-items">`;
+            html += node.items.map(item => renderCard(sectionId, item)).join('');
+            html += `</div>`;
+        }
+
+        // Render nested subdirs (sorted alphabetically)
+        const nestedSubdirs = Object.keys(node.subdirs).sort();
+        for (const nestedName of nestedSubdirs) {
+            html += renderSubdirNode(sectionId, nestedName, node.subdirs[nestedName], subdirPath, depth + 1);
+        }
+    }
+
+    html += `
+            </div>
+        </div>
+    `;
+
+    return html;
+}
+
+// Helper: render items grouped by subdirectory with collapsible nested subdirs
 // getSubdir is a function that extracts subdirectory from an item
 function renderItemsWithSubsections(items, sectionId, getSubdir = item => item._subdir || null) {
     if (items.length === 0) {
         return '<p style="color: var(--text-muted); grid-column: 1/-1;">No items yet. Add a bookmark, note, or code!</p>';
     }
 
-    // Group items by subdirectory, preserving the order from loading
-    // (Items are pre-sorted: quiz first, then summaries, then others by subfolder/date)
-    const itemsBySubdir = new Map();
-    items.forEach(item => {
-        const subdir = getSubdir(item);
-        if (!itemsBySubdir.has(subdir)) {
-            itemsBySubdir.set(subdir, []);
-        }
-        itemsBySubdir.get(subdir).push(item);
-    });
+    // Build tree structure from flat items
+    const tree = buildSubdirTree(items, getSubdir);
 
-    // Build HTML with subsection headers
     let html = '';
 
     // Render root items first (no subdirectory)
-    const rootItems = itemsBySubdir.get(null) || [];
-    if (rootItems.length > 0) {
-        html += rootItems.map(item => renderCard(sectionId, item)).join('');
+    if (tree.items.length > 0) {
+        html += tree.items.map(item => renderCard(sectionId, item)).join('');
     }
 
-    // Render each subdirectory group with a header
+    // Render subdirectories as collapsible nodes
     // Sort alphabetically, but put 'root' first (for System section)
-    const subdirs = [...itemsBySubdir.keys()].filter(k => k !== null).sort((a, b) => {
+    const subdirNames = Object.keys(tree.subdirs).sort((a, b) => {
         if (a === 'root') return -1;
         if (b === 'root') return 1;
         return a.localeCompare(b);
     });
-    for (const subdir of subdirs) {
-        const subdirItems = itemsBySubdir.get(subdir);
-        if (subdirItems.length > 0) {
-            html += `<div class="subsection-header">${escapeHtml(subdir)}</div>`;
-            html += subdirItems.map(item => renderCard(sectionId, item)).join('');
-        }
+
+    for (const subdirName of subdirNames) {
+        html += renderSubdirNode(sectionId, subdirName, tree.subdirs[subdirName], null, 0);
     }
 
     return html;
@@ -9219,6 +9333,18 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Escape a string for use in JavaScript within an HTML attribute
+// e.g., onclick="func('${escapeJsAttr(value)}')"
+function escapeJsAttr(text) {
+    if (typeof text !== 'string') return text;
+    return text
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }
 
 // ========== SECTION: EVENT_HANDLERS_AND_INIT ==========
@@ -9350,8 +9476,9 @@ async function init() {
     await initFilesystem();
 
     if (filesystemLinked) {
-        // Restore collapsed sections now that we know the notebook name
+        // Restore collapsed sections/subdirs now that we know the notebook name
         restoreCollapsedSections();
+        restoreExpandedSubdirs();
         // Filesystem data already loaded in initFilesystem, just render
         render();
     } else {

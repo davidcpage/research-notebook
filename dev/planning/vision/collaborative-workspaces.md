@@ -239,6 +239,37 @@ viewer:
 
 This is a later feature - current template system handles most needs.
 
+### Future: Self-Contained Card Type Modules
+
+As the project evolves into multiple domain-specific workspaces, the architecture should support fully modular card types. Each card type would live in a self-contained folder:
+
+```
+card-types/
+├── note/
+│   ├── template.yaml    # Schema, editor config, metadata
+│   ├── styles.css       # All note-specific CSS
+│   └── index.js         # Optional: custom render/behavior
+├── quiz/
+│   ├── template.yaml
+│   ├── styles.css
+│   └── index.js         # Dynamic summary aggregation
+```
+
+**Benefits:**
+- "How does this card type work?" → look in one folder
+- Clear framework/extension boundary
+- Ship different card bundles for different domains (teaching vs research)
+- Users can inspect, modify, and create new types
+- A rich set of extensions is less forbidding than a sprawling core
+
+**Implementation notes:**
+- Parsers can remain in core initially (simple, stable, needed before templates load)
+- CSS scoping handled by existing cascade layers
+- Module loading performance is not a concern for local node server
+- Core provides render primitives that modules compose
+
+This positions card types as first-class extensibility points rather than hardcoded features.
+
 ---
 
 ## Architecture: Framework + Applications

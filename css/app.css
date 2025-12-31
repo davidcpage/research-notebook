@@ -370,6 +370,84 @@ main {
     padding-top: 0;
 }
 
+/* Collapsible subdirectory nodes (progressive disclosure) */
+.subdir-node {
+    grid-column: 1 / -1;
+    margin-top: 1rem;
+    /* Visual indentation based on depth */
+    margin-left: calc(var(--subdir-depth, 0) * 1.5rem);
+}
+
+.subdir-node:first-child {
+    margin-top: 0;
+}
+
+.subdir-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--surface-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.subdir-header:hover {
+    background: var(--surface-tertiary, var(--surface-secondary));
+}
+
+.subdir-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+    padding: 0.125rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.subdir-toggle:hover {
+    color: var(--text-primary);
+}
+
+.subdir-toggle.collapsed {
+    transform: rotate(-90deg);
+}
+
+.subdir-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.01em;
+}
+
+.subdir-count {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+.subdir-content {
+    margin-top: 0.75rem;
+}
+
+.subdir-content.collapsed {
+    display: none;
+}
+
+/* Items grid within subdirectory */
+.subdir-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
 .section-toggle {
     background: none;
     border: none;
