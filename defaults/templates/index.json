@@ -1,14 +1,11 @@
 {
   "templates": [
-    "note",
     "code",
-    "bookmark",
     "quiz",
     "quiz-response",
     "quiz-response-summary",
     "settings",
     "template",
-    "theme",
-    "image"
+    "theme"
   ]
 }

@@ -1,0 +1,35 @@
+/* Note template: define colors once, used by both card and viewer */
+.card[data-template="note"],
+.modal.viewer[data-template="note"] {
+    --template-border: var(--note-border);
+    --template-bg: #f0ebe0;
+    --template-preview-bg: #e8e3d8;
+    --template-title-text: var(--text-primary);
+    --template-meta-text: var(--text-muted);
+    --template-heading-font: 'Playfair Display', serif;
+    --template-body-font: inherit;
+}
+
+.card[data-template="note"] {
+    border-color: var(--template-border);
+}
+
+.card[data-template="note"] .card-preview {
+    background: var(--template-preview-bg);
+    padding: 0 15%;
+}
+
+/* Viewer styles */
+.modal.viewer[data-template="note"] {
+    background: var(--template-bg);
+    border: 1px solid var(--template-border);
+}
+
+.modal.viewer[data-template="note"] .modal-header h2 {
+    font-family: var(--template-heading-font);
+    color: var(--template-title-text);
+}
+
+.modal.viewer[data-template="note"] .viewer-meta {
+    color: var(--template-meta-text);
+}

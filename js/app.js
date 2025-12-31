@@ -234,7 +234,7 @@ function getDefaultExtensionRegistry() {
     };
 }
 
-// Fetch default templates from /defaults/templates/
+// Fetch default templates from /defaults/templates/ and /card-types/
 // This must be called during app initialization before templates are used
 async function fetchDefaultTemplates() {
     if (defaultTemplatesCache) {
@@ -245,14 +245,13 @@ async function fetchDefaultTemplates() {
     const templates = {};
 
     try {
-        // Fetch the template index
+        // 1. Load legacy templates from /defaults/templates/
         const indexResponse = await fetch('/defaults/templates/index.json');
         if (!indexResponse.ok) {
             throw new Error(`Failed to fetch template index: ${indexResponse.status}`);
         }
         const index = await indexResponse.json();
 
-        // Fetch each template YAML file
         for (const templateName of index.templates) {
             try {
                 const response = await fetch(`/defaults/templates/${templateName}.yaml`);
@@ -267,6 +266,10 @@ async function fetchDefaultTemplates() {
                 console.error(`[Templates] Error loading ${templateName}.yaml:`, e);
             }
         }
+
+        // 2. Load card type modules (these take precedence over legacy templates)
+        const cardTypeTemplates = await loadCardTypeModules();
+        Object.assign(templates, cardTypeTemplates);
 
         console.log(`[Templates] Loaded ${Object.keys(templates).length} default templates`);
         defaultTemplatesCache = templates;
@@ -286,6 +289,132 @@ function getDefaultTemplates() {
         return {};
     }
     return defaultTemplatesCache;
+}
+
+// ========== Card Type Modules ==========
+// Self-contained card type modules from /card-types/ directory
+// Each module can provide: template.yaml, styles.css, index.js
+
+// Map of card type name -> JS module exports (render functions, actions)
+let cardTypeModules = {};
+
+// Registry for custom render functions from card type modules
+// Structure: { 'quiz-response-summary': { renderPreview: fn, renderViewer: fn } }
+let cardTypeRenderers = {};
+
+// Load card type modules from /card-types/
+// Fetches manifest, loads templates, injects CSS, imports JS modules
+async function loadCardTypeModules() {
+    console.log('[CardTypes] Loading modules...');
+
+    try {
+        // Fetch the manifest
+        const response = await fetch('/card-types/index.json');
+        if (!response.ok) {
+            console.log('[CardTypes] No card-types manifest found, skipping');
+            return {};
+        }
+
+        const manifest = await response.json();
+        if (!manifest.modules || manifest.modules.length === 0) {
+            console.log('[CardTypes] No modules in manifest');
+            return {};
+        }
+
+        const templates = {};
+        const cssBlocks = [];
+
+        for (const moduleName of manifest.modules) {
+            console.log(`[CardTypes] Loading ${moduleName}...`);
+
+            // 1. Load template.yaml (required)
+            try {
+                const templateResponse = await fetch(`/card-types/${moduleName}/template.yaml`);
+                if (templateResponse.ok) {
+                    const yamlContent = await templateResponse.text();
+                    const template = jsyaml.load(yamlContent);
+                    if (template && template.name) {
+                        templates[template.name] = template;
+                    }
+                } else {
+                    console.warn(`[CardTypes] ${moduleName}: template.yaml not found`);
+                    continue;
+                }
+            } catch (e) {
+                console.error(`[CardTypes] ${moduleName}: Error loading template.yaml:`, e);
+                continue;
+            }
+
+            // 2. Load styles.css (optional)
+            try {
+                const cssResponse = await fetch(`/card-types/${moduleName}/styles.css`);
+                if (cssResponse.ok) {
+                    const css = await cssResponse.text();
+                    cssBlocks.push(`/* ${moduleName} */\n${css}`);
+                }
+            } catch (e) {
+                // Optional, ignore errors
+            }
+
+            // 3. Load index.js (optional) - ES module with render functions
+            try {
+                const jsModule = await import(`/card-types/${moduleName}/index.js`);
+                if (jsModule) {
+                    cardTypeModules[moduleName] = jsModule;
+
+                    // Register render functions if provided
+                    if (jsModule.renderPreview || jsModule.renderViewer) {
+                        cardTypeRenderers[moduleName] = {
+                            renderPreview: jsModule.renderPreview,
+                            renderViewer: jsModule.renderViewer
+                        };
+                        console.log(`[CardTypes] ${moduleName}: Registered render functions`);
+                    }
+
+                    console.log(`[CardTypes] ${moduleName}: Loaded JS module`);
+                }
+            } catch (e) {
+                // Optional, ignore if not present (404 is expected for simple types)
+                if (!e.message?.includes('404') && !e.message?.includes('Failed to fetch')) {
+                    console.error(`[CardTypes] ${moduleName}: Error loading index.js:`, e);
+                }
+            }
+        }
+
+        // Inject all CSS at once
+        if (cssBlocks.length > 0) {
+            injectCardTypeStyles(cssBlocks.join('\n\n'));
+        }
+
+        console.log(`[CardTypes] Loaded ${Object.keys(templates).length} templates, ${Object.keys(cardTypeModules).length} JS modules, ${Object.keys(cardTypeRenderers).length} custom renderers`);
+        return templates;
+    } catch (e) {
+        console.error('[CardTypes] Error loading modules:', e);
+        return {};
+    }
+}
+
+// Inject card type CSS into the page within @layer templates
+function injectCardTypeStyles(css) {
+    // Remove existing if present
+    const existing = document.getElementById('card-type-styles');
+    if (existing) existing.remove();
+
+    const style = document.createElement('style');
+    style.id = 'card-type-styles';
+    style.textContent = `@layer templates {\n${css}\n}`;
+    document.head.appendChild(style);
+    console.log('[CardTypes] Injected styles');
+}
+
+// Get card type JS module by name
+function getCardTypeModule(name) {
+    return cardTypeModules[name] || null;
+}
+
+// Get card type renderer by name
+function getCardTypeRenderer(name) {
+    return cardTypeRenderers[name] || null;
 }
 
 // Fetch default theme.css content from /defaults/theme.css
@@ -759,6 +888,11 @@ async function loadTemplates(dirHandle) {
         } catch (e) {
             console.error(`[Templates] Error saving ${name}:`, e);
         }
+    }
+
+    // Expose templateRegistry to framework.js for card type modules
+    if (window.notebook) {
+        window.notebook.templateRegistry = templateRegistry;
     }
 
     return templateRegistry;
@@ -1433,7 +1567,15 @@ function renderCard(sectionId, card) {
 function renderCardPreview(card, template) {
     const layout = template.card?.layout || 'document';
     const placeholder = template.card?.placeholder || '';
+    const templateName = template.name;
 
+    // Check for custom renderer from card type module first
+    const customRenderer = cardTypeRenderers[templateName];
+    if (customRenderer?.renderPreview) {
+        return customRenderer.renderPreview(card, template);
+    }
+
+    // Fall back to built-in layout renderers
     switch (layout) {
         case 'document':
             return renderDocumentPreview(card, template);
@@ -1855,7 +1997,15 @@ function refreshOpenViewer() {
 
 function renderViewerContent(card, template) {
     const layout = template.viewer?.layout || 'document';
+    const templateName = template.name;
 
+    // Check for custom renderer from card type module first
+    const customRenderer = cardTypeRenderers[templateName];
+    if (customRenderer?.renderViewer) {
+        return customRenderer.renderViewer(card, template);
+    }
+
+    // Fall back to built-in layout renderers
     switch (layout) {
         case 'document':
             return renderViewerDocument(card, template);
@@ -9484,6 +9634,39 @@ notebook</code></pre>
         </div>
     `;
 }
+
+// ========== FRAMEWORK API REGISTRATION ==========
+// Expose functions for card type modules to import via js/framework.js
+// Card type modules use: import { findCardById, saveCard } from '/js/framework.js';
+// The framework module proxies to window.notebook for these operations.
+window.notebook = {
+    // Data access
+    get data() { return data; },
+    templateRegistry: null,  // Set after loadTemplates()
+
+    // Card operations
+    findCardById,
+    findSectionByItem,
+    saveCardFile,
+
+    // UI operations
+    render,
+    showToast,
+    openViewer,
+    closeViewer,
+    refreshOpenViewer,
+
+    // Markdown rendering
+    renderMarkdownWithLinks,
+
+    // Card type modules (set after loadCardTypeModules)
+    get cardTypeModules() { return cardTypeModules; },
+    getCardTypeModule,
+
+    // Card type renderers (custom render functions from modules)
+    get cardTypeRenderers() { return cardTypeRenderers; },
+    getCardTypeRenderer,
+};
 
 // Initialize
 async function init() {

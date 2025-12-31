@@ -140,6 +140,7 @@ repo/
 ├── index.html          # HTML shell with CDN imports (~210 lines)
 ├── css/app.css         # All application styles (~2800 lines)
 ├── js/app.js           # All application JavaScript (~6500 lines)
+├── js/framework.js     # ES module: utilities for card type modules
 ├── cli.js              # Node.js static server (required for themes)
 ├── themes/             # Base themes (fetched at runtime)
 │   ├── index.json      # Theme registry
@@ -148,9 +149,15 @@ repo/
 │   ├── terminal.css
 │   ├── friendly.css
 │   └── handwritten.css
+├── card-types/         # Self-contained card type modules
+│   ├── index.json      # Module manifest
+│   └── {type}/         # Each type has its own directory
+│       ├── template.yaml   # Schema + layout config (required)
+│       ├── styles.css      # CSS styles (optional)
+│       └── index.js        # Custom render functions (optional)
 ├── defaults/           # Default files for new notebooks
 │   ├── theme.css       # Starter customization template
-│   └── templates/      # Default template definitions
+│   └── templates/      # Legacy template definitions (being migrated to card-types/)
 └── examples/           # Example notebooks
 ```
 - External CDN dependencies: PDF.js, Marked.js, KaTeX, Pyodide, Highlight.js, CodeMirror 6

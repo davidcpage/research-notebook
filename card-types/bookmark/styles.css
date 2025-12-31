@@ -1,0 +1,12 @@
+/* Bookmark card preview */
+.card[data-template="bookmark"] .card-preview {
+    background: linear-gradient(135deg, var(--bg-primary) 0%, var(--border) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Bookmark viewer */
+.modal.viewer[data-template="bookmark"] {
+    background: var(--bg-secondary);
+}

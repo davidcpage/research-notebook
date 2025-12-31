@@ -1,0 +1,50 @@
+name: bookmark
+description: Web bookmark with thumbnail and description
+schema:
+  title:
+    type: text
+    required: true
+  url:
+    type: url
+    required: true
+  description:
+    type: markdown
+  thumbnail:
+    type: thumbnail
+    auto_generate: true
+  favicon:
+    type: url
+  created:
+    type: datetime
+  modified:
+    type: datetime
+card:
+  layout: image
+  preview_field: thumbnail
+  placeholder: "🔗"
+  title_link_field: url
+viewer:
+  layout: image
+  image_field: thumbnail
+  content_field: description
+editor:
+  fields:
+    - field: thumbnail
+      label: Thumbnail (optional)
+      widget: thumbnail-upload
+    - field: url
+      label: URL
+      auto_fetch: true
+    - field: title
+      label: Title (optional)
+    - field: description
+      label: Description (optional)
+      multiline: true
+      rows: 4
+style:
+  variables:
+    --preview-bg: "linear-gradient(135deg, #f8f6f3 0%, #e8e4df 100%)"
+ui:
+  button_label: Bookmark
+  icon: "🔗"
+  sort_order: 3
