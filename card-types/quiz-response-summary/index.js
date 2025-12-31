@@ -414,15 +414,28 @@ function renderSummaryAnswerRow(answer, question, questionIndex, quizQuestion = 
         }
     }
 
+    // Determine if grading UI should be shown
+    // Objective types have deterministic answers - no teacher override needed
+    const objectiveTypes = ['multiple_choice', 'checkbox', 'dropdown', 'numeric', 'scale', 'grid'];
+    const isObjective = objectiveTypes.includes(question.questionType);
+    const autoStatus = answer.autoGrade?.status;
+    const isAutoGraded = autoStatus === 'correct' || autoStatus === 'incorrect' || autoStatus === 'partial';
+
+    // Skip grading UI for objective auto-graded questions
+    const skipGradingUI = isObjective && isAutoGraded;
+
+    // Show grading UI if: claudeGrade needs review, OR short_answer with incorrect autoGrade (teacher might accept variation)
+    const needsGradingUI = !skipGradingUI && (
+        answer.claudeGrade ||
+        (question.questionType === 'short_answer' && autoStatus === 'incorrect')
+    );
+
     // Format score - make editable for unreviewed answers
     let scoreHtml;
     if (answer.teacherGrade) {
         // Already reviewed - show final score
         scoreHtml = `<span class="summary-answer-score">${effectiveGrade.score}/${effectiveGrade.maxScore || points}</span>`;
-    } else if (answer.autoGrade?.status === 'correct' || answer.autoGrade?.status === 'incorrect') {
-        // Auto-graded objective question - show score (no manual override needed)
-        scoreHtml = `<span class="summary-answer-score">${effectiveGrade?.score || 0}/${points}</span>`;
-    } else {
+    } else if (needsGradingUI) {
         // Needs grading - show inline editing
         const prefillScore = answer.claudeGrade?.score ?? '';
         scoreHtml = `<span class="summary-grade-inline">
@@ -437,6 +450,9 @@ function renderSummaryAnswerRow(answer, question, questionIndex, quizQuestion = 
                     onclick="approveSummaryClaudeGrade('${escapeHtml(responseCardId)}', ${questionIndex})"
                     title="Approve AI grade">🤖</button>` : ''}
         </span>`;
+    } else {
+        // Auto-graded or no grade yet - show score (read-only)
+        scoreHtml = `<span class="summary-answer-score">${effectiveGrade?.score ?? '—'}/${points}</span>`;
     }
 
     // Format answer text (truncated for display)

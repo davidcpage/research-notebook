@@ -290,12 +290,10 @@ function renderResponseAnswer(answer, question, index) {
             html += renderGradeCard('Teacher Review', answer.teacherGrade, 'teacher');
         }
 
-        // If no teacher grade yet, show grading UI for questions that need review
-        // For short_answer: show if auto-graded incorrect (teacher might override) or pending
-        const needsReview = answer.claudeGrade || autoStatus === 'pending_review' ||
-            (question?.type === 'short_answer' && autoStatus === 'incorrect');
-        if (!answer.teacherGrade && needsReview) {
-            html += renderTeacherGradeUI(index, answer.claudeGrade);
+        // If no teacher grade yet, show grading UI
+        // For non-objective questions, teacher can always grade/review
+        if (!answer.teacherGrade) {
+            html += renderTeacherGradeUI(index, answer.claudeGrade, question);
         }
     }
 
@@ -329,10 +327,10 @@ function renderGradeCard(label, grade, type) {
 }
 
 // Render teacher grade UI (similar to quiz review UI)
-function renderTeacherGradeUI(answerIndex, claudeGrade) {
-    const prefillScore = claudeGrade?.score || '';
+function renderTeacherGradeUI(answerIndex, claudeGrade, question = null) {
+    const prefillScore = claudeGrade?.score ?? '';
     const prefillFeedback = claudeGrade?.feedback || '';
-    const maxScore = claudeGrade?.maxScore || 1;
+    const maxScore = claudeGrade?.maxScore || question?.points || 1;
 
     return `<div class="response-teacher-grade-ui" data-answer-index="${answerIndex}">
         <div class="response-grade-label">Teacher Review:</div>
@@ -388,10 +386,17 @@ async function submitTeacherGrade(answerIndex) {
         return;
     }
 
-    card.answers[answerIndex].teacherGrade = {
+    // Get maxScore from existing grades or quiz question
+    const answer = card.answers[answerIndex];
+    const quiz = findCardById(card.quizId);
+    const quizQuestion = quiz?.questions?.[answerIndex];
+    const maxScore = answer.claudeGrade?.maxScore ||
+                     answer.autoGrade?.maxScore ||
+                     quizQuestion?.points || 1;
+
+    answer.teacherGrade = {
         score: score,
-        maxScore: card.answers[answerIndex].claudeGrade?.maxScore ||
-                  card.answers[answerIndex].autoGrade?.maxScore || 1,
+        maxScore: maxScore,
         feedback: feedback,
         reviewedAt: new Date().toISOString(),
         reviewer: notebookSettings?.default_author || 'Teacher'

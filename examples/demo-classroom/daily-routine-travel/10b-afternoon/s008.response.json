@@ -10,14 +10,12 @@
     {
       "questionIndex": 0,
       "answer": 1,
-      "autoGrade": { "status": "correct", "score": 1, "maxScore": 1 },
-      "teacherGrade": { "score": 1, "maxScore": 1, "reviewedAt": "2025-01-10T16:45:00Z", "reviewer": "Ms. Williams" }
+      "autoGrade": { "status": "correct", "score": 1, "maxScore": 1 }
     },
     {
       "questionIndex": 1,
       "answer": 2,
-      "autoGrade": { "status": "incorrect", "score": 0, "maxScore": 1 },
-      "teacherGrade": { "score": 0, "maxScore": 1, "reviewedAt": "2025-01-10T16:45:00Z", "reviewer": "Ms. Williams" }
+      "autoGrade": { "status": "incorrect", "score": 0, "maxScore": 1 }
     },
     {
       "questionIndex": 2,
