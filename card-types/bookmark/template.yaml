@@ -48,3 +48,6 @@ ui:
   button_label: Bookmark
   icon: "🔗"
   sort_order: 3
+extensions:
+  ".bookmark.json":
+    parser: json

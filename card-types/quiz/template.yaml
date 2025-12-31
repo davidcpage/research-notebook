@@ -178,3 +178,6 @@ ui:
   button_label: null
   icon: "❓"
   sort_order: 10
+extensions:
+  ".quiz.json":
+    parser: json

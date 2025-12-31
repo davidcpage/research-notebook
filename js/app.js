@@ -158,7 +158,7 @@ marked.setOptions({
 
 // ========== SECTION: TEMPLATE_SYSTEM ==========
 // Template and extension registry infrastructure for unified card handling
-// Phase 1 (Loading): loadExtensionRegistry, loadTemplates, getDefaultExtensionRegistry,
+// Phase 1 (Loading): loadExtensionRegistry, loadTemplates, getExtensionRegistry,
 //            getDefaultTemplates, getTemplateFileContent, ensureTemplateFiles,
 //            parsers, serializers, loadCard, serializeCard
 // Phase 2 (Rendering): renderCard, renderCardPreview, renderCardTitle, renderCardMeta,
@@ -185,50 +185,10 @@ let defaultThemeContentCache = null;
 // Cache for theme registry loaded from /themes/index.json
 let themeRegistryCache = null;
 
-// Get the default extension registry (hardcoded fallback)
-function getDefaultExtensionRegistry() {
-    return {
-        '.md': {
-            parser: 'yaml-frontmatter',
-            defaultTemplate: 'note',
-            bodyField: 'content'
-        },
-        '.code.py': {
-            parser: 'comment-frontmatter',
-            defaultTemplate: 'code',
-            bodyField: 'code',
-            companionFiles: [
-                { suffix: '.output.html', field: 'output' }
-            ]
-        },
-        '.bookmark.json': {
-            parser: 'json',
-            defaultTemplate: 'bookmark'
-        },
-        '.quiz.json': {
-            parser: 'json',
-            defaultTemplate: 'quiz'
-        },
-        '.response.json': {
-            parser: 'json',
-            defaultTemplate: 'quiz-response'
-        },
-        '.response-summary.json': {
-            parser: 'json',
-            defaultTemplate: 'quiz-response-summary'
-        },
-        '.card.yaml': {
-            parser: 'yaml',
-            defaultTemplate: null  // Must specify template: in file
-        },
-        // Image files - loaded as binary data URLs
-        '.png': { parser: 'binary-image', defaultTemplate: 'image' },
-        '.jpg': { parser: 'binary-image', defaultTemplate: 'image' },
-        '.jpeg': { parser: 'binary-image', defaultTemplate: 'image' },
-        '.gif': { parser: 'binary-image', defaultTemplate: 'image' },
-        '.webp': { parser: 'binary-image', defaultTemplate: 'image' },
-        '.svg': { parser: 'text-image', defaultTemplate: 'image' }
-    };
+// Get the extension registry (aggregated from card type modules)
+// This returns the registry built during loadCardTypeModules()
+function getExtensionRegistry() {
+    return cardTypeExtensions;
 }
 
 // Fetch default templates from /defaults/templates/ and /card-types/
@@ -299,6 +259,10 @@ let cardTypeModules = {};
 // Structure: { 'quiz-response-summary': { renderPreview: fn, renderViewer: fn } }
 let cardTypeRenderers = {};
 
+// Extension registry aggregated from card type modules
+// Structure: { '.md': { parser: 'yaml-frontmatter', defaultTemplate: 'note', bodyField: 'content' }, ... }
+let cardTypeExtensions = {};
+
 // Load card type modules from /card-types/
 // Fetches manifest, loads templates, injects CSS, imports JS modules
 async function loadCardTypeModules() {
@@ -320,18 +284,33 @@ async function loadCardTypeModules() {
 
         const templates = {};
         const cssBlocks = [];
+        const extensions = {};
 
         for (const moduleName of manifest.modules) {
             console.log(`[CardTypes] Loading ${moduleName}...`);
 
             // 1. Load template.yaml (required)
+            let template = null;
             try {
                 const templateResponse = await fetch(`/card-types/${moduleName}/template.yaml`);
                 if (templateResponse.ok) {
                     const yamlContent = await templateResponse.text();
-                    const template = jsyaml.load(yamlContent);
+                    template = jsyaml.load(yamlContent);
                     if (template && template.name) {
                         templates[template.name] = template;
+
+                        // Aggregate extensions from template
+                        if (template.extensions) {
+                            for (const [ext, config] of Object.entries(template.extensions)) {
+                                if (extensions[ext]) {
+                                    console.warn(`[CardTypes] Extension conflict: ${ext} already registered by another type`);
+                                }
+                                extensions[ext] = {
+                                    ...config,
+                                    defaultTemplate: template.name
+                                };
+                            }
+                        }
                     }
                 } else {
                     console.warn(`[CardTypes] ${moduleName}: template.yaml not found`);
@@ -383,7 +362,16 @@ async function loadCardTypeModules() {
             injectCardTypeStyles(cssBlocks.join('\n\n'));
         }
 
-        console.log(`[CardTypes] Loaded ${Object.keys(templates).length} templates, ${Object.keys(cardTypeModules).length} JS modules, ${Object.keys(cardTypeRenderers).length} custom renderers`);
+        // Add built-in .card.yaml extension (generic card type that specifies template in file)
+        extensions['.card.yaml'] = {
+            parser: 'yaml',
+            defaultTemplate: null  // Must specify template: in file
+        };
+
+        // Store aggregated extensions
+        cardTypeExtensions = extensions;
+
+        console.log(`[CardTypes] Loaded ${Object.keys(templates).length} templates, ${Object.keys(cardTypeModules).length} JS modules, ${Object.keys(cardTypeRenderers).length} custom renderers, ${Object.keys(extensions).length} extensions`);
         return templates;
     } catch (e) {
         console.error('[CardTypes] Error loading modules:', e);
@@ -578,7 +566,6 @@ const SETTINGS_SCHEMA = {
     ] },
     default_author: { default: null },
     authors: { default: [{ name: 'Claude', icon: 'claude.svg' }] },
-    extensions: { default: () => getDefaultExtensionRegistry() },
     theme: { default: null },
     quiz_self_review: { default: true },  // Allow students to self-mark pending questions
     hidden_templates: { default: [] },    // Template names to hide from create buttons
@@ -750,16 +737,10 @@ async function saveSettings(dirHandle) {
     console.log('[Settings] Saved .notebook/settings.yaml');
 }
 
-// Load extension registry from settings (or use defaults)
+// Load extension registry (uses extensions aggregated from card type modules)
 async function loadExtensionRegistry(dirHandle) {
-    // Use extensions from settings if available, otherwise use defaults
-    if (notebookSettings && notebookSettings.extensions) {
-        extensionRegistry = notebookSettings.extensions;
-        console.log('[Templates] Using extensions from settings');
-    } else {
-        extensionRegistry = getDefaultExtensionRegistry();
-        console.log('[Templates] Using default extension registry');
-    }
+    extensionRegistry = cardTypeExtensions;
+    console.log(`[Templates] Using extension registry with ${Object.keys(extensionRegistry).length} extensions`);
     return extensionRegistry;
 }
 
@@ -1338,7 +1319,7 @@ const serializers = {
 // Get extension config for a filename
 function getExtensionConfig(filename) {
     if (!extensionRegistry) {
-        extensionRegistry = getDefaultExtensionRegistry();
+        extensionRegistry = cardTypeExtensions;
     }
     // Check extensions in order of specificity (longer matches first)
     const extensions = Object.keys(extensionRegistry).sort((a, b) => b.length - a.length);
@@ -4979,9 +4960,10 @@ async function loadFromFilesystem(dirHandle) {
     // Load roster (optional student name mappings)
     await loadRoster(dirHandle);
 
-    // Load extension registry (uses settings.extensions), templates, and authors
-    await loadExtensionRegistry(dirHandle);
+    // Load templates first (populates cardTypeExtensions via loadCardTypeModules)
     await loadTemplates(dirHandle);
+    // Then load extension registry (uses cardTypeExtensions)
+    await loadExtensionRegistry(dirHandle);
     await loadAuthors(dirHandle);
 
     // Inject template CSS variables and load user theme
@@ -5019,7 +5001,6 @@ async function loadFromFilesystem(dirHandle) {
                     notebook_title: notebookSettings?.notebook_title || 'Research Notebook',
                     notebook_subtitle: notebookSettings?.notebook_subtitle || '',
                     sections: notebookSettings?.sections || [],
-                    extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
                     theme: notebookSettings?.theme || null,
                     default_author: notebookSettings?.default_author || null,
                     authors: notebookSettings?.authors || [],
@@ -5486,7 +5467,6 @@ async function saveToFilesystem(dirHandle) {
             notebook_subtitle: data.subtitle,
             // Save display names (not slugs) - directory mapping is by slugified name
             sections: data.sections.map(s => ({ name: s.name, visible: s.visible !== false })),
-            extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
             theme: notebookSettings?.theme || null
         };
         await saveSettings(dirHandle);
@@ -5591,14 +5571,11 @@ async function saveCardFile(sectionId, card) {
             sections: card.sections || notebookSettings?.sections,
             default_author: card.default_author,
             authors: card.authors,
-            extensions: card.extensions || notebookSettings?.extensions,
             theme: card.theme
         });
         // Also update data.title/subtitle so UI reflects changes
         data.title = notebookSettings.notebook_title;
         data.subtitle = notebookSettings.notebook_subtitle;
-        // Update extension registry
-        extensionRegistry = notebookSettings.extensions;
         // Reload author registry with new authors
         await loadAuthors(notebookDirHandle);
 
@@ -6346,7 +6323,6 @@ function openSettingsEditor() {
             notebook_title: data.title || 'Research Notebook',
             notebook_subtitle: data.subtitle || '',
             sections: data.sections.map(s => ({ name: slugify(s.name), visible: s.visible !== false })),
-            extensions: notebookSettings?.extensions || getDefaultExtensionRegistry(),
             theme: notebookSettings?.theme || null,
             modified: new Date().toISOString()
         };

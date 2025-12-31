@@ -38,3 +38,7 @@ ui:
   button_label: Note
   icon: "📝"
   sort_order: 1
+extensions:
+  ".md":
+    parser: yaml-frontmatter
+    bodyField: content

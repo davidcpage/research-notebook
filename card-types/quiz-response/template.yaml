@@ -104,3 +104,6 @@ ui:
   button_label: null
   icon: "📝"
   sort_order: 11
+extensions:
+  ".response.json":
+    parser: json

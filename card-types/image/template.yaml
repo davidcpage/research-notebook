@@ -47,3 +47,16 @@ ui:
   icon: "🖼️"
   show_create_button: false
   sort_order: 96
+extensions:
+  ".png":
+    parser: binary-image
+  ".jpg":
+    parser: binary-image
+  ".jpeg":
+    parser: binary-image
+  ".gif":
+    parser: binary-image
+  ".webp":
+    parser: binary-image
+  ".svg":
+    parser: text-image

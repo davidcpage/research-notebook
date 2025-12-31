@@ -35,3 +35,6 @@ ui:
   button_label: null
   icon: "📊"
   sort_order: 12
+extensions:
+  ".response-summary.json":
+    parser: json

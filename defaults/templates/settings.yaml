@@ -35,8 +35,6 @@ schema:
       icon:
         type: text
         label: Icon file
-  extensions:
-    type: yaml
   theme:
     type: theme
 card:
@@ -56,11 +54,6 @@ editor:
       label: Default Author
     - field: authors
       label: Author Icons
-    - field: extensions
-      label: Extension Registry
-      multiline: true
-      rows: 20
-      monospace: true
     - field: theme
       label: Base Theme
 style:
