@@ -118,6 +118,38 @@ export function getData() {
 }
 
 /**
+ * Get the current notebook settings.
+ * @returns {Object|null} Notebook settings or null
+ */
+export function getSettings() {
+    return window.notebook?.notebookSettings;
+}
+
+/**
+ * Get the current notebook roster (for classroom features).
+ * @returns {Object|null} Roster data or null
+ */
+export function getRoster() {
+    return window.notebook?.notebookRoster;
+}
+
+/**
+ * Get the currently viewing card.
+ * @returns {Object|null} Current viewing card with sectionId, or null
+ */
+export function getCurrentViewingCard() {
+    return window.notebook?.currentViewingCard;
+}
+
+/**
+ * Get the template registry.
+ * @returns {Object} Template registry object
+ */
+export function getTemplateRegistry() {
+    return window.notebook?.templateRegistry || {};
+}
+
+/**
  * Find a card by ID across all sections and systemNotes.
  * @param {string|number} cardId - Card ID to find
  * @returns {Object|null} Card object or null if not found
@@ -200,6 +232,47 @@ export async function saveCard(card) {
 }
 
 /**
+ * Save all data to IndexedDB.
+ * @returns {Promise<void>}
+ */
+export async function saveData() {
+    if (window.notebook?.saveData) {
+        await window.notebook.saveData();
+    }
+}
+
+/**
+ * Save a card file to the filesystem.
+ * @param {string} sectionId - Section ID
+ * @param {Object} card - Card object
+ * @returns {Promise<boolean>} True if save succeeded
+ */
+export async function saveCardFile(sectionId, card) {
+    if (!window.notebook?.saveCardFile) {
+        console.error('[Framework] saveCardFile not available');
+        return false;
+    }
+    return window.notebook.saveCardFile(sectionId, card);
+}
+
+/**
+ * Get subdirectory from a card's _path field.
+ * @param {string} path - Card's _path (e.g., "section/subdir1/subdir2")
+ * @returns {string|null} Subdirectory path within section, or null
+ */
+export function getSubdirFromPath(path) {
+    if (window.notebook?.getSubdirFromPath) {
+        return window.notebook.getSubdirFromPath(path);
+    }
+    // Fallback implementation
+    if (!path) return null;
+    const parts = path.split('/');
+    // First part is section, rest is subdir
+    if (parts.length <= 1) return null;
+    return parts.slice(1).join('/');
+}
+
+/**
  * Refresh the viewer if it's currently open.
  */
 export function refreshViewer() {
@@ -224,12 +297,31 @@ export function renderMarkdown(text, containerId = null) {
 
 /**
  * Open the viewer for a card.
- * @param {string|number} cardId - ID of the card to open
+ * @param {string|number|Object} cardOrId - Card object or ID of the card to open
  */
-export function openViewer(cardId) {
-    if (window.notebook?.openViewer) {
-        window.notebook.openViewer(cardId);
+export function openViewer(cardOrId) {
+    if (!window.notebook?.openViewer) return;
+
+    // Handle both card objects and card IDs
+    let card, cardId;
+    if (typeof cardOrId === 'object' && cardOrId !== null) {
+        card = cardOrId;
+        cardId = card.id;
+    } else {
+        cardId = cardOrId;
+        card = findCardById(cardId);
     }
+
+    if (!card) {
+        console.warn('[Framework] openViewer: card not found:', cardId);
+        return;
+    }
+
+    // Find the section containing this card
+    const section = findSectionByItem(card);
+    const sectionId = section?.id || '_system';
+
+    window.notebook.openViewer(sectionId, card.id);
 }
 
 /**

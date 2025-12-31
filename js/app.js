@@ -9642,12 +9642,19 @@ notebook</code></pre>
 window.notebook = {
     // Data access
     get data() { return data; },
+    get notebookSettings() { return notebookSettings; },
+    get notebookRoster() { return notebookRoster; },
+    get currentViewingCard() { return currentViewingCard; },
     templateRegistry: null,  // Set after loadTemplates()
 
     // Card operations
     findCardById,
     findSectionByItem,
     saveCardFile,
+    saveData,
+
+    // Filesystem helpers
+    getSubdirFromPath,
 
     // UI operations
     render,
