@@ -43,6 +43,10 @@ function restoreCollapsedSections() {
 // Keys are in format: "sectionId/subdirPath" (e.g., "section-research/responses/batch1")
 let expandedSubdirs = new Set();
 
+// Focus mode: scope UI to a subdirectory path (null = show all)
+// Path format: "section" or "section/subdir/path" (e.g., "2024-25/year-8-set-1")
+let focusedPath = null;
+
 // Get localStorage key for expanded subdirectories (notebook-specific)
 function getExpandedSubdirsKey() {
     const notebookName = notebookDirHandle?.name || 'default';
@@ -99,6 +103,116 @@ function getSubdirFromPath(path) {
 function getSectionFromPath(path) {
     if (!path) return null;
     return path.split('/')[0];
+}
+
+// Focus mode helpers
+
+// Get localStorage key for focus path (notebook-specific)
+function getFocusKey() {
+    const notebookName = notebookDirHandle?.name || 'default';
+    return `focusedPath_${notebookName}`;
+}
+
+// Save focus to localStorage and update URL
+function saveFocus() {
+    if (focusedPath) {
+        localStorage.setItem(getFocusKey(), focusedPath);
+    } else {
+        localStorage.removeItem(getFocusKey());
+    }
+    updateFocusURL();
+}
+
+// Restore focus from URL (priority) or localStorage
+function restoreFocus() {
+    // URL takes priority
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlFocus = urlParams.get('focus');
+    if (urlFocus) {
+        focusedPath = urlFocus;
+        return;
+    }
+    // Fall back to localStorage
+    const saved = localStorage.getItem(getFocusKey());
+    focusedPath = saved || null;
+}
+
+// Update URL to reflect current focus (without page reload)
+function updateFocusURL() {
+    const url = new URL(window.location);
+    if (focusedPath) {
+        url.searchParams.set('focus', focusedPath);
+    } else {
+        url.searchParams.delete('focus');
+    }
+    window.history.replaceState({}, '', url);
+}
+
+// Set focus to a path and re-render
+function setFocus(path) {
+    focusedPath = path || null;
+    saveFocus();
+    // Auto-expand the focused path so items are visible
+    if (focusedPath) {
+        autoExpandFocusedPath();
+    }
+    render();
+}
+
+// Clear focus and re-render
+function clearFocus() {
+    setFocus(null);
+}
+
+// Auto-expand subdirectories along the focused path
+function autoExpandFocusedPath() {
+    if (!focusedPath) return;
+    const parts = focusedPath.split('/');
+    if (parts.length < 2) return;  // No subdirs to expand
+
+    const sectionName = parts[0];
+    const sectionId = 'section-' + sectionName;
+
+    // Expand each level of the subdir path
+    for (let i = 2; i <= parts.length; i++) {
+        const subdirPath = parts.slice(1, i).join('/');
+        const key = `${sectionId}/${subdirPath}`;
+        expandedSubdirs.add(key);
+    }
+    saveExpandedSubdirs();
+}
+
+// Check if a section matches the current focus
+function sectionMatchesFocus(section) {
+    if (!focusedPath) return true;  // No focus = show all
+    const focusSection = getSectionFromPath(focusedPath);
+    return section._dirName === focusSection;
+}
+
+// Check if an item matches the current focus (for filtering within section)
+function itemMatchesFocus(item) {
+    if (!focusedPath) return true;  // No focus = show all
+    if (!item._path) return true;   // No path = show (shouldn't happen)
+
+    // If focus is just a section, all items in that section match
+    const focusParts = focusedPath.split('/');
+    if (focusParts.length === 1) return true;
+
+    // Focus includes subdir - item path must start with focus path
+    return item._path === focusedPath || item._path.startsWith(focusedPath + '/');
+}
+
+// Get display name for a section, stripping focused prefix if applicable
+function getSectionDisplayName(section) {
+    if (!focusedPath) return section.name;
+
+    // If focused on a subdir within this section, show just the subdir name
+    const focusParts = focusedPath.split('/');
+    if (focusParts.length > 1 && section._dirName === focusParts[0]) {
+        // Return the last segment of the focus path as the "section" name
+        return focusParts[focusParts.length - 1];
+    }
+    return section.name;
 }
 
 // Pyodide state
@@ -6267,6 +6381,7 @@ async function linkNotebookFolder() {
             data = fsData;
             restoreCollapsedSections();
             restoreExpandedSubdirs();
+            restoreFocus();
             render();
             showToast(`📁 Linked to folder (loaded ${data.sections.length} sections)`);
         } else {
@@ -6280,6 +6395,7 @@ async function linkNotebookFolder() {
             data = fsData;
             restoreCollapsedSections();
             restoreExpandedSubdirs();
+            restoreFocus();
             render();
             showToast('📁 Linked to folder (new notebook created)');
         }
@@ -7442,18 +7558,23 @@ function countSubtreeItems(node) {
 }
 
 // Helper: render a subdirectory node with its items and nested subdirs
-function renderSubdirNode(sectionId, subdirName, node, parentPath, depth) {
+function renderSubdirNode(sectionId, subdirName, node, parentPath, depth, sectionDirName) {
     const subdirPath = parentPath ? `${parentPath}/${subdirName}` : subdirName;
     const isExpanded = isSubdirExpanded(sectionId, subdirPath);
     const itemCount = countSubtreeItems(node);
+    // Full path from notebook root for focus (section/subdir/path)
+    const fullPath = sectionDirName ? `${sectionDirName}/${subdirPath}` : subdirPath;
 
     // Subdirectory header with toggle
     let html = `
         <div class="subdir-node" data-depth="${depth}" style="--subdir-depth: ${depth}">
-            <div class="subdir-header" onclick="toggleSubdir('${escapeJsAttr(sectionId)}', '${escapeJsAttr(subdirPath)}')">
-                <button class="subdir-toggle ${isExpanded ? '' : 'collapsed'}" title="${isExpanded ? 'Collapse' : 'Expand'}">▼</button>
-                <span class="subdir-name">${escapeHtml(subdirName)}</span>
-                ${!isExpanded ? `<span class="subdir-count">(${itemCount})</span>` : ''}
+            <div class="subdir-header">
+                <div class="subdir-header-left" onclick="toggleSubdir('${escapeJsAttr(sectionId)}', '${escapeJsAttr(subdirPath)}')">
+                    <button class="subdir-toggle ${isExpanded ? '' : 'collapsed'}" title="${isExpanded ? 'Collapse' : 'Expand'}">▼</button>
+                    <span class="subdir-name">${escapeHtml(subdirName)}</span>
+                    ${!isExpanded ? `<span class="subdir-count">(${itemCount})</span>` : ''}
+                </div>
+                <button class="btn-focus btn-focus-subdir" onclick="event.stopPropagation(); setFocus('${escapeJsAttr(fullPath)}')" title="Focus on ${escapeHtml(subdirName)}">⊙</button>
             </div>
             <div class="subdir-content ${isExpanded ? '' : 'collapsed'}">
     `;
@@ -7469,7 +7590,7 @@ function renderSubdirNode(sectionId, subdirName, node, parentPath, depth) {
         // Render nested subdirs (sorted alphabetically)
         const nestedSubdirs = Object.keys(node.subdirs).sort();
         for (const nestedName of nestedSubdirs) {
-            html += renderSubdirNode(sectionId, nestedName, node.subdirs[nestedName], subdirPath, depth + 1);
+            html += renderSubdirNode(sectionId, nestedName, node.subdirs[nestedName], subdirPath, depth + 1, sectionDirName);
         }
     }
 
@@ -7483,7 +7604,8 @@ function renderSubdirNode(sectionId, subdirName, node, parentPath, depth) {
 
 // Helper: render items grouped by subdirectory with collapsible nested subdirs
 // getSubdir is a function that extracts subdirectory (within section) from an item
-function renderItemsWithSubsections(items, sectionId, getSubdir = item => getSubdirFromPath(item._path)) {
+// sectionDirName is the directory name for building focus paths (null for system section)
+function renderItemsWithSubsections(items, sectionId, getSubdir = item => getSubdirFromPath(item._path), sectionDirName = null) {
     if (items.length === 0) {
         return '<p style="color: var(--text-muted); grid-column: 1/-1;">No items yet. Add a bookmark, note, or code!</p>';
     }
@@ -7507,7 +7629,7 @@ function renderItemsWithSubsections(items, sectionId, getSubdir = item => getSub
     });
 
     for (const subdirName of subdirNames) {
-        html += renderSubdirNode(sectionId, subdirName, tree.subdirs[subdirName], null, 0);
+        html += renderSubdirNode(sectionId, subdirName, tree.subdirs[subdirName], null, 0, sectionDirName);
     }
 
     return html;
@@ -7521,6 +7643,28 @@ function getSystemSubdir(note) {
     return 'root';  // Root files (CLAUDE.md, README.md, etc.)
 }
 
+// Render focus breadcrumb bar
+function renderFocusBreadcrumb() {
+    if (!focusedPath) return '';
+
+    const parts = focusedPath.split('/');
+    const breadcrumbParts = parts.map((part, i) => {
+        const path = parts.slice(0, i + 1).join('/');
+        const isLast = i === parts.length - 1;
+        if (isLast) {
+            return `<span class="breadcrumb-current">${escapeHtml(part)}</span>`;
+        }
+        return `<a href="#" class="breadcrumb-link" onclick="setFocus('${escapeJsAttr(path)}'); return false;">${escapeHtml(part)}</a>`;
+    });
+
+    return `
+        <div class="focus-breadcrumb">
+            <span class="breadcrumb-path">${breadcrumbParts.join('<span class="breadcrumb-sep">/</span>')}</span>
+            <button class="breadcrumb-clear" onclick="clearFocus()" title="Clear focus">×</button>
+        </div>
+    `;
+}
+
 // Render the UI
 function render() {
     // Update header and page title with current title and subtitle
@@ -7531,45 +7675,82 @@ function render() {
 
     const content = document.getElementById('content');
 
-    // Filter sections by visibility
-    const visibleSections = data.sections.filter(s => s.visible !== false);
+    // Filter sections by visibility and focus
+    const visibleSections = data.sections
+        .filter(s => s.visible !== false)
+        .filter(s => sectionMatchesFocus(s));
 
-    // Check if _system section is visible (from settings)
-    const systemSectionVisible = getSystemSectionVisible();
+    // Check if _system section is visible (from settings) - hide when focused
+    const systemSectionVisible = getSystemSectionVisible() && !focusedPath;
     const hasSystemNotes = systemSectionVisible && data.systemNotes && data.systemNotes.length > 0;
 
+    // Start with breadcrumb if focused
+    let sectionsHtml = renderFocusBreadcrumb();
+
     if (visibleSections.length === 0 && !hasSystemNotes) {
-        content.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">📚</div>
-                <h2>Your research notebook awaits</h2>
-                <p>Create a section to start organizing your bookmarks and notes</p>
-            </div>
-        `;
+        if (focusedPath) {
+            // Focus path doesn't match any section
+            content.innerHTML = sectionsHtml + `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🔍</div>
+                    <h2>Focus path not found</h2>
+                    <p>The path "${escapeHtml(focusedPath)}" doesn't exist in this notebook</p>
+                    <button class="btn btn-primary" onclick="clearFocus()">Clear Focus</button>
+                </div>
+            `;
+        } else {
+            content.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📚</div>
+                    <h2>Your research notebook awaits</h2>
+                    <p>Create a section to start organizing your bookmarks and notes</p>
+                </div>
+            `;
+        }
         return;
     }
 
-    let sectionsHtml = visibleSections.map(section => {
+    sectionsHtml += visibleSections.map(section => {
         const isCollapsed = collapsedSections.has(section.id);
-        const itemCount = section.items.length;
+        // Filter items by focus
+        const focusedItems = section.items.filter(item => itemMatchesFocus(item));
+        const itemCount = focusedItems.length;
+        const displayName = getSectionDisplayName(section);
+        // When focused on a subdir, don't show section name input (it would be confusing)
+        const isFocusedOnSubdir = focusedPath && focusedPath.includes('/');
+        // Adjust getSubdir to be relative to focus path (so focused subdir appears as root)
+        const focusSubdir = isFocusedOnSubdir ? getSubdirFromPath(focusedPath) : null;
+        const getSubdir = focusSubdir
+            ? item => {
+                const subdir = getSubdirFromPath(item._path);
+                if (!subdir) return null;
+                if (subdir === focusSubdir) return null;  // At focus root
+                if (subdir.startsWith(focusSubdir + '/')) {
+                    return subdir.slice(focusSubdir.length + 1);  // Strip focus prefix
+                }
+                return subdir;
+            }
+            : item => getSubdirFromPath(item._path);
 
         return `
         <div class="section" data-section-id="${section.id}">
-            ${itemCount === 0 ? `<button class="section-delete" onclick="deleteSection('${section.id}')" title="Delete empty section">×</button>` : ''}
+            ${itemCount === 0 && !focusedPath ? `<button class="section-delete" onclick="deleteSection('${section.id}')" title="Delete empty section">×</button>` : ''}
             <div class="section-header">
                 <button class="section-toggle ${isCollapsed ? 'collapsed' : ''}" onclick="toggleSection('${section.id}')" title="${isCollapsed ? 'Expand' : 'Collapse'}">▼</button>
                 <h2 class="section-title">
+                    ${isFocusedOnSubdir ? `<span>${escapeHtml(displayName)}</span>` : `
                     <input type="text" value="${escapeHtml(section.name)}"
                         onchange="updateSectionName('${section.id}', this.value)"
-                        onblur="updateSectionName('${section.id}', this.value)">
+                        onblur="updateSectionName('${section.id}', this.value)">`}
                     ${isCollapsed && itemCount > 0 ? `<span class="section-count">(${itemCount})</span>` : ''}
                 </h2>
                 <div class="section-actions">
+                    ${!focusedPath ? `<button class="btn-focus" onclick="setFocus('${escapeJsAttr(section._dirName)}')" title="Focus on this section">⊙</button>` : ''}
                     ${renderTemplateButtons(section.id)}
                 </div>
             </div>
             <div class="items-grid ${isCollapsed ? 'collapsed' : ''}">
-                ${renderItemsWithSubsections(section.items, section.id)}
+                ${renderItemsWithSubsections(focusedItems, section.id, getSubdir, section._dirName)}
             </div>
         </div>
     `}).join('');
@@ -7809,9 +7990,10 @@ async function init() {
     await initFilesystem();
 
     if (filesystemLinked) {
-        // Restore collapsed sections/subdirs now that we know the notebook name
+        // Restore collapsed sections/subdirs/focus now that we know the notebook name
         restoreCollapsedSections();
         restoreExpandedSubdirs();
+        restoreFocus();
         // Filesystem data already loaded in initFilesystem, just render
         render();
     } else {
