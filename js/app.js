@@ -193,7 +193,8 @@ function getExtensionRegistry() {
 
 // Fetch default templates from /defaults/templates/ and /card-types/
 // This must be called during app initialization before templates are used
-async function fetchDefaultTemplates() {
+// enabledTypes: optional array of card type names to fully load (CSS/JS)
+async function fetchDefaultTemplates(enabledTypes = null) {
     if (defaultTemplatesCache) {
         return defaultTemplatesCache;
     }
@@ -225,7 +226,8 @@ async function fetchDefaultTemplates() {
         }
 
         // 2. Load card type modules (these take precedence over legacy templates)
-        const cardTypeTemplates = await loadCardTypeModules();
+        // Pass enabledTypes to control which types get CSS/JS loaded
+        const cardTypeTemplates = await loadCardTypeModules(enabledTypes);
         Object.assign(templates, cardTypeTemplates);
 
         console.log(`[Templates] Loaded ${Object.keys(templates).length} default templates`);
@@ -263,10 +265,20 @@ let cardTypeRenderers = {};
 // Structure: { '.md': { parser: 'yaml-frontmatter', defaultTemplate: 'note', bodyField: 'content' }, ... }
 let cardTypeExtensions = {};
 
+// Track which card types have been fully loaded (CSS + JS)
+let fullyLoadedCardTypes = new Set();
+
+// All available card types from manifest (module directory name -> template name)
+let availableCardTypes = {};
+
+// Card types currently in use in the notebook (detected from files)
+let inUseCardTypes = new Set();
+
 // Load card type modules from /card-types/
-// Fetches manifest, loads templates, injects CSS, imports JS modules
-async function loadCardTypeModules() {
-    console.log('[CardTypes] Loading modules...');
+// Phase 1: Fetches manifest, loads ALL template.yaml (for extensions/schema)
+// Phase 2: Loads CSS/JS only for enabledTypes (if specified)
+async function loadCardTypeModules(enabledTypes = null) {
+    console.log('[CardTypes] Loading modules...', enabledTypes ? `(enabled: ${[...enabledTypes].join(', ')})` : '(all)');
 
     try {
         // Fetch the manifest
@@ -286,10 +298,11 @@ async function loadCardTypeModules() {
         const cssBlocks = [];
         const extensions = {};
 
-        for (const moduleName of manifest.modules) {
-            console.log(`[CardTypes] Loading ${moduleName}...`);
+        // Convert enabledTypes to Set for fast lookup
+        const enabledSet = enabledTypes ? new Set(enabledTypes) : null;
 
-            // 1. Load template.yaml (required)
+        for (const moduleName of manifest.modules) {
+            // Phase 1: Always load template.yaml (required for extensions/schema)
             let template = null;
             try {
                 const templateResponse = await fetch(`/card-types/${moduleName}/template.yaml`);
@@ -298,6 +311,9 @@ async function loadCardTypeModules() {
                     template = jsyaml.load(yamlContent);
                     if (template && template.name) {
                         templates[template.name] = template;
+
+                        // Track module name -> template name mapping
+                        availableCardTypes[moduleName] = template.name;
 
                         // Aggregate extensions from template
                         if (template.extensions) {
@@ -321,39 +337,44 @@ async function loadCardTypeModules() {
                 continue;
             }
 
-            // 2. Load styles.css (optional)
-            try {
-                const cssResponse = await fetch(`/card-types/${moduleName}/styles.css`);
-                if (cssResponse.ok) {
-                    const css = await cssResponse.text();
-                    cssBlocks.push(`/* ${moduleName} */\n${css}`);
-                }
-            } catch (e) {
-                // Optional, ignore errors
-            }
+            // Phase 2: Load CSS/JS only for enabled types (or all if no filter)
+            const templateName = template?.name;
+            const shouldLoadAssets = !enabledSet || enabledSet.has(templateName);
 
-            // 3. Load index.js (optional) - ES module with render functions
-            try {
-                const jsModule = await import(`/card-types/${moduleName}/index.js`);
-                if (jsModule) {
-                    cardTypeModules[moduleName] = jsModule;
-
-                    // Register render functions if provided
-                    if (jsModule.renderPreview || jsModule.renderViewer) {
-                        cardTypeRenderers[moduleName] = {
-                            renderPreview: jsModule.renderPreview,
-                            renderViewer: jsModule.renderViewer
-                        };
-                        console.log(`[CardTypes] ${moduleName}: Registered render functions`);
+            if (shouldLoadAssets && templateName && !fullyLoadedCardTypes.has(templateName)) {
+                // Load styles.css (optional)
+                try {
+                    const cssResponse = await fetch(`/card-types/${moduleName}/styles.css`);
+                    if (cssResponse.ok) {
+                        const css = await cssResponse.text();
+                        cssBlocks.push(`/* ${moduleName} */\n${css}`);
                     }
+                } catch (e) {
+                    // Optional, ignore errors
+                }
 
-                    console.log(`[CardTypes] ${moduleName}: Loaded JS module`);
+                // Load index.js (optional) - ES module with render functions
+                try {
+                    const jsModule = await import(`/card-types/${moduleName}/index.js`);
+                    if (jsModule) {
+                        cardTypeModules[moduleName] = jsModule;
+
+                        // Register render functions if provided
+                        if (jsModule.renderPreview || jsModule.renderViewer) {
+                            cardTypeRenderers[moduleName] = {
+                                renderPreview: jsModule.renderPreview,
+                                renderViewer: jsModule.renderViewer
+                            };
+                        }
+                    }
+                } catch (e) {
+                    // Optional, ignore if not present (404 is expected for simple types)
+                    if (!e.message?.includes('404') && !e.message?.includes('Failed to fetch')) {
+                        console.error(`[CardTypes] ${moduleName}: Error loading index.js:`, e);
+                    }
                 }
-            } catch (e) {
-                // Optional, ignore if not present (404 is expected for simple types)
-                if (!e.message?.includes('404') && !e.message?.includes('Failed to fetch')) {
-                    console.error(`[CardTypes] ${moduleName}: Error loading index.js:`, e);
-                }
+
+                fullyLoadedCardTypes.add(templateName);
             }
         }
 
@@ -371,11 +392,82 @@ async function loadCardTypeModules() {
         // Store aggregated extensions
         cardTypeExtensions = extensions;
 
-        console.log(`[CardTypes] Loaded ${Object.keys(templates).length} templates, ${Object.keys(cardTypeModules).length} JS modules, ${Object.keys(cardTypeRenderers).length} custom renderers, ${Object.keys(extensions).length} extensions`);
+        console.log(`[CardTypes] Loaded ${Object.keys(templates).length} templates, ${fullyLoadedCardTypes.size} fully loaded, ${Object.keys(extensions).length} extensions`);
         return templates;
     } catch (e) {
         console.error('[CardTypes] Error loading modules:', e);
         return {};
+    }
+}
+
+// Load CSS and JS assets for additional card types (lazy loading)
+async function loadCardTypeAssets(typeNames) {
+    if (!typeNames || typeNames.length === 0) return;
+
+    const cssBlocks = [];
+
+    for (const typeName of typeNames) {
+        if (fullyLoadedCardTypes.has(typeName)) continue;
+
+        // Find module name for this type
+        const moduleName = Object.entries(availableCardTypes)
+            .find(([mod, name]) => name === typeName)?.[0];
+
+        if (!moduleName) {
+            console.warn(`[CardTypes] Unknown type: ${typeName}`);
+            continue;
+        }
+
+        console.log(`[CardTypes] Lazy loading ${typeName}...`);
+
+        // Load CSS
+        try {
+            const cssResponse = await fetch(`/card-types/${moduleName}/styles.css`);
+            if (cssResponse.ok) {
+                cssBlocks.push(`/* ${moduleName} */\n${await cssResponse.text()}`);
+            }
+        } catch (e) { /* optional */ }
+
+        // Load JS
+        try {
+            const jsModule = await import(`/card-types/${moduleName}/index.js`);
+            if (jsModule) {
+                cardTypeModules[moduleName] = jsModule;
+                if (jsModule.renderPreview || jsModule.renderViewer) {
+                    cardTypeRenderers[moduleName] = {
+                        renderPreview: jsModule.renderPreview,
+                        renderViewer: jsModule.renderViewer
+                    };
+                }
+            }
+        } catch (e) {
+            if (!e.message?.includes('404') && !e.message?.includes('Failed to fetch')) {
+                console.error(`[CardTypes] ${moduleName}: Error loading index.js:`, e);
+            }
+        }
+
+        fullyLoadedCardTypes.add(typeName);
+    }
+
+    // Append CSS (don't replace, add to existing)
+    if (cssBlocks.length > 0) {
+        appendCardTypeStyles(cssBlocks.join('\n\n'));
+    }
+}
+
+// Append additional card type CSS (for lazy loading)
+function appendCardTypeStyles(css) {
+    const existing = document.getElementById('card-type-styles');
+    if (existing) {
+        // Append to existing styles within the layer
+        const currentContent = existing.textContent;
+        // Extract content between @layer templates { and closing }
+        const match = currentContent.match(/@layer templates \{([\s\S]*)\}$/);
+        if (match) {
+            existing.textContent = `@layer templates {\n${match[1]}\n${css}\n}`;
+        }
+    } else {
+        injectCardTypeStyles(css);
     }
 }
 
@@ -400,6 +492,52 @@ function getCardTypeModule(name) {
 // Get card type renderer by name
 function getCardTypeRenderer(name) {
     return cardTypeRenderers[name] || null;
+}
+
+// Get all available card type names (from manifest)
+function getAvailableCardTypes() {
+    return Object.values(availableCardTypes);
+}
+
+// Get card types currently in use in the notebook
+function getInUseCardTypes() {
+    return inUseCardTypes;
+}
+
+// Scan notebook files to detect which card types are in use
+async function detectInUseCardTypes(dirHandle) {
+    const detected = new Set();
+    const extensions = getExtensionRegistry();
+
+    async function scanDir(handle) {
+        try {
+            for await (const entry of handle.values()) {
+                if (entry.kind === 'directory') {
+                    // Skip hidden directories and reserved paths
+                    if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+                    try {
+                        const subHandle = await handle.getDirectoryHandle(entry.name);
+                        await scanDir(subHandle);
+                    } catch (e) { /* skip inaccessible */ }
+                } else if (entry.kind === 'file') {
+                    // Check if file matches any known extension
+                    for (const [ext, config] of Object.entries(extensions)) {
+                        if (entry.name.endsWith(ext) && config.defaultTemplate) {
+                            detected.add(config.defaultTemplate);
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[CardTypes] Error scanning directory:', e);
+        }
+    }
+
+    await scanDir(dirHandle);
+    inUseCardTypes = detected;
+    console.log(`[CardTypes] Detected in-use types: ${[...detected].join(', ') || '(none)'}`);
+    return detected;
 }
 
 // Fetch default theme.css content from /defaults/theme.css
@@ -569,6 +707,7 @@ const SETTINGS_SCHEMA = {
     theme: { default: null },
     quiz_self_review: { default: true },  // Allow students to self-mark pending questions
     hidden_templates: { default: [] },    // Template names to hide from create buttons
+    enabled_templates: { default: ['note', 'bookmark', 'code'] }, // Card types available in this notebook
     quiz_template_mode: { default: false }, // Disable quiz-taking in viewer (for quiz templates)
     grading: { default: null }            // Grading settings: { roster_path, show_student_names }
 };
@@ -806,7 +945,9 @@ async function loadAuthors(dirHandle) {
 // Load templates from .notebook/templates/
 async function loadTemplates(dirHandle) {
     // Fetch default templates from server (ensures settings is always available)
-    const defaults = await fetchDefaultTemplates();
+    // Pass enabled_templates from settings to control which card types get fully loaded
+    const enabledTypes = notebookSettings?.enabled_templates || null;
+    const defaults = await fetchDefaultTemplates(enabledTypes);
     templateRegistry = { ...defaults };
 
     if (!dirHandle) {
@@ -3099,6 +3240,65 @@ function renderEditorField(fieldConfig, fieldDef, value) {
         hint.className = 'form-hint';
         hint.textContent = 'Base theme from /themes/. Your .notebook/theme.css customizations are layered on top.';
         div.appendChild(hint);
+    } else if (type === 'templates') {
+        // Card type selector - checkbox grid for available card types
+        const container = document.createElement('div');
+        container.className = 'templates-selector';
+        container.id = `editor-${field}`;
+
+        const availableTypes = getAvailableCardTypes();
+        const enabledTypes = Array.isArray(value) ? value : [];
+        const currentInUse = getInUseCardTypes();
+
+        // Sort: in-use first, then alphabetically
+        const sortedTypes = [...availableTypes].sort((a, b) => {
+            const aInUse = currentInUse.has(a);
+            const bInUse = currentInUse.has(b);
+            if (aInUse !== bInUse) return bInUse - aInUse;
+            return a.localeCompare(b);
+        });
+
+        sortedTypes.forEach(typeName => {
+            const template = templateRegistry[typeName];
+            // Skip system types that don't show create buttons
+            if (!template || template.ui?.show_create_button === false) return;
+
+            const isInUse = currentInUse.has(typeName);
+            const isEnabled = enabledTypes.includes(typeName) || isInUse;
+
+            const item = document.createElement('label');
+            item.className = 'template-selector-item' + (isInUse ? ' in-use' : '');
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = typeName;
+            checkbox.checked = isEnabled;
+            checkbox.disabled = isInUse;
+
+            const labelText = document.createElement('span');
+            labelText.className = 'template-selector-label';
+            labelText.textContent = template.name || typeName;
+
+            item.appendChild(checkbox);
+            item.appendChild(labelText);
+
+            if (isInUse) {
+                const badge = document.createElement('span');
+                badge.className = 'template-selector-badge';
+                badge.textContent = '(in use)';
+                item.appendChild(badge);
+            }
+
+            container.appendChild(item);
+        });
+
+        div.appendChild(container);
+
+        // Add description hint
+        const hint = document.createElement('p');
+        hint.className = 'form-hint';
+        hint.textContent = 'Card types with existing cards cannot be disabled.';
+        div.appendChild(hint);
     } else {
         // Default text input
         inputEl = document.createElement('input');
@@ -4428,6 +4628,10 @@ function getEditorFieldValue(fieldName, fieldDef, fieldConfig) {
     } else if (type === 'questions') {
         // Use the dedicated function to extract questions data
         return getQuestionsEditorValue();
+    } else if (type === 'templates') {
+        // Collect checked template names from checkbox grid
+        const checkboxes = el.querySelectorAll('input[type="checkbox"]:checked');
+        return Array.from(checkboxes).map(cb => cb.value);
     }
 
     return el.value;
@@ -4961,9 +5165,19 @@ async function loadFromFilesystem(dirHandle) {
     await loadRoster(dirHandle);
 
     // Load templates first (populates cardTypeExtensions via loadCardTypeModules)
+    // Only loads CSS/JS for enabled_templates from settings
     await loadTemplates(dirHandle);
     // Then load extension registry (uses cardTypeExtensions)
     await loadExtensionRegistry(dirHandle);
+
+    // Detect in-use card types and lazy-load their CSS/JS
+    const inUseTypes = await detectInUseCardTypes(dirHandle);
+    const additionalTypes = [...inUseTypes].filter(t => !fullyLoadedCardTypes.has(t));
+    if (additionalTypes.length > 0) {
+        console.log(`[CardTypes] Loading assets for in-use types: ${additionalTypes.join(', ')}`);
+        await loadCardTypeAssets(additionalTypes);
+    }
+
     await loadAuthors(dirHandle);
 
     // Inject template CSS variables and load user theme
@@ -5004,6 +5218,7 @@ async function loadFromFilesystem(dirHandle) {
                     theme: notebookSettings?.theme || null,
                     default_author: notebookSettings?.default_author || null,
                     authors: notebookSettings?.authors || [],
+                    enabled_templates: notebookSettings?.enabled_templates || null,
                     modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
                 });
                 console.log('[Filesystem] Loaded settings card');
@@ -5571,13 +5786,22 @@ async function saveCardFile(sectionId, card) {
             sections: card.sections || notebookSettings?.sections,
             default_author: card.default_author,
             authors: card.authors,
-            theme: card.theme
+            theme: card.theme,
+            enabled_templates: card.enabled_templates
         });
         // Also update data.title/subtitle so UI reflects changes
         data.title = notebookSettings.notebook_title;
         data.subtitle = notebookSettings.notebook_subtitle;
         // Reload author registry with new authors
         await loadAuthors(notebookDirHandle);
+
+        // Lazy-load CSS/JS for newly enabled card types
+        if (notebookSettings.enabled_templates) {
+            const newlyEnabled = notebookSettings.enabled_templates.filter(t => !fullyLoadedCardTypes.has(t));
+            if (newlyEnabled.length > 0) {
+                await loadCardTypeAssets(newlyEnabled);
+            }
+        }
 
         // Reorder data.sections to match the new order from settings
         // card.sections is now an array of {name, path, visible} records
@@ -6324,6 +6548,7 @@ function openSettingsEditor() {
             notebook_subtitle: data.subtitle || '',
             sections: data.sections.map(s => ({ name: slugify(s.name), visible: s.visible !== false })),
             theme: notebookSettings?.theme || null,
+            enabled_templates: notebookSettings?.enabled_templates || null,
             modified: new Date().toISOString()
         };
         // Add to systemNotes so it appears in the list
@@ -7147,11 +7372,17 @@ function getPlainTextPreview(markdown, maxLength = 200) {
 function renderTemplateButtons(sectionId) {
     // Get hidden_templates from settings (per-notebook configuration)
     const hiddenTemplates = notebookSettings?.hidden_templates || [];
+    // Get enabled_templates from settings (if set, only show these types)
+    const enabledTemplates = notebookSettings?.enabled_templates;
+    const hasEnabledFilter = Array.isArray(enabledTemplates) && enabledTemplates.length > 0;
+    // In-use types should also show create buttons
+    const currentInUse = getInUseCardTypes();
 
     // Get templates sorted by sort_order
     const templates = Object.values(templateRegistry)
         .filter(t => t.ui?.show_create_button !== false)
         .filter(t => !hiddenTemplates.includes(t.name))
+        .filter(t => !hasEnabledFilter || enabledTemplates.includes(t.name) || currentInUse.has(t.name))
         .sort((a, b) => (a.ui?.sort_order || 99) - (b.ui?.sort_order || 99));
 
     // Button styles by template type

@@ -58,3 +58,10 @@ ui:
   button_label: Code
   icon: 🐍
   sort_order: 2
+extensions:
+  .code.py:
+    parser: comment-frontmatter
+    bodyField: code
+    companionFiles:
+      - suffix: .output.html
+        field: output

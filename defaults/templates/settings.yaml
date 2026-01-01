@@ -37,6 +37,9 @@ schema:
         label: Icon file
   theme:
     type: theme
+  enabled_templates:
+    type: array
+    description: Card types available in this notebook
 card:
   layout: yaml
   placeholder: "⚙"
@@ -56,6 +59,9 @@ editor:
       label: Author Icons
     - field: theme
       label: Base Theme
+    - field: enabled_templates
+      label: Available Card Types
+      type: templates
 style:
   variables:
     --preview-bg: "#f5f5f5"
