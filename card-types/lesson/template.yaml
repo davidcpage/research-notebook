@@ -1,0 +1,125 @@
+name: lesson
+description: Lesson plan with links to Google Drive materials
+schema:
+  number:
+    type: text
+    description: Lesson number within module (e.g., "1.1", "1.2")
+  title:
+    type: text
+    required: true
+  date:
+    type: date
+    description: When the lesson was/will be taught
+  time:
+    type: text
+    description: Time slot (e.g., "14:30-15:30")
+  status:
+    type: text
+    enum: [planned, taught, cancelled]
+    default: planned
+
+  # Links to Google Drive materials
+  teacher_slides:
+    type: url
+    description: Full slides with answers (Google Slides link)
+  student_slides:
+    type: url
+    description: Student version without answers
+  audio:
+    type: url
+    description: Listening activity audio file
+  handout:
+    type: url
+    description: Printable student handout
+
+  # Planning metadata
+  objectives:
+    type: array
+    description: Learning objectives for this lesson
+    items:
+      type: text
+  vocab:
+    type: array
+    description: Key vocabulary introduced
+    items:
+      type: text
+  grammar:
+    type: text
+    description: Grammar focus for this lesson
+  notes:
+    type: markdown
+    description: Post-lesson reflections and observations
+
+  created:
+    type: datetime
+  modified:
+    type: datetime
+
+card:
+  layout: lesson
+  placeholder: "📚"
+viewer:
+  layout: lesson
+editor:
+  fields:
+    - field: number
+      label: Lesson Number
+      width: quarter
+      placeholder: "1.1"
+    - field: title
+      label: Title
+      width: three-quarters
+    - field: date
+      label: Date
+      width: third
+    - field: time
+      label: Time
+      width: third
+      placeholder: "14:30-15:30"
+    - field: status
+      label: Status
+      width: third
+      type: select
+      options:
+        - { value: planned, label: Planned }
+        - { value: taught, label: Taught }
+        - { value: cancelled, label: Cancelled }
+    - section: Materials (Google Drive)
+    - field: teacher_slides
+      label: Teacher Slides
+      placeholder: "https://docs.google.com/presentation/d/..."
+    - field: student_slides
+      label: Student Slides
+      placeholder: "https://docs.google.com/presentation/d/..."
+    - field: audio
+      label: Audio File
+      placeholder: "https://drive.google.com/file/d/..."
+    - field: handout
+      label: Handout
+      placeholder: "https://drive.google.com/file/d/..."
+    - section: Lesson Content
+    - field: objectives
+      label: Learning Objectives
+      type: list
+    - field: vocab
+      label: Vocabulary
+      type: list
+    - field: grammar
+      label: Grammar Focus
+    - field: notes
+      label: Notes / Reflections
+      multiline: true
+      rows: 6
+style:
+  variables:
+    --template-border: "#b8c9a8"
+    --template-bg: "#f4f8f0"
+    --template-preview-bg: "#e8f0e0"
+    --template-title-text: "#3d5a3d"
+ui:
+  button_label: Lesson
+  icon: "📚"
+  sort_order: 5
+extensions:
+  ".lesson.yaml":
+    parser: yaml

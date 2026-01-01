@@ -10,4 +10,6 @@ node_modules/
 # Notebook exports
 *_notebook*.json
 my_notebook*.json
-.claude/skills/
+# Ignore external skill symlinks, but track project skills
+.claude/skills/*
+!.claude/skills/import-drive-structure/

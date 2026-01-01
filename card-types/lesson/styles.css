@@ -1,0 +1,178 @@
+/* Lesson card: green/sage color scheme for educational context */
+.card[data-template="lesson"],
+.modal.viewer[data-template="lesson"] {
+    --template-border: #b8c9a8;
+    --template-bg: #f4f8f0;
+    --template-preview-bg: #e8f0e0;
+    --template-title-text: #3d5a3d;
+    --template-meta-text: #5a7a5a;
+    --lesson-status-planned: #6b7280;
+    --lesson-status-taught: #059669;
+    --lesson-status-cancelled: #dc2626;
+}
+
+/* Card styles */
+.card[data-template="lesson"] {
+    border-color: var(--template-border);
+}
+
+.card[data-template="lesson"] .card-preview {
+    background: var(--template-preview-bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    gap: 0.5rem;
+}
+
+/* Lesson number badge in preview */
+.card[data-template="lesson"] .lesson-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--template-title-text);
+    background: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    border: 2px solid var(--template-border);
+}
+
+/* Status badge */
+.lesson-status {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.lesson-status.planned {
+    background: #e5e7eb;
+    color: var(--lesson-status-planned);
+}
+
+.lesson-status.taught {
+    background: #d1fae5;
+    color: var(--lesson-status-taught);
+}
+
+.lesson-status.cancelled {
+    background: #fee2e2;
+    color: var(--lesson-status-cancelled);
+}
+
+/* Viewer styles */
+.modal.viewer[data-template="lesson"] {
+    background: var(--template-bg);
+    border: 1px solid var(--template-border);
+}
+
+.modal.viewer[data-template="lesson"] .viewer-content {
+    padding: 1.5rem;
+}
+
+/* Materials section in viewer */
+.lesson-materials {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.lesson-material-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: white;
+    border: 1px solid var(--template-border);
+    border-radius: 6px;
+    color: var(--template-title-text);
+    text-decoration: none;
+    transition: all 0.15s;
+}
+
+.lesson-material-link:hover {
+    background: var(--template-preview-bg);
+    border-color: var(--template-title-text);
+}
+
+.lesson-material-link .icon {
+    font-size: 1.25rem;
+}
+
+.lesson-material-link .label {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.lesson-material-link.empty {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Objectives and vocab lists */
+.lesson-list {
+    margin-bottom: 1rem;
+}
+
+.lesson-list-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--template-title-text);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.lesson-list ul {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.lesson-list li {
+    margin-bottom: 0.25rem;
+    color: var(--text-primary);
+}
+
+/* Grammar focus */
+.lesson-grammar {
+    background: white;
+    border: 1px solid var(--template-border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.lesson-grammar-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--template-meta-text);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.lesson-grammar-value {
+    color: var(--template-title-text);
+    font-weight: 500;
+}
+
+/* Notes section */
+.lesson-notes {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--template-border);
+}
+
+.lesson-notes-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--template-title-text);
+    margin-bottom: 0.75rem;
+}
+
+.lesson-notes .md-content {
+    font-size: 0.95rem;
+    line-height: 1.6;
+}

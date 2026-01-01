@@ -1,0 +1,31 @@
+id: lesson-demo-001
+number: "1.1"
+title: Point de Départ
+date: 2025-01-06
+time: "14:30-15:30"
+status: planned
+
+# Google Drive links (example URLs)
+teacher_slides: https://docs.google.com/presentation/d/1ABC123/edit
+student_slides: https://docs.google.com/presentation/d/1DEF456/edit
+
+objectives:
+  - Introduce yourself in French
+  - Ask someone's name
+  - Use basic greetings (Bonjour, Salut, Au revoir)
+
+vocab:
+  - Bonjour - Hello
+  - Comment tu t'appelles? - What's your name?
+  - Je m'appelle... - My name is...
+  - Salut - Hi/Bye (informal)
+  - Au revoir - Goodbye
+
+grammar: Present tense of s'appeler (je m'appelle, tu t'appelles)
+
+notes: |
+  First lesson of the year - focus on building confidence.
+  Use name games to practice introductions.
+
+created: 2025-01-01T10:00:00Z
+modified: 2025-01-01T10:00:00Z

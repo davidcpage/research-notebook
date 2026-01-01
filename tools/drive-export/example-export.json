@@ -1,0 +1,190 @@
+{
+  "exportedAt": "2025-01-01T10:00:00.000Z",
+  "rootFolderId": "1ABC123XYZ789example",
+  "rootFolderName": "Class 7K",
+  "structure": {
+    "name": "Class 7K",
+    "path": "Class 7K",
+    "type": "folder",
+    "children": [
+      {
+        "name": "Module 1 - La Rentree",
+        "path": "Class 7K/Module 1 - La Rentree",
+        "type": "folder",
+        "children": [
+          {
+            "name": "1.1 Point de Depart",
+            "path": "Class 7K/Module 1 - La Rentree/1.1 Point de Depart",
+            "type": "folder",
+            "children": [],
+            "files": [
+              {
+                "name": "Teacher Slides",
+                "mimeType": "application/vnd.google-apps.presentation",
+                "url": "https://docs.google.com/presentation/d/1ABC_teacher_slides/edit",
+                "size": 0,
+                "category": "slides"
+              },
+              {
+                "name": "Student Slides",
+                "mimeType": "application/vnd.google-apps.presentation",
+                "url": "https://docs.google.com/presentation/d/1DEF_student_slides/edit",
+                "size": 0,
+                "category": "slides"
+              },
+              {
+                "name": "Listening Activity.mp3",
+                "mimeType": "audio/mpeg",
+                "url": "https://drive.google.com/file/d/1GHI_audio/view",
+                "size": 2456789,
+                "category": "audio"
+              },
+              {
+                "name": "Vocabulary Handout.pdf",
+                "mimeType": "application/pdf",
+                "url": "https://drive.google.com/file/d/1JKL_handout/view",
+                "size": 123456,
+                "category": "pdf"
+              }
+            ]
+          },
+          {
+            "name": "1.2 Ma Famille",
+            "path": "Class 7K/Module 1 - La Rentree/1.2 Ma Famille",
+            "type": "folder",
+            "children": [],
+            "files": [
+              {
+                "name": "Teacher Slides",
+                "mimeType": "application/vnd.google-apps.presentation",
+                "url": "https://docs.google.com/presentation/d/1MNO_teacher_slides/edit",
+                "size": 0,
+                "category": "slides"
+              },
+              {
+                "name": "Student Slides",
+                "mimeType": "application/vnd.google-apps.presentation",
+                "url": "https://docs.google.com/presentation/d/1PQR_student_slides/edit",
+                "size": 0,
+                "category": "slides"
+              },
+              {
+                "name": "Family Tree Activity.pdf",
+                "mimeType": "application/pdf",
+                "url": "https://drive.google.com/file/d/1STU_handout/view",
+                "size": 234567,
+                "category": "pdf"
+              }
+            ]
+          },
+          {
+            "name": "1.3 Les Animaux",
+            "path": "Class 7K/Module 1 - La Rentree/1.3 Les Animaux",
+            "type": "folder",
+            "children": [],
+            "files": [
+              {
+                "name": "Teacher Slides",
+                "mimeType": "application/vnd.google-apps.presentation",
+                "url": "https://docs.google.com/presentation/d/1VWX_teacher_slides/edit",
+                "size": 0,
+                "category": "slides"
+              },
+              {
+                "name": "Animal Sounds.mp3",
+                "mimeType": "audio/mpeg",
+                "url": "https://drive.google.com/file/d/1YZA_audio/view",
+                "size": 3456789,
+                "category": "audio"
+              }
+            ]
+          },
+          {
+            "name": "Assessment",
+            "path": "Class 7K/Module 1 - La Rentree/Assessment",
+            "type": "folder",
+            "children": [],
+            "files": [
+              {
+                "name": "Reading Quiz.pdf",
+                "mimeType": "application/pdf",
+                "url": "https://drive.google.com/file/d/1BCD_reading/view",
+                "size": 98765,
+                "category": "pdf"
+              },
+              {
+                "name": "Listening Quiz.pdf",
+                "mimeType": "application/pdf",
+                "url": "https://drive.google.com/file/d/1EFG_listening/view",
+                "size": 87654,
+                "category": "pdf"
+              },
+              {
+                "name": "Mark Scheme.pdf",
+                "mimeType": "application/pdf",
+                "url": "https://drive.google.com/file/d/1HIJ_marks/view",
+                "size": 76543,
+                "category": "pdf"
+              }
+            ]
+          }
+        ],
+        "files": []
+      },
+      {
+        "name": "Module 2 - Ma Ville",
+        "path": "Class 7K/Module 2 - Ma Ville",
+        "type": "folder",
+        "children": [
+          {
+            "name": "2.1 Ou Habites-Tu",
+            "path": "Class 7K/Module 2 - Ma Ville/2.1 Ou Habites-Tu",
+            "type": "folder",
+            "children": [],
+            "files": [
+              {
+                "name": "Teacher Slides",
+                "mimeType": "application/vnd.google-apps.presentation",
+                "url": "https://docs.google.com/presentation/d/2ABC_teacher_slides/edit",
+                "size": 0,
+                "category": "slides"
+              },
+              {
+                "name": "Student Slides",
+                "mimeType": "application/vnd.google-apps.presentation",
+                "url": "https://docs.google.com/presentation/d/2DEF_student_slides/edit",
+                "size": 0,
+                "category": "slides"
+              }
+            ]
+          },
+          {
+            "name": "2.2 Les Magasins",
+            "path": "Class 7K/Module 2 - Ma Ville/2.2 Les Magasins",
+            "type": "folder",
+            "children": [],
+            "files": [
+              {
+                "name": "Teacher Slides",
+                "mimeType": "application/vnd.google-apps.presentation",
+                "url": "https://docs.google.com/presentation/d/2GHI_teacher_slides/edit",
+                "size": 0,
+                "category": "slides"
+              }
+            ]
+          }
+        ],
+        "files": []
+      }
+    ],
+    "files": [
+      {
+        "name": "Class Overview",
+        "mimeType": "application/vnd.google-apps.document",
+        "url": "https://docs.google.com/document/d/1ROOT_overview/edit",
+        "size": 0,
+        "category": "doc"
+      }
+    ]
+  }
+}
