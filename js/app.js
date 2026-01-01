@@ -5707,6 +5707,17 @@ async function loadFromFilesystem(dirHandle) {
                 const bSubdir = getSubdirFromPath(b._path) || '';
                 if (aSubdir !== bSubdir) return aSubdir.localeCompare(bSubdir);
 
+                // Within same subfolder, sort by lesson number if present (0.0 < 0.1 < 1.0 < 1.1)
+                if (a.number && b.number) {
+                    const aParts = String(a.number).split('.').map(Number);
+                    const bParts = String(b.number).split('.').map(Number);
+                    for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+                        const aVal = aParts[i] || 0;
+                        const bVal = bParts[i] || 0;
+                        if (aVal !== bVal) return aVal - bVal;
+                    }
+                }
+
                 // Within same subfolder, sort by modified date (newest first)
                 const aTime = a._fileModified || 0;
                 const bTime = b._fileModified || 0;
