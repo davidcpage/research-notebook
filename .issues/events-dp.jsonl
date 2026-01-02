@@ -255,3 +255,50 @@
 {"ts":"2026-01-01T18:01:01Z","type":"created","id":"dp-108","title":"Apps Script for Google Drive export with import skill","issue_type":"feature","priority":2,"description":"Google Apps Script that teacher runs in their school account to export folder structure with file URLs. Plus /import-drive-structure skill to bootstrap notebook from export. Include README with step-by-step instructions for running on teacher's machine. Part of teacher workspace feature (see dev/planning/features/teacher-workspace.md)","labels":["teacher-workspace"]}
 {"ts":"2026-01-01T18:05:00Z","type":"closed","id":"dp-107","reason":"Done - Created lesson card type with template.yaml, styles.css, and index.js for custom rendering. Includes fields for lesson number, status, Drive links (teacher/student slides, audio, handout), objectives, vocab, grammar, and notes. Added sample lesson file to demo notebook."}
 {"ts":"2026-01-01T18:28:13Z","type":"closed","id":"dp-108","reason":"Done - Created tools/drive-export/ with Apps Script and README, plus .claude/skills/import-drive-structure/ skill. Includes example-export.json for testing."}
+{"ts":"2026-01-02T13:45:36Z","type":"created","id":"dp-110","title":"Unify directory naming: infer display names from filesystem","issue_type":"feature","priority":2,"description":"Currently sections have a name mapping in settings (dir → display name) but subdirectories show raw filesystem names (e.g., `module-1-la-rentree`). This creates UI inconsistency, especially in focus mode where subdirs act like sections.
+
+**Changes:**
+
+1. **Add `formatDirName(dirName)` function:**
+   - Convert kebab-case/snake_case to Title Case
+   - Preserve date patterns: `2025-26` stays as \"2025-26\" not \"2025 26\"
+   - Examples: `module-1-la-rentree` → \"Module 1 La Rentree\", `french-2025-26` → \"French 2025-26\"
+
+2. **Remove section name mapping from settings:**
+   - Settings only stores `{dir, visible}` for sections
+   - Display names inferred from dir via `formatDirName()`
+   - Simpler, single source of truth (filesystem)
+
+3. **Section rename = folder rename:**
+   - Add `toDirName(displayName)` to convert back to kebab-case
+   - `updateSectionName()` renames folder on disk via File System API
+   - Update all item `_path` fields when section renames
+   - Handle errors gracefully (permissions, open files)
+
+4. **Add \"New Folder\" button to sections:**
+   - Button alongside card type buttons in section header
+   - Prompts for folder name, creates subdirectory
+   - Completes filesystem features (create folders, not just files)
+
+**Benefits:**
+- Consistent display names for sections and subdirs
+- No settings/filesystem desync bugs
+- Filesystem is true source of truth
+- Aligns with thin-wrapper-on-filesystem philosophy
+
+**Edge cases:**
+- Folder rename fails → show error, keep old name
+- Empty folder creation → just mkdir
+- Nested folder creation → create parent path if needed
+
+Related: dp-106 (focus mode), dp-093 (unified _path field)","labels":["ui","architecture","filesystem"]}
+{"ts":"2026-01-02T13:56:15Z","type":"note","id":"dp-110","content":"Implementation complete:
+
+1. Added formatDirName() - converts kebab-case to Title Case, preserving date patterns (2025-26)
+2. Added toDirName() - converts display name back to kebab-case
+3. Updated section/subdir headers, focus breadcrumb to use formatDirName()
+4. Section rename now renames folder on disk via renameSectionDir()
+5. Settings now stores {dir, visible} instead of {name, path, visible}
+6. Added New Folder button (📁+) to section headers - creates subfolders, respects focus mode
+
+Backwards compatible with legacy settings format."}

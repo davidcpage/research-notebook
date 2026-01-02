@@ -11,13 +11,10 @@ schema:
     allowDelete: false
     allowAdd: true
     schema:
-      name:
+      dir:
         type: text
-        label: Name
-      path:
-        type: text
-        label: Path
-        placeholder: "(auto from name)"
+        label: Directory
+        frozen: true
       visible:
         type: boolean
         default: true

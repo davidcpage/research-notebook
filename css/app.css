@@ -333,6 +333,15 @@ main {
     font-size: 0.8rem;
 }
 
+.btn-new-folder {
+    opacity: 0.6;
+    font-size: 0.75rem;
+}
+
+.btn-new-folder:hover {
+    opacity: 1;
+}
+
 .items-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -380,6 +389,40 @@ main {
 
 .subdir-node:first-child {
     margin-top: 0;
+}
+
+.subdir-node {
+    position: relative;
+}
+
+.subdir-delete {
+    position: absolute;
+    left: -0.5rem;
+    top: 0.5rem;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    font-size: 0.7rem;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 1;
+}
+
+.subdir-node:hover > .subdir-delete {
+    opacity: 1;
+}
+
+.subdir-delete:hover {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
 }
 
 .subdir-header {
@@ -1681,6 +1724,14 @@ main {
     outline: none;
     border-color: var(--accent);
     background: var(--bg-secondary);
+}
+
+.form-group input.location-readonly {
+    background: var(--bg-tertiary, #f0f0f0);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 0.9rem;
 }
 
 .form-group textarea {

@@ -105,6 +105,47 @@ function getSectionFromPath(path) {
     return path.split('/')[0];
 }
 
+// Format directory name for display (kebab-case → Title Case)
+// Preserves date patterns like 2025-26 or 2024-2025
+function formatDirName(dirName) {
+    if (!dirName) return '';
+
+    // Split on hyphens and underscores
+    const parts = dirName.split(/[-_]/);
+    const result = [];
+
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const nextPart = parts[i + 1];
+
+        // Date range: 4-digit year followed by 1-4 digit number (2025-26, 2024-2025)
+        if (/^\d{4}$/.test(part) && nextPart && /^\d{1,4}$/.test(nextPart)) {
+            result.push(`${part}-${nextPart}`);
+            i++; // Skip next part since we consumed it
+        }
+        // Standalone number: keep as-is
+        else if (/^\d+$/.test(part)) {
+            result.push(part);
+        }
+        // Word: title case it
+        else {
+            result.push(part.charAt(0).toUpperCase() + part.slice(1).toLowerCase());
+        }
+    }
+
+    return result.join(' ');
+}
+
+// Convert display name back to directory name (Title Case → kebab-case)
+function toDirName(displayName) {
+    if (!displayName) return '';
+    return displayName
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, ''); // Remove special chars except hyphens
+}
+
 // Focus mode helpers
 
 // Get localStorage key for focus path (notebook-specific)
@@ -203,16 +244,17 @@ function itemMatchesFocus(item) {
 }
 
 // Get display name for a section, stripping focused prefix if applicable
+// Uses formatDirName() to convert directory names to Title Case
 function getSectionDisplayName(section) {
-    if (!focusedPath) return section.name;
+    if (!focusedPath) return formatDirName(section._dirName);
 
     // If focused on a subdir within this section, show just the subdir name
     const focusParts = focusedPath.split('/');
     if (focusParts.length > 1 && section._dirName === focusParts[0]) {
         // Return the last segment of the focus path as the "section" name
-        return focusParts[focusParts.length - 1];
+        return formatDirName(focusParts[focusParts.length - 1]);
     }
-    return section.name;
+    return formatDirName(section._dirName);
 }
 
 // Pyodide state
@@ -2836,38 +2878,33 @@ function openEditor(templateName, sectionId, card = null) {
     const bodyEl = document.getElementById('editorBody');
     bodyEl.innerHTML = '';
 
-    // Section selector (for regular cards, not system notes)
+    // Location display (read-only for regular cards)
     if (sectionId !== '_system') {
-        const sectionGroup = document.createElement('div');
-        sectionGroup.className = 'form-group';
-        sectionGroup.innerHTML = `
-            <label for="editorSection">Section</label>
-            <select id="editorSection">
-                ${data.sections.map(s => `
-                    <option value="${s.id}" ${s.id === sectionId ? 'selected' : ''}>${escapeHtml(s.name)}</option>
-                `).join('')}
-            </select>
-        `;
-        bodyEl.appendChild(sectionGroup);
-
-        // Subdirectory selector (if section has subdirectories)
         const section = data.sections.find(s => s.id === sectionId);
-        const subdirs = section ? [...new Set(section.items.map(i => getSubdirFromPath(i._path)).filter(Boolean))].sort() : [];
-        if (subdirs.length > 0) {
-            const subdirGroup = document.createElement('div');
-            subdirGroup.className = 'form-group';
-            const currentSubdir = getSubdirFromPath(card?._path) || '';
-            subdirGroup.innerHTML = `
-                <label for="editorSubdir">Subdirectory</label>
-                <select id="editorSubdir">
-                    <option value="" ${!currentSubdir ? 'selected' : ''}>(root)</option>
-                    ${subdirs.map(sd => `
-                        <option value="${escapeHtml(sd)}" ${sd === currentSubdir ? 'selected' : ''}>${escapeHtml(sd)}</option>
-                    `).join('')}
-                </select>
-            `;
-            bodyEl.appendChild(subdirGroup);
+        const sectionDirName = section?._dirName || sectionId.replace('section-', '');
+
+        // For existing cards, use their path; for new cards, use section + focused subdir
+        let locationPath;
+        if (card && card._path) {
+            locationPath = card._path;
+        } else {
+            // New card: inherit from focus mode or default to section root
+            const focusSubdir = focusedPath && focusedPath.includes('/')
+                ? getSubdirFromPath(focusedPath)
+                : null;
+            locationPath = focusSubdir ? `${sectionDirName}/${focusSubdir}` : sectionDirName;
         }
+
+        // Store computed path for saveEditorCard
+        editingCard.locationPath = locationPath;
+
+        const locationGroup = document.createElement('div');
+        locationGroup.className = 'form-group';
+        locationGroup.innerHTML = `
+            <label>Location</label>
+            <input type="text" value="${escapeHtml(locationPath)}" disabled class="location-readonly" title="File location (use terminal to move files)">
+        `;
+        bodyEl.appendChild(locationGroup);
     } else {
         // System section: show location selector using standard subdirectory UI
         // Get subdirs from existing system notes using getSystemSubdir()
@@ -3165,13 +3202,13 @@ function renderEditorField(fieldConfig, fieldDef, value) {
         inputEl = document.createElement('input');
         inputEl.type = 'date';
         inputEl.id = `editor-${field}`;
-        inputEl.value = value ? value.split('T')[0] : '';
+        inputEl.value = value ? String(value).split('T')[0] : '';
         div.appendChild(inputEl);
     } else if (type === 'datetime') {
         inputEl = document.createElement('input');
         inputEl.type = 'datetime-local';
         inputEl.id = `editor-${field}`;
-        inputEl.value = value ? value.slice(0, 16) : '';
+        inputEl.value = value ? String(value).slice(0, 16) : '';
         div.appendChild(inputEl);
     } else if (type === 'enum' && fieldDef?.options) {
         inputEl = document.createElement('select');
@@ -4970,17 +5007,8 @@ async function saveEditor() {
         }
     }
 
-    // Get selected section (may have changed)
-    const sectionSelect = document.getElementById('editorSection');
-    const newSectionId = sectionSelect ? sectionSelect.value : sectionId;
-
-    // Get selected subdirectory (if any) and build full _path
-    const subdirSelect = document.getElementById('editorSubdir');
-    const newSubdir = subdirSelect ? (subdirSelect.value || null) : getSubdirFromPath(card._path);
-    // Build full _path from section directory name + subdirectory
-    const targetSection = data.sections.find(s => s.id === newSectionId);
-    const sectionDirName = targetSection?._dirName || newSectionId.replace('section-', '');
-    cardData._path = newSubdir ? `${sectionDirName}/${newSubdir}` : sectionDirName;
+    // Use stored location path (computed in openEditor, not editable by user)
+    cardData._path = editingCard.locationPath || card._path;
 
     // Set timestamps
     const now = new Date().toISOString();
@@ -5050,44 +5078,25 @@ async function saveEditor() {
             return;
         }
 
-        // Handle section change
-        if (!isNew && newSectionId !== sectionId) {
-            // Remove from old section
-            const oldSection = data.sections.find(s => s.id === sectionId);
-            if (oldSection) {
-                const idx = oldSection.items.findIndex(i => i.id === card.id);
+        // Update or add card in section
+        const section = data.sections.find(s => s.id === sectionId);
+        if (section) {
+            if (isNew) {
+                section.items.push(cardData);
+            } else {
+                const idx = section.items.findIndex(i => i.id === card.id);
                 if (idx >= 0) {
-                    oldSection.items.splice(idx, 1);
-                    // Delete old file
-                    await deleteItemFile(sectionId, card);
-                }
-            }
-            // Add to new section
-            const newSection = data.sections.find(s => s.id === newSectionId);
-            if (newSection) {
-                newSection.items.push(cardData);
-            }
-        } else {
-            // Same section - update or add
-            const section = data.sections.find(s => s.id === newSectionId);
-            if (section) {
-                if (isNew) {
-                    section.items.push(cardData);
-                } else {
-                    const idx = section.items.findIndex(i => i.id === card.id);
-                    if (idx >= 0) {
-                        // Handle title change (requires file rename)
-                        if (card.title && card.title !== cardData.title) {
-                            await deleteItemFile(newSectionId, card);
-                        }
-                        section.items[idx] = cardData;
+                    // Handle title change (requires file rename)
+                    if (card.title && card.title !== cardData.title) {
+                        await deleteItemFile(sectionId, card);
                     }
+                    section.items[idx] = cardData;
                 }
             }
         }
 
         await saveData();
-        await saveCardFile(newSectionId, cardData);
+        await saveCardFile(sectionId, cardData);
 
         closeEditor();
         render();
@@ -5597,16 +5606,25 @@ async function loadFromFilesystem(dirHandle) {
             }
 
             // Third pass: recursively load from subdirectories (arbitrary depth)
+            // Also track all subdirectory paths (even empty ones) for tree display
+            const allSubdirPaths = [];
             for (const [subdirName, subdirHandle] of Object.entries(subdirs)) {
                 // Build full path for nested subdirectories
                 const newSubdirPath = subdirPath ? `${subdirPath}/${subdirName}` : subdirName;
+                allSubdirPaths.push(newSubdirPath);
                 const subdirItems = await loadSectionItems(subdirHandle, sectionDirName, newSubdirPath);
                 items.push(...subdirItems);
+                // Collect nested subdir paths from returned items
+                if (subdirItems._subdirPaths) {
+                    allSubdirPaths.push(...subdirItems._subdirPaths);
+                }
                 if (subdirItems.length > 0) {
                     console.log(`[Filesystem] Loaded ${subdirItems.length} items from ${sectionDirName}/${newSubdirPath}/`);
                 }
             }
 
+            // Attach subdir paths to the items array for upstream collection
+            items._subdirPaths = allSubdirPaths;
             return items;
         }
 
@@ -5631,17 +5649,19 @@ async function loadFromFilesystem(dirHandle) {
             return s.name && !s.name.startsWith('_');
         });
 
-        // Build lookup maps for matching directories to settings
-        const settingsByPath = new Map(); // path -> settings record
-        const settingsBySlug = new Map(); // slugified name -> settings record
+        // Build lookup map for matching directories to settings
+        // Supports both new format {dir, visible} and legacy {name, visible, path}
+        const settingsByDir = new Map(); // dir name -> settings record
         sectionsFromSettings.forEach((s, i) => {
             if (typeof s === 'object') {
-                // Use explicit path if provided, otherwise slugified name
-                const path = s.path || slugify(s.name);
-                settingsByPath.set(path, { record: s, index: i });
-                settingsBySlug.set(slugify(s.name), { record: s, index: i });
-            } else {
-                settingsBySlug.set(slugify(s), { record: s, index: i });
+                // New format uses 'dir', legacy uses 'path' or slugified 'name'
+                const dir = s.dir || s.path || (s.name ? slugify(s.name) : null);
+                if (dir) {
+                    settingsByDir.set(dir, { record: s, index: i });
+                }
+            } else if (typeof s === 'string') {
+                // Legacy string format: treat as display name, slugify for dir
+                settingsByDir.set(slugify(s), { record: s, index: i });
             }
         });
 
@@ -5651,37 +5671,34 @@ async function loadFromFilesystem(dirHandle) {
         for (const [dirName, { handle }] of discoveredSections) {
             // Special defaults for known directories
             const knownDirectoryDefaults = {
-                'assets': { name: 'Assets', visible: false }
+                'assets': { visible: false }
             };
-            const defaults = knownDirectoryDefaults[dirName] || { name: dirName, visible: true };
+            const defaults = knownDirectoryDefaults[dirName] || { visible: true };
 
             const section = {
                 id: 'section-' + dirName,  // Stable ID based on directory name
-                name: defaults.name,  // Default to directory name (or known name)
                 items: [],
                 visible: defaults.visible,  // Default visible (or known default)
                 _dirName: dirName  // Store for filesystem operations
             };
 
-            // Try to match to settings by path first, then by slugified name
-            let settingsMatch = settingsByPath.get(dirName);
-            if (!settingsMatch) {
-                settingsMatch = settingsBySlug.get(slugify(dirName));
-            }
+            // Try to match to settings by dir name
+            const settingsMatch = settingsByDir.get(dirName);
 
             if (settingsMatch) {
                 const { record: settingsRecord, index } = settingsMatch;
                 matchedSettings.add(settingsRecord);
                 if (typeof settingsRecord === 'object') {
-                    // Use display name from settings
-                    section.name = settingsRecord.name || defaults.name;
                     section.visible = settingsRecord.visible !== false;
                     section._settingsIndex = index;
                 }
             }
 
             // Load items from the section
-            section.items = await loadSectionItems(handle, dirName);
+            const loadedItems = await loadSectionItems(handle, dirName);
+            section.items = loadedItems;
+            // Store all discovered subdirectory paths (including empty ones)
+            section._subdirPaths = loadedItems._subdirPaths || [];
 
             // Sort items: quiz first, then summaries (by folder), then others (by subfolder, then date)
             section.items.sort((a, b) => {
@@ -5742,19 +5759,20 @@ async function loadFromFilesystem(dirHandle) {
         for (const settingsRecord of sectionsFromSettings) {
             if (matchedSettings.has(settingsRecord)) continue;
 
-            const name = typeof settingsRecord === 'string' ? settingsRecord : settingsRecord.name;
-            if (!name) continue;
+            // Get dir name from new format (dir) or legacy (path, slugified name)
+            let dirName;
+            if (typeof settingsRecord === 'object') {
+                dirName = settingsRecord.dir || settingsRecord.path || (settingsRecord.name ? slugify(settingsRecord.name) : null);
+            } else if (typeof settingsRecord === 'string') {
+                dirName = slugify(settingsRecord);
+            }
+            if (!dirName) continue;
 
-            // Use explicit path if provided, otherwise slugify name
-            const dirName = (typeof settingsRecord === 'object' && settingsRecord.path)
-                ? settingsRecord.path
-                : slugify(name);
-            console.log(`[Filesystem] Section "${name}" in settings has no directory, will create: ${dirName}/`);
+            console.log(`[Filesystem] Section "${dirName}" in settings has no directory, will create: ${dirName}/`);
 
             // Create empty section - directory will be created on first save
             const section = {
                 id: 'section-' + dirName,  // Stable ID based on directory name
-                name: name,
                 items: [],
                 visible: typeof settingsRecord === 'object' ? settingsRecord.visible !== false : true,
                 _dirName: dirName,
@@ -5768,19 +5786,17 @@ async function loadFromFilesystem(dirHandle) {
         const settingsCard = loadedData.systemNotes.find(n => n.template === 'settings');
         if (settingsCard) {
             settingsCard.sections = loadedData.sections.map(s => ({
-                name: s.name,
-                path: s._dirName || slugify(s.name),
+                dir: s._dirName,
                 visible: s.visible !== false
             }));
-            // Ensure System section (root files, path includes '.') is included
-            if (!settingsCard.sections.some(s => sectionPathIncludesRoot(s.path))) {
-                // Check original settings for visibility preference and path
+            // Ensure System section (root files, dir includes '.') is included
+            if (!settingsCard.sections.some(s => sectionPathIncludesRoot(s.dir))) {
+                // Check original settings for visibility preference
                 const originalSystem = notebookSettings?.sections?.find(s =>
-                    typeof s === 'object' && sectionPathIncludesRoot(s.path)
+                    typeof s === 'object' && sectionPathIncludesRoot(s.dir || s.path)
                 );
                 const visible = originalSystem?.visible === true;
-                const path = originalSystem?.path || '.';
-                settingsCard.sections.push({ name: 'System', path, visible });
+                settingsCard.sections.push({ dir: '.', visible });
             }
         }
 
@@ -5891,8 +5907,8 @@ async function saveNotebookMeta() {
         ...notebookSettings,
         notebook_title: data.title,
         notebook_subtitle: data.subtitle,
-        // Save display names (not slugs) - directory mapping is by slugified name
-        sections: data.sections.map(s => ({ name: s.name, visible: s.visible !== false }))
+        // Save dir name + visibility (display name is computed from dir via formatDirName)
+        sections: data.sections.map(s => ({ dir: s._dirName, visible: s.visible !== false }))
     });
     await saveSettings(notebookDirHandle);
     recordSave('settings.yaml');
@@ -5929,46 +5945,45 @@ async function saveCardFile(sectionId, card) {
         }
 
         // Reorder data.sections to match the new order from settings
-        // card.sections is now an array of {name, path, visible} records
+        // card.sections is array of {dir, visible} records (or legacy {name, path, visible})
         if (card.sections && Array.isArray(card.sections)) {
             const newOrder = [];
             for (const sectionRecord of card.sections) {
-                const sectionName = typeof sectionRecord === 'string' ? sectionRecord : sectionRecord.name;
-                if (!sectionName) continue;
+                // Get dir name from new format (dir) or legacy (path, slugified name)
+                let dirName;
+                if (typeof sectionRecord === 'object') {
+                    dirName = sectionRecord.dir || sectionRecord.path || (sectionRecord.name ? slugify(sectionRecord.name) : null);
+                } else if (typeof sectionRecord === 'string') {
+                    dirName = slugify(sectionRecord);
+                }
+                if (!dirName) continue;
 
-                // Skip System section (path includes '.') - it's virtual, not a directory
-                if (typeof sectionRecord === 'object' && sectionPathIncludesRoot(sectionRecord.path)) continue;
+                // Skip System section (dir includes '.') - it's virtual, not a directory
+                if (sectionPathIncludesRoot(dirName)) continue;
 
-                // Find section by matching path, slug, or name
-                const sectionPath = typeof sectionRecord === 'object' ? sectionRecord.path : null;
-                const sectionSlug = sectionPath || slugify(sectionName);
-                let section = data.sections.find(s =>
-                    s._dirName === sectionSlug || slugify(s.name) === sectionSlug
-                );
+                // Find section by matching _dirName
+                let section = data.sections.find(s => s._dirName === dirName);
 
                 if (section) {
                     // Apply visibility from settings record
                     if (typeof sectionRecord === 'object') {
                         section.visible = sectionRecord.visible !== false;
                     }
-                    // Update display name if changed
-                    section.name = sectionName;
                     newOrder.push(section);
                 } else {
                     // New section added via settings - create it
                     const newSection = {
-                        id: 'section-' + sectionSlug,  // Stable ID based on directory name
-                        name: sectionName,
+                        id: 'section-' + dirName,
                         items: [],
                         visible: typeof sectionRecord === 'object' ? sectionRecord.visible !== false : true,
-                        _dirName: sectionSlug,
+                        _dirName: dirName,
                         _needsDirectory: true
                     };
                     // Create directory immediately
                     try {
-                        await notebookDirHandle.getDirectoryHandle(sectionSlug, { create: true });
+                        await notebookDirHandle.getDirectoryHandle(dirName, { create: true });
                         newSection._needsDirectory = false;
-                        console.log(`[Filesystem] Created section directory: ${sectionSlug}/`);
+                        console.log(`[Filesystem] Created section directory: ${dirName}/`);
                     } catch (e) {
                         console.error('[Filesystem] Error creating section directory:', e);
                     }
@@ -6099,18 +6114,17 @@ async function saveCardFile(sectionId, card) {
     // Get or create section directory (new sections go to root, existing preserve location)
     let sectionDir, sectionPath;
     if (section._needsDirectory) {
-        // New section - create at root
-        const sectionSlug = slugify(section.name);
-        sectionDir = await notebookDirHandle.getDirectoryHandle(sectionSlug, { create: true });
-        sectionPath = sectionSlug;
-        section._dirName = sectionSlug;
+        // New section - create at root using _dirName
+        const dirName = section._dirName;
+        sectionDir = await notebookDirHandle.getDirectoryHandle(dirName, { create: true });
+        sectionPath = dirName;
         delete section._needsDirectory;
-        console.log(`[Filesystem] Created section directory: ${sectionSlug}/`);
+        console.log(`[Filesystem] Created section directory: ${dirName}/`);
     } else {
         // Existing section - use getSectionDirHandle to find it
         const sectionInfo = await getSectionDirHandle(section, { create: true });
         if (!sectionInfo) {
-            console.error('[Filesystem] Cannot get section directory for', section.name);
+            console.error('[Filesystem] Cannot get section directory for', section._dirName);
             return;
         }
         sectionDir = sectionInfo.handle;
@@ -6227,25 +6241,124 @@ async function getSectionDirHandle(sectionOrName, options = {}) {
 async function createSectionDir(section) {
     if (!filesystemLinked || !notebookDirHandle) return;
 
-    const sectionSlug = slugify(section.name);
+    const dirName = section._dirName;
     // Create directory at root (not under sections/)
-    await notebookDirHandle.getDirectoryHandle(sectionSlug, { create: true });
-    console.log(`[Filesystem] Created section directory: ${sectionSlug}/`);
-    recordSave(`${sectionSlug}`);
+    await notebookDirHandle.getDirectoryHandle(dirName, { create: true });
+    console.log(`[Filesystem] Created section directory: ${dirName}/`);
+    recordSave(`${dirName}`);
 }
 
 // Delete a section directory at notebook root
-async function deleteSectionDir(sectionName) {
+async function deleteSectionDir(dirName) {
     if (!filesystemLinked || !notebookDirHandle) return;
 
-    const sectionSlug = slugify(sectionName);
-
     try {
-        await notebookDirHandle.removeEntry(sectionSlug, { recursive: true });
-        recordSave(sectionSlug);
-        console.log(`[Filesystem] Deleted section directory: ${sectionSlug}/`);
+        await notebookDirHandle.removeEntry(dirName, { recursive: true });
+        recordSave(dirName);
+        console.log(`[Filesystem] Deleted section directory: ${dirName}/`);
     } catch (e) {
         console.error('[Filesystem] Error deleting section dir:', e);
+    }
+}
+
+// Create a new subfolder within a section
+async function createSubfolder(sectionId) {
+    if (!filesystemLinked || !notebookDirHandle) {
+        showToast('Filesystem not linked');
+        return;
+    }
+
+    const section = data.sections.find(s => s.id === sectionId);
+    if (!section) return;
+
+    // Prompt for folder name
+    const displayName = prompt('New folder name:');
+    if (!displayName || !displayName.trim()) return;
+
+    const dirName = toDirName(displayName.trim());
+    if (!dirName) {
+        showToast('Invalid folder name');
+        return;
+    }
+
+    try {
+        const sectionInfo = await getSectionDirHandle(section);
+        if (!sectionInfo) {
+            showToast('Cannot find section directory');
+            return;
+        }
+
+        // Get current focus subdir if any (create inside focused folder)
+        let targetDir = sectionInfo.handle;
+        let targetPath = section._dirName;
+        if (focusedPath && focusedPath.startsWith(section._dirName + '/')) {
+            const focusSubdir = getSubdirFromPath(focusedPath);
+            if (focusSubdir) {
+                // Navigate to focused subdir
+                const subparts = focusSubdir.split('/');
+                for (const part of subparts) {
+                    targetDir = await targetDir.getDirectoryHandle(part, { create: false });
+                }
+                targetPath = focusedPath;
+            }
+        }
+
+        // Create the new subfolder
+        await targetDir.getDirectoryHandle(dirName, { create: true });
+        console.log(`[Filesystem] Created subfolder: ${targetPath}/${dirName}/`);
+
+        // Auto-expand the parent so new folder is visible
+        const parentSubdir = getSubdirFromPath(targetPath);
+        if (parentSubdir) {
+            expandedSubdirs.add(`${sectionId}:${parentSubdir}`);
+            saveExpandedSubdirs();
+        }
+
+        // Reload and re-render
+        await reloadFromFilesystem(false);
+        showToast(`Created folder: ${formatDirName(dirName)}`);
+    } catch (e) {
+        console.error('[Filesystem] Error creating subfolder:', e);
+        showToast('Failed to create folder: ' + e.message);
+    }
+}
+
+// Delete an empty subfolder within a section
+// fullPath is the full path from notebook root (e.g., 'section/subdir/nested')
+async function deleteSubfolder(fullPath) {
+    if (!filesystemLinked || !notebookDirHandle) {
+        showToast('Filesystem not linked');
+        return;
+    }
+
+    const displayName = formatDirName(fullPath.split('/').pop());
+    console.log('[Filesystem] Attempting to delete subfolder:', fullPath);
+    if (!confirm(`Delete empty folder "${displayName}"?`)) return;
+
+    try {
+        // Navigate to the parent directory and delete the target
+        const parts = fullPath.split('/');
+        const targetName = parts.pop();
+        console.log('[Filesystem] Target:', targetName, 'Parent path:', parts.join('/'));
+        let parentDir = notebookDirHandle;
+
+        for (const part of parts) {
+            parentDir = await parentDir.getDirectoryHandle(part, { create: false });
+        }
+
+        await parentDir.removeEntry(targetName, { recursive: false });
+        console.log(`[Filesystem] Deleted subfolder: ${fullPath}/`);
+
+        // Reload and re-render
+        await reloadFromFilesystem(false);
+        showToast(`Deleted folder: ${displayName}`);
+    } catch (e) {
+        console.error('[Filesystem] Error deleting subfolder:', e);
+        if (e.name === 'InvalidModificationError') {
+            showToast('Cannot delete: folder is not empty');
+        } else {
+            showToast('Failed to delete folder: ' + e.message);
+        }
     }
 }
 
@@ -6310,39 +6423,43 @@ async function copyDirectoryContents(sourceDir, destDir, pathPrefix = '') {
 }
 
 // Rename a section directory at notebook root
-async function renameSectionDir(oldName, newName, section) {
-    if (!filesystemLinked || !notebookDirHandle) return;
-
-    const oldSlug = slugify(oldName);
-    const newSlug = slugify(newName);
-    if (oldSlug === newSlug) return; // No actual rename needed
-
-    try {
-        // Find the old directory
-        const oldInfo = await getSectionDirHandle(section);
-        if (!oldInfo) {
-            console.error('[Filesystem] Cannot find section to rename:', oldName);
-            return;
-        }
-        const { handle: oldDir, path: oldPath } = oldInfo;
-
-        // Create new directory
-        const newDir = await notebookDirHandle.getDirectoryHandle(newSlug, { create: true });
-
-        // Recursively copy all files and subdirectories from old to new
-        await copyDirectoryContents(oldDir, newDir, newSlug);
-
-        // Delete old directory
-        await notebookDirHandle.removeEntry(oldSlug, { recursive: true });
-        recordSave(oldPath);
-
-        // Update section's internal tracking
-        section._dirName = newSlug;
-
-        console.log(`[Filesystem] Renamed section: ${oldPath}/ -> ${newSlug}/`);
-    } catch (e) {
-        console.error('[Filesystem] Error renaming section dir:', e);
+// Takes directory names directly (not display names)
+async function renameSectionDir(oldDirName, newDirName, section) {
+    if (!filesystemLinked || !notebookDirHandle) {
+        throw new Error('Filesystem not linked');
     }
+
+    if (oldDirName === newDirName) return; // No actual rename needed
+
+    // Find the old directory
+    const oldInfo = await getSectionDirHandle(section);
+    if (!oldInfo) {
+        throw new Error(`Cannot find directory: ${oldDirName}`);
+    }
+    const { handle: oldDir, path: oldPath } = oldInfo;
+
+    // Create new directory
+    const newDir = await notebookDirHandle.getDirectoryHandle(newDirName, { create: true });
+
+    // Recursively copy all files and subdirectories from old to new
+    await copyDirectoryContents(oldDir, newDir, newDirName);
+
+    // Delete old directory
+    await notebookDirHandle.removeEntry(oldDirName, { recursive: true });
+    recordSave(oldPath);
+
+    // Update all item _path fields in this section
+    for (const item of section.items) {
+        if (item._path) {
+            item._path = item._path.replace(new RegExp(`^${oldDirName}(/|$)`), `${newDirName}$1`);
+        }
+    }
+
+    // Update section's internal tracking
+    section._dirName = newDirName;
+    section.id = `section-${newDirName}`;
+
+    console.log(`[Filesystem] Renamed section: ${oldPath}/ -> ${newDirName}/`);
 }
 
 // Link a notebook folder - show picker and save handle
@@ -7132,7 +7249,7 @@ function findBacklinks(itemId) {
         const item = section.items.find(i => i.id === itemId);
         if (item && item.title) {
             targetTitle = item.title.toLowerCase();
-            targetSectionName = section.name ? section.name.toLowerCase() : null;
+            targetSectionName = formatDirName(section._dirName).toLowerCase();
             break;
         }
     }
@@ -7425,15 +7542,26 @@ async function deleteItem(sectionId, itemId) {
     showToast('Item deleted');
 }
 
-// Update section name
-async function updateSectionName(sectionId, newName) {
+// Update section name (renames folder on disk)
+async function updateSectionName(sectionId, newDisplayName) {
     const section = data.sections.find(s => s.id === sectionId);
-    if (section && newName.trim()) {
-        const oldName = section.name;
-        section.name = newName.trim();
+    if (!section || !newDisplayName.trim()) return;
+
+    const oldDirName = section._dirName;
+    const newDirName = toDirName(newDisplayName.trim());
+
+    // Skip if dir name hasn't actually changed
+    if (oldDirName === newDirName) return;
+
+    try {
+        await renameSectionDir(oldDirName, newDirName, section);
         await saveData();
-        await saveNotebookMeta();  // Update settings.yaml with new section list
-        await renameSectionDir(oldName, newName.trim(), section);  // Rename directory
+        await saveNotebookMeta();
+        render();
+    } catch (e) {
+        console.error('[Section] Rename failed:', e);
+        showToast('Failed to rename section: ' + e.message);
+        render(); // Re-render to restore original name in UI
     }
 }
 
@@ -7534,9 +7662,24 @@ function renderTemplateButtons(sectionId) {
 // Helper: build a tree structure from flat items with _path field
 // Returns { items: [...], subdirs: { name: { items: [...], subdirs: {...} } } }
 // getSubdir extracts the subdirectory portion (within section) from an item
-function buildSubdirTree(items, getSubdir = item => getSubdirFromPath(item._path)) {
+function buildSubdirTree(items, getSubdir = item => getSubdirFromPath(item._path), emptySubdirs = []) {
     const tree = { items: [], subdirs: {} };
 
+    // First, ensure all known subdirectory paths exist in the tree (even if empty)
+    // emptySubdirs contains paths relative to section root (e.g., 'test' or 'module-1/lesson-1')
+    for (const subdirPath of emptySubdirs) {
+        if (!subdirPath) continue;
+        const parts = subdirPath.split('/');
+        let current = tree;
+        for (const part of parts) {
+            if (!current.subdirs[part]) {
+                current.subdirs[part] = { items: [], subdirs: {} };
+            }
+            current = current.subdirs[part];
+        }
+    }
+
+    // Then add items to the tree
     items.forEach(item => {
         const subdirPath = getSubdir(item);
         if (!subdirPath) {
@@ -7577,15 +7720,18 @@ function renderSubdirNode(sectionId, subdirName, node, parentPath, depth, sectio
     const fullPath = sectionDirName ? `${sectionDirName}/${subdirPath}` : subdirPath;
 
     // Subdirectory header with toggle
+    const displayName = formatDirName(subdirName);
+    const isEmpty = itemCount === 0 && Object.keys(node.subdirs).length === 0;
     let html = `
-        <div class="subdir-node" data-depth="${depth}" style="--subdir-depth: ${depth}">
+        <div class="subdir-node ${isEmpty ? 'subdir-empty' : ''}" data-depth="${depth}" style="--subdir-depth: ${depth}">
+            ${isEmpty ? `<button class="subdir-delete" onclick="event.stopPropagation(); deleteSubfolder('${escapeJsAttr(fullPath)}')" title="Delete empty folder">×</button>` : ''}
             <div class="subdir-header">
                 <div class="subdir-header-left" onclick="toggleSubdir('${escapeJsAttr(sectionId)}', '${escapeJsAttr(subdirPath)}')">
                     <button class="subdir-toggle ${isExpanded ? '' : 'collapsed'}" title="${isExpanded ? 'Collapse' : 'Expand'}">▼</button>
-                    <span class="subdir-name">${escapeHtml(subdirName)}</span>
+                    <span class="subdir-name">${escapeHtml(displayName)}</span>
                     ${!isExpanded ? `<span class="subdir-count">(${itemCount})</span>` : ''}
                 </div>
-                <button class="btn-focus btn-focus-subdir" onclick="event.stopPropagation(); setFocus('${escapeJsAttr(fullPath)}')" title="Focus on ${escapeHtml(subdirName)}">⊙</button>
+                <button class="btn-focus btn-focus-subdir" onclick="event.stopPropagation(); setFocus('${escapeJsAttr(fullPath)}')" title="Focus on ${escapeHtml(displayName)}">⊙</button>
             </div>
             <div class="subdir-content ${isExpanded ? '' : 'collapsed'}">
     `;
@@ -7616,13 +7762,16 @@ function renderSubdirNode(sectionId, subdirName, node, parentPath, depth, sectio
 // Helper: render items grouped by subdirectory with collapsible nested subdirs
 // getSubdir is a function that extracts subdirectory (within section) from an item
 // sectionDirName is the directory name for building focus paths (null for system section)
-function renderItemsWithSubsections(items, sectionId, getSubdir = item => getSubdirFromPath(item._path), sectionDirName = null) {
-    if (items.length === 0) {
+// emptySubdirs is an array of subdirectory paths that exist but have no items
+function renderItemsWithSubsections(items, sectionId, getSubdir = item => getSubdirFromPath(item._path), sectionDirName = null, emptySubdirs = []) {
+    // Build tree structure from flat items (including empty subdirs)
+    const tree = buildSubdirTree(items, getSubdir, emptySubdirs);
+
+    // Check if tree has any content (items or subdirs)
+    const hasContent = items.length > 0 || Object.keys(tree.subdirs).length > 0;
+    if (!hasContent) {
         return '<p style="color: var(--text-muted); grid-column: 1/-1;">No items yet. Add a bookmark, note, or code!</p>';
     }
-
-    // Build tree structure from flat items
-    const tree = buildSubdirTree(items, getSubdir);
 
     let html = '';
 
@@ -7661,11 +7810,12 @@ function renderFocusBreadcrumb() {
     const parts = focusedPath.split('/');
     const breadcrumbParts = parts.map((part, i) => {
         const path = parts.slice(0, i + 1).join('/');
+        const displayName = formatDirName(part);
         const isLast = i === parts.length - 1;
         if (isLast) {
-            return `<span class="breadcrumb-current">${escapeHtml(part)}</span>`;
+            return `<span class="breadcrumb-current">${escapeHtml(displayName)}</span>`;
         }
-        return `<a href="#" class="breadcrumb-link" onclick="setFocus('${escapeJsAttr(path)}'); return false;">${escapeHtml(part)}</a>`;
+        return `<a href="#" class="breadcrumb-link" onclick="setFocus('${escapeJsAttr(path)}'); return false;">${escapeHtml(displayName)}</a>`;
     });
 
     return `
@@ -7743,6 +7893,14 @@ function render() {
             }
             : item => getSubdirFromPath(item._path);
 
+        // Filter and adjust empty subdirs for focus mode (same logic as items)
+        const focusedSubdirs = focusSubdir
+            ? (section._subdirPaths || [])
+                .filter(p => p === focusSubdir || p.startsWith(focusSubdir + '/'))
+                .map(p => p === focusSubdir ? null : p.slice(focusSubdir.length + 1))
+                .filter(p => p)
+            : (section._subdirPaths || []);
+
         return `
         <div class="section" data-section-id="${section.id}">
             ${itemCount === 0 && !focusedPath ? `<button class="section-delete" onclick="deleteSection('${section.id}')" title="Delete empty section">×</button>` : ''}
@@ -7750,7 +7908,7 @@ function render() {
                 <button class="section-toggle ${isCollapsed ? 'collapsed' : ''}" onclick="toggleSection('${section.id}')" title="${isCollapsed ? 'Expand' : 'Collapse'}">▼</button>
                 <h2 class="section-title">
                     ${isFocusedOnSubdir ? `<span>${escapeHtml(displayName)}</span>` : `
-                    <input type="text" value="${escapeHtml(section.name)}"
+                    <input type="text" value="${escapeHtml(displayName)}"
                         onchange="updateSectionName('${section.id}', this.value)"
                         onblur="updateSectionName('${section.id}', this.value)">`}
                     ${isCollapsed && itemCount > 0 ? `<span class="section-count">(${itemCount})</span>` : ''}
@@ -7758,10 +7916,11 @@ function render() {
                 <div class="section-actions">
                     ${!focusedPath ? `<button class="btn-focus" onclick="setFocus('${escapeJsAttr(section._dirName)}')" title="Focus on this section">⊙</button>` : ''}
                     ${renderTemplateButtons(section.id)}
+                    <button class="btn btn-secondary btn-small btn-new-folder" onclick="createSubfolder('${section.id}')" title="New folder">📁+</button>
                 </div>
             </div>
             <div class="items-grid ${isCollapsed ? 'collapsed' : ''}">
-                ${renderItemsWithSubsections(focusedItems, section.id, getSubdir, section._dirName)}
+                ${renderItemsWithSubsections(focusedItems, section.id, getSubdir, focusSubdir ? `${section._dirName}/${focusSubdir}` : section._dirName, focusedSubdirs)}
             </div>
         </div>
     `}).join('');
