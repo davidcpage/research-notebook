@@ -15,6 +15,10 @@ let data = {
 // Track collapsed sections (persisted to localStorage per-notebook)
 let collapsedSections = new Set();
 
+// Debounce timers for toggle (prevents single-click firing on double-click)
+let sectionToggleTimer = null;
+let subdirToggleTimer = null;
+
 // Get localStorage key for collapsed sections (notebook-specific)
 function getCollapsedSectionsKey() {
     const notebookName = notebookDirHandle?.name || 'default';
@@ -77,19 +81,69 @@ function restoreExpandedSubdirs() {
 }
 
 // Toggle subdirectory expanded state
+// Uses debounce to prevent firing on double-click
 function toggleSubdir(sectionId, subdirPath) {
+    // Clear any existing timer
+    if (subdirToggleTimer) {
+        clearTimeout(subdirToggleTimer);
+    }
+    // Delay execution to allow double-click to cancel (300ms is standard dblclick threshold)
+    subdirToggleTimer = setTimeout(() => {
+        subdirToggleTimer = null;
+        const key = `${sectionId}/${subdirPath}`;
+        if (expandedSubdirs.has(key)) {
+            expandedSubdirs.delete(key);
+        } else {
+            expandedSubdirs.add(key);
+        }
+        saveExpandedSubdirs();
+        render();
+    }, 300);
+}
+
+// Toggle all nested subdirectories within a subdirectory
+// Called on double-click - cancels pending single-click toggle
+function toggleAllNestedSubdirs(sectionId, subdirPath) {
+    // Cancel pending single-click toggle
+    if (subdirToggleTimer) {
+        clearTimeout(subdirToggleTimer);
+        subdirToggleTimer = null;
+    }
+
+    const section = data.sections.find(s => s.id === sectionId);
+    if (!section) return;
+
     const key = `${sectionId}/${subdirPath}`;
-    if (expandedSubdirs.has(key)) {
-        expandedSubdirs.delete(key);
-        // Clear expansion state for all child subdirectories
-        const prefix = `${key}/`;
-        for (const k of [...expandedSubdirs]) {
-            if (k.startsWith(prefix)) {
-                expandedSubdirs.delete(k);
+    const prefix = `${key}/`;
+
+    // Build set of all nested subdirs under this path
+    const nestedSubdirs = new Set();
+    nestedSubdirs.add(key);  // Include this subdir itself
+    for (const item of section.items) {
+        const itemSubdir = getSubdirFromPath(item._path);
+        if (itemSubdir && itemSubdir.startsWith(subdirPath + '/')) {
+            // This item is in a nested subdir - add all path segments
+            const parts = itemSubdir.split('/');
+            for (let i = subdirPath.split('/').length; i <= parts.length; i++) {
+                const path = parts.slice(0, i).join('/');
+                nestedSubdirs.add(`${sectionId}/${path}`);
             }
         }
+    }
+
+    // Toggle based on current subdir state
+    const isExpanded = expandedSubdirs.has(key);
+
+    if (isExpanded) {
+        // Collapse this subdir + all nested
+        for (const k of nestedSubdirs) {
+            expandedSubdirs.delete(k);
+        }
     } else {
-        expandedSubdirs.add(key);
+        // Expand this subdir + all nested
+        for (const k of nestedSubdirs) {
+            expandedSubdirs.add(k);
+        }
     }
     saveExpandedSubdirs();
     render();
@@ -7589,22 +7643,84 @@ function extractDomain(url) {
 // ========== SECTION: DATA_OPERATIONS ==========
 // Section/item actions: toggleSection, toggleCodeOutput, confirmDeleteItem, deleteSection, deleteItem, updateSectionName
 
-// Toggle section collapsed state
+// Toggle section collapsed state (does not affect subdirectory expansion)
+// Uses debounce to prevent firing on double-click
 function toggleSection(sectionId) {
-    if (collapsedSections.has(sectionId)) {
-        collapsedSections.delete(sectionId);
-    } else {
-        collapsedSections.add(sectionId);
-        // Clear expansion state for all subdirectories in this section
-        const prefix = `${sectionId}/`;
-        for (const key of [...expandedSubdirs]) {
-            if (key.startsWith(prefix)) {
-                expandedSubdirs.delete(key);
+    // Clear any existing timer
+    if (sectionToggleTimer) {
+        clearTimeout(sectionToggleTimer);
+    }
+    // Delay execution to allow double-click to cancel (300ms is standard dblclick threshold)
+    sectionToggleTimer = setTimeout(() => {
+        sectionToggleTimer = null;
+        if (collapsedSections.has(sectionId)) {
+            collapsedSections.delete(sectionId);
+        } else {
+            collapsedSections.add(sectionId);
+        }
+        saveCollapsedSections();
+        render();
+    }, 300);
+}
+
+// Toggle all subdirectories within a section (expand all / collapse all)
+// Called on double-click - cancels pending single-click toggle
+function toggleAllSubdirsInSection(sectionId) {
+    // Cancel pending single-click toggle
+    if (sectionToggleTimer) {
+        clearTimeout(sectionToggleTimer);
+        sectionToggleTimer = null;
+    }
+
+    const section = data.sections.find(s => s.id === sectionId);
+    if (!section) return;
+
+    // Build set of all subdirs in this section
+    const sectionSubdirs = new Set();
+    for (const item of section.items) {
+        const subdir = getSubdirFromPath(item._path);
+        if (subdir) {
+            const parts = subdir.split('/');
+            for (let i = 1; i <= parts.length; i++) {
+                const path = parts.slice(0, i).join('/');
+                sectionSubdirs.add(`${sectionId}/${path}`);
             }
         }
-        saveExpandedSubdirs();
     }
-    saveCollapsedSections();
+
+    // No subdirs - just toggle the section
+    if (sectionSubdirs.size === 0) {
+        if (collapsedSections.has(sectionId)) {
+            collapsedSections.delete(sectionId);
+        } else {
+            collapsedSections.add(sectionId);
+        }
+        saveCollapsedSections();
+        render();
+        return;
+    }
+
+    // Toggle based on section state (not subdir state)
+    const isCollapsed = collapsedSections.has(sectionId);
+
+    if (isCollapsed) {
+        // Expand section + all subdirs
+        for (const key of sectionSubdirs) {
+            expandedSubdirs.add(key);
+        }
+        collapsedSections.delete(sectionId);
+        saveCollapsedSections();
+        showToast('Expanded all subdirectories');
+    } else {
+        // Collapse all subdirs + section
+        for (const key of sectionSubdirs) {
+            expandedSubdirs.delete(key);
+        }
+        collapsedSections.add(sectionId);
+        saveCollapsedSections();
+        showToast('Collapsed section');
+    }
+    saveExpandedSubdirs();
     render();
 }
 
@@ -7836,7 +7952,7 @@ function renderSubdirNode(sectionId, subdirName, node, parentPath, depth, sectio
         <div class="subdir-node ${isEmpty ? 'subdir-empty' : ''}" data-depth="${depth}" style="--subdir-depth: ${depth}">
             ${isEmpty ? `<button class="subdir-delete" onclick="event.stopPropagation(); deleteSubfolder('${escapeJsAttr(fullPath)}')" title="Delete empty folder">×</button>` : ''}
             <div class="subdir-header">
-                <div class="subdir-header-left" onclick="toggleSubdir('${escapeJsAttr(sectionId)}', '${escapeJsAttr(subdirPath)}')">
+                <div class="subdir-header-left" onclick="toggleSubdir('${escapeJsAttr(sectionId)}', '${escapeJsAttr(subdirPath)}')" ondblclick="toggleAllNestedSubdirs('${escapeJsAttr(sectionId)}', '${escapeJsAttr(subdirPath)}')" title="Double-click to expand/collapse all nested">
                     <button class="subdir-toggle ${isExpanded ? '' : 'collapsed'}" title="${isExpanded ? 'Collapse' : 'Expand'}">▼</button>
                     <span class="subdir-name">${escapeHtml(displayName)}</span>
                     ${!isExpanded ? `<span class="subdir-count">(${itemCount})</span>` : ''}
@@ -8006,7 +8122,7 @@ function render() {
         <div class="section" data-section-id="${section.id}">
             ${itemCount === 0 && !focusedPath ? `<button class="section-delete" onclick="deleteSection('${section.id}')" title="Delete empty section">×</button>` : ''}
             <div class="section-header">
-                <button class="section-toggle ${isCollapsed ? 'collapsed' : ''}" onclick="toggleSection('${section.id}')" title="${isCollapsed ? 'Expand' : 'Collapse'}">▼</button>
+                <button class="section-toggle ${isCollapsed ? 'collapsed' : ''}" onclick="toggleSection('${section.id}')" ondblclick="toggleAllSubdirsInSection('${section.id}')" title="${isCollapsed ? 'Expand' : 'Collapse'} (double-click: expand/collapse all subdirs)">▼</button>
                 <h2 class="section-title">
                     ${isFocusedOnSubdir ? `<span>${escapeHtml(displayName)}</span>` : `
                     <input type="text" value="${escapeHtml(displayName)}"
