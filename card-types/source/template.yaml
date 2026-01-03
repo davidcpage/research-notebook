@@ -1,0 +1,373 @@
+name: source
+description: Source code file (read-only syntax-highlighted display)
+schema:
+  title:
+    type: text
+    required: true
+  code:
+    type: code
+    required: true
+  language:
+    type: text
+  lineCount:
+    type: number
+  path:
+    type: text
+  filesize:
+    type: text
+card:
+  layout: document
+  preview_field: code
+  placeholder: "📄"
+viewer:
+  layout: document
+  content_field: code
+editor:
+  fields:
+    - field: title
+      label: Filename
+      readonly: true
+    - field: path
+      label: Path
+      readonly: true
+    - field: filesize
+      label: Size
+      readonly: true
+    - field: language
+      label: Language
+      readonly: true
+    - field: code
+      label: Code
+      multiline: true
+      rows: 30
+      monospace: true
+style:
+  variables:
+    --template-bg: "#1e1e1e"
+    --template-preview-bg: "#252526"
+    --template-border: var(--code-border)
+    --template-title-text: "#e0e0e0"
+ui:
+  button_label: Source
+  icon: "📄"
+  show_create_button: false
+  sort_order: 97
+extensions:
+  # Python
+  ".py":
+    parser: source-code
+    bodyField: code
+    language: python
+  ".pyw":
+    parser: source-code
+    bodyField: code
+    language: python
+  ".pyi":
+    parser: source-code
+    bodyField: code
+    language: python
+  # JavaScript/TypeScript
+  ".js":
+    parser: source-code
+    bodyField: code
+    language: javascript
+  ".mjs":
+    parser: source-code
+    bodyField: code
+    language: javascript
+  ".cjs":
+    parser: source-code
+    bodyField: code
+    language: javascript
+  ".jsx":
+    parser: source-code
+    bodyField: code
+    language: javascript
+  ".ts":
+    parser: source-code
+    bodyField: code
+    language: typescript
+  ".tsx":
+    parser: source-code
+    bodyField: code
+    language: typescript
+  ".mts":
+    parser: source-code
+    bodyField: code
+    language: typescript
+  ".cts":
+    parser: source-code
+    bodyField: code
+    language: typescript
+  # Systems languages
+  ".go":
+    parser: source-code
+    bodyField: code
+    language: go
+  ".rs":
+    parser: source-code
+    bodyField: code
+    language: rust
+  ".c":
+    parser: source-code
+    bodyField: code
+    language: c
+  ".h":
+    parser: source-code
+    bodyField: code
+    language: c
+  ".cpp":
+    parser: source-code
+    bodyField: code
+    language: cpp
+  ".cc":
+    parser: source-code
+    bodyField: code
+    language: cpp
+  ".cxx":
+    parser: source-code
+    bodyField: code
+    language: cpp
+  ".hpp":
+    parser: source-code
+    bodyField: code
+    language: cpp
+  ".hxx":
+    parser: source-code
+    bodyField: code
+    language: cpp
+  ".zig":
+    parser: source-code
+    bodyField: code
+    language: zig
+  # JVM languages
+  ".java":
+    parser: source-code
+    bodyField: code
+    language: java
+  ".kt":
+    parser: source-code
+    bodyField: code
+    language: kotlin
+  ".kts":
+    parser: source-code
+    bodyField: code
+    language: kotlin
+  ".scala":
+    parser: source-code
+    bodyField: code
+    language: scala
+  ".groovy":
+    parser: source-code
+    bodyField: code
+    language: groovy
+  ".clj":
+    parser: source-code
+    bodyField: code
+    language: clojure
+  ".cljs":
+    parser: source-code
+    bodyField: code
+    language: clojure
+  # .NET languages
+  ".cs":
+    parser: source-code
+    bodyField: code
+    language: csharp
+  ".fs":
+    parser: source-code
+    bodyField: code
+    language: fsharp
+  ".vb":
+    parser: source-code
+    bodyField: code
+    language: vbnet
+  # Ruby/PHP/Perl
+  ".rb":
+    parser: source-code
+    bodyField: code
+    language: ruby
+  ".php":
+    parser: source-code
+    bodyField: code
+    language: php
+  ".pl":
+    parser: source-code
+    bodyField: code
+    language: perl
+  ".pm":
+    parser: source-code
+    bodyField: code
+    language: perl
+  # Functional languages
+  ".hs":
+    parser: source-code
+    bodyField: code
+    language: haskell
+  ".lhs":
+    parser: source-code
+    bodyField: code
+    language: haskell
+  ".ml":
+    parser: source-code
+    bodyField: code
+    language: ocaml
+  ".mli":
+    parser: source-code
+    bodyField: code
+    language: ocaml
+  ".ex":
+    parser: source-code
+    bodyField: code
+    language: elixir
+  ".exs":
+    parser: source-code
+    bodyField: code
+    language: elixir
+  ".erl":
+    parser: source-code
+    bodyField: code
+    language: erlang
+  # Mobile
+  ".swift":
+    parser: source-code
+    bodyField: code
+    language: swift
+  ".dart":
+    parser: source-code
+    bodyField: code
+    language: dart
+  # Scripting
+  ".lua":
+    parser: source-code
+    bodyField: code
+    language: lua
+  ".r":
+    parser: source-code
+    bodyField: code
+    language: r
+  ".R":
+    parser: source-code
+    bodyField: code
+    language: r
+  ".jl":
+    parser: source-code
+    bodyField: code
+    language: julia
+  # Shell
+  ".sh":
+    parser: source-code
+    bodyField: code
+    language: bash
+  ".bash":
+    parser: source-code
+    bodyField: code
+    language: bash
+  ".zsh":
+    parser: source-code
+    bodyField: code
+    language: bash
+  ".fish":
+    parser: source-code
+    bodyField: code
+    language: bash
+  ".ps1":
+    parser: source-code
+    bodyField: code
+    language: powershell
+  ".psm1":
+    parser: source-code
+    bodyField: code
+    language: powershell
+  ".bat":
+    parser: source-code
+    bodyField: code
+    language: dos
+  ".cmd":
+    parser: source-code
+    bodyField: code
+    language: dos
+  # Database
+  ".sql":
+    parser: source-code
+    bodyField: code
+    language: sql
+  # Web frontend
+  ".vue":
+    parser: source-code
+    bodyField: code
+    language: xml
+  ".svelte":
+    parser: source-code
+    bodyField: code
+    language: xml
+  ".html":
+    parser: source-code
+    bodyField: code
+    language: html
+  ".htm":
+    parser: source-code
+    bodyField: code
+    language: html
+  ".css":
+    parser: source-code
+    bodyField: code
+    language: css
+  ".scss":
+    parser: source-code
+    bodyField: code
+    language: scss
+  ".sass":
+    parser: source-code
+    bodyField: code
+    language: scss
+  ".less":
+    parser: source-code
+    bodyField: code
+    language: less
+  # Config/data files
+  ".xml":
+    parser: source-code
+    bodyField: code
+    language: xml
+  ".toml":
+    parser: source-code
+    bodyField: code
+    language: toml
+  ".ini":
+    parser: source-code
+    bodyField: code
+    language: ini
+  ".cfg":
+    parser: source-code
+    bodyField: code
+    language: ini
+  ".conf":
+    parser: source-code
+    bodyField: code
+    language: ini
+  # Dockerfiles and makefiles (no extension, but common names)
+  "Dockerfile":
+    parser: source-code
+    bodyField: code
+    language: dockerfile
+  "Makefile":
+    parser: source-code
+    bodyField: code
+    language: makefile
+  "makefile":
+    parser: source-code
+    bodyField: code
+    language: makefile
+  "GNUmakefile":
+    parser: source-code
+    bodyField: code
+    language: makefile
+  "CMakeLists.txt":
+    parser: source-code
+    bodyField: code
+    language: cmake
+  ".cmake":
+    parser: source-code
+    bodyField: code
+    language: cmake

@@ -352,6 +352,55 @@ main {
     display: none;
 }
 
+/* Compact cards mode - smaller cards for large codebases */
+body.compact-cards .items-grid,
+body.compact-cards .subdir-items {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+
+body.compact-cards .card {
+    min-height: 120px;
+}
+
+body.compact-cards .card-preview {
+    height: 80px;
+}
+
+body.compact-cards .card-title {
+    font-size: 0.75rem;
+}
+
+body.compact-cards .card-meta {
+    font-size: 0.6rem;
+    padding: 0.25rem 0.5rem;
+}
+
+body.compact-cards .subdir-header {
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+}
+
+body.compact-cards .subdir-name {
+    font-size: 0.75rem;
+}
+
+body.compact-cards .subdir-toggle {
+    font-size: 0.7rem;
+}
+
+body.compact-cards .subdir-count {
+    font-size: 0.65rem;
+}
+
+body.compact-cards .subdir-content {
+    margin-top: 0.35rem;
+}
+
+body.compact-cards .subdir-node {
+    margin-bottom: 0.35rem;
+}
+
 /* Subsection headers for grouped items within a section */
 .subsection-header {
     grid-column: 1 / -1;

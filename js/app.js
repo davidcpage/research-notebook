@@ -44,6 +44,9 @@ function restoreCollapsedSections() {
 // Keys are in format: "sectionId/subdirPath" (e.g., "section-research/responses/batch1")
 let expandedSubdirs = new Set();
 
+// Saved state for expand all toggle (revert on second press)
+let savedExpandedSubdirs = null;
+
 // Focus mode: scope UI to a subdirectory path (null = show all)
 // Path format: "section" or "section/subdir/path" (e.g., "2024-25/year-8-set-1")
 let focusedPath = null;
@@ -90,6 +93,45 @@ function isSubdirExpanded(sectionId, subdirPath) {
     return expandedSubdirs.has(key);
 }
 
+// Expand all subdirectories in all sections (toggle: second press reverts)
+function expandAllSubdirs() {
+    // Build set of all possible subdirs
+    const allSubdirs = new Set();
+    for (const section of data.sections) {
+        if (!section.visible) continue;
+        for (const item of section.items) {
+            const subdir = getSubdirFromPath(item._path);
+            if (subdir) {
+                const parts = subdir.split('/');
+                for (let i = 1; i <= parts.length; i++) {
+                    const path = parts.slice(0, i).join('/');
+                    allSubdirs.add(`${section.id}/${path}`);
+                }
+            }
+        }
+    }
+
+    // Check if already fully expanded
+    const isFullyExpanded = allSubdirs.size > 0 &&
+        [...allSubdirs].every(key => expandedSubdirs.has(key));
+
+    if (isFullyExpanded && savedExpandedSubdirs) {
+        // Revert to saved state
+        expandedSubdirs = new Set(savedExpandedSubdirs);
+        savedExpandedSubdirs = null;
+        saveExpandedSubdirs();
+        render();
+        showToast('Reverted to previous state');
+    } else {
+        // Save current state and expand all
+        savedExpandedSubdirs = new Set(expandedSubdirs);
+        expandedSubdirs = allSubdirs;
+        saveExpandedSubdirs();
+        render();
+        showToast('Expanded all subdirectories');
+    }
+}
+
 // Path helpers for unified _path field
 // _path stores full path from notebook root (e.g., 'research/responses/batch1')
 
@@ -114,6 +156,9 @@ function formatDirName(dirName) {
 
     // Special cases for system directories - display as-is
     if (dirName === '.' || dirName === '.notebook') return dirName;
+
+    // If preserve_dir_names is enabled, return directory name as-is
+    if (notebookSettings?.preserve_dir_names) return dirName;
 
     // Split on hyphens and underscores
     const parts = dirName.split(/[-_]/);
@@ -987,12 +1032,17 @@ const SETTINGS_SCHEMA = {
     hidden_templates: { default: [] },    // Template names to hide from create buttons
     enabled_templates: { default: ['note', 'bookmark', 'code'] }, // Card types available in this notebook
     quiz_template_mode: { default: false }, // Disable quiz-taking in viewer (for quiz templates)
+    source_cards_editable: { default: false }, // Allow editing source code files (default: read-only)
+    preserve_dir_names: { default: false }, // Show directory names as-is (default: Title Case)
+    compact_cards: { default: false }, // Smaller cards for viewing large codebases
     grading: { default: null }            // Grading settings: { roster_path, show_student_names }
 };
 
 // Build settings object from parsed data, filling in defaults
+// Tracks which fields used defaults in _fromDefaults Set
 function buildSettingsObject(parsed = {}) {
     const settings = {};
+    const fromDefaults = new Set();
     for (const [key, config] of Object.entries(SETTINGS_SCHEMA)) {
         if (parsed[key] !== undefined) {
             // Use parsed value, with special handling for sections
@@ -1004,8 +1054,10 @@ function buildSettingsObject(parsed = {}) {
             settings[key] = typeof config.default === 'function'
                 ? config.default()
                 : config.default;
+            fromDefaults.add(key);
         }
     }
+    settings._fromDefaults = fromDefaults;
     return settings;
 }
 
@@ -1137,7 +1189,15 @@ async function loadRoster(dirHandle) {
 async function saveSettings(dirHandle) {
     if (!dirHandle || !notebookSettings) return;
 
-    const content = jsyaml.dump(notebookSettings, {
+    // Create clean object without internal metadata (_fromDefaults)
+    const settingsToSave = {};
+    for (const key of Object.keys(SETTINGS_SCHEMA)) {
+        if (notebookSettings[key] !== undefined) {
+            settingsToSave[key] = notebookSettings[key];
+        }
+    }
+
+    const content = jsyaml.dump(settingsToSave, {
         indent: 2,
         lineWidth: -1,
         quotingType: '"',
@@ -1499,6 +1559,13 @@ const parsers = {
         parse(content) {
             return { frontmatter: jsyaml.load(content), body: null };
         }
+    },
+
+    // Parse source code file (no frontmatter expected, entire file is content)
+    'source-code': {
+        parse(content) {
+            return { frontmatter: {}, body: content };
+        }
     }
 };
 
@@ -1565,6 +1632,13 @@ const serializers = {
     'yaml': {
         serialize(frontmatter, body) {
             return jsyaml.dump(frontmatter, { indent: 2, lineWidth: -1 });
+        }
+    },
+
+    // Serialize source code (just the raw content, no frontmatter)
+    'source-code': {
+        serialize(frontmatter, body) {
+            return body || '';
         }
     }
 };
@@ -1634,9 +1708,17 @@ function loadCard(filename, content, sectionName, companionData = {}) {
     // This ensures existing render functions work
     frontmatter.type = templateName;
 
-    // Set language for code files (required by render functions)
-    if (extension === '.code.py') {
+    // Set language for code/source files (required by render functions)
+    // Use language from extension config, or default for .code.py
+    if (config.language) {
+        frontmatter.language = config.language;
+    } else if (extension === '.code.py') {
         frontmatter.language = 'python';
+    }
+
+    // Infer title from filename if not in frontmatter (for source files and similar)
+    if (!frontmatter.title) {
+        frontmatter.title = filename;
     }
 
     // Store source info for saving
@@ -1769,6 +1851,9 @@ function compareVersionNumbers(a, b) {
 
 // Sort section items by: number field, then modified date
 function sortSectionItems(section) {
+    // Get card type order from manifest (note, bookmark, image, code, source, etc.)
+    const typeOrder = Object.keys(availableCardTypes);
+
     section.items.sort((a, b) => {
         // 1. Number field (supports "1.1" versioning for explicit ordering)
         if (a.number != null && b.number != null) {
@@ -1780,7 +1865,15 @@ function sortSectionItems(section) {
             return 1;
         }
 
-        // 2. Modified date (newest first)
+        // 2. Card type order (standard types before source files)
+        const aTypeIdx = typeOrder.indexOf(a.type);
+        const bTypeIdx = typeOrder.indexOf(b.type);
+        // Unknown types go to end
+        const aOrder = aTypeIdx >= 0 ? aTypeIdx : 999;
+        const bOrder = bTypeIdx >= 0 ? bTypeIdx : 999;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+
+        // 3. Modified date (newest first)
         const aTime = a._fileModified || new Date(a.modified || 0).getTime();
         const bTime = b._fileModified || new Date(b.modified || 0).getTime();
         return bTime - aTime;
@@ -1881,8 +1974,12 @@ function renderDocumentPreview(card, template) {
         return `<pre class="preview-code">${escapeHtml(yamlStr.substring(0, 400))}</pre>`;
     } else if (fieldType === 'code') {
         // Code fields: monospace with language class (check before 'content' field name)
-        const codePreview = escapeHtml(content.substring(0, 800));
-        return `<pre class="preview-code"><code class="language-${fieldDef?.language || 'python'}">${codePreview || 'No code'}</code></pre>`;
+        // Language can come from field definition or card data (for source files)
+        const language = fieldDef?.language || card.language || 'python';
+        // Source cards use minimap preview with tiny font, so show more characters
+        const previewLength = card.type === 'source' ? 2000 : 800;
+        const codePreview = escapeHtml(content.substring(0, previewLength));
+        return `<pre class="preview-code"><code class="language-${language}">${codePreview || 'No code'}</code></pre>`;
     } else if (fieldType === 'markdown' || field === 'content') {
         // Use existing renderNotePreview for markdown
         const previewHtml = renderNotePreview(content, format);
@@ -1936,8 +2033,10 @@ function renderSplitPanePreview(card, template) {
         // Render as code preview for code template
         const leftFieldDef = template.schema?.[fallbackField];
         if (leftFieldDef?.type === 'code') {
+            // Language can come from field definition or card data (for source files)
+            const language = leftFieldDef?.language || card.language || 'python';
             const codePreview = escapeHtml(fallbackContent.substring(0, 800));
-            return `<pre class="preview-code"><code class="language-${leftFieldDef?.language || 'python'}">${codePreview}</code></pre>`;
+            return `<pre class="preview-code"><code class="language-${language}">${codePreview}</code></pre>`;
         }
         return `<div class="preview-text">${escapeHtml(fallbackContent.substring(0, 300))}</div>`;
     }
@@ -2047,6 +2146,17 @@ function renderCardMeta(card, template) {
         return meta || `<span>${formatDate(created)}</span>`;
     }
 
+    // For source cards, show language and line count
+    if (card.template === 'source' || card.type === 'source') {
+        if (card.language) {
+            meta += `<span>${escapeHtml(card.language)}</span>`;
+        }
+        if (card.lineCount) {
+            meta += `<span>${card.lineCount} lines</span>`;
+        }
+        return meta || `<span>${formatDate(modified)}</span>`;
+    }
+
     meta = `<span>${formatDate(created)}</span>`;
     if (modified && created && modified !== created) {
         meta += `<span>Updated ${formatDate(modified)}</span>`;
@@ -2115,8 +2225,16 @@ function openViewer(sectionId, itemId) {
 
     // Set meta info
     const isSystemNote = card.system && card.type === 'note';
+    const isSourceCard = card.template === 'source' || card.type === 'source';
     let metaText;
-    if (isSystemNote) {
+    if (isSourceCard) {
+        // Show language and line count for source cards
+        const parts = [];
+        if (card.language) parts.push(card.language);
+        if (card.lineCount) parts.push(`${card.lineCount} lines`);
+        if (card.modified) parts.push(`Modified ${formatDate(card.modified)}`);
+        metaText = parts.join(' · ');
+    } else if (isSystemNote) {
         metaText = card.modified ? `Modified ${formatDate(card.modified)}` : '';
     } else {
         metaText = formatDate(card.created || card.modified);
@@ -2227,7 +2345,9 @@ function renderViewerDocument(card, template) {
     } else if (format === 'text' || format === 'yaml' || fieldType === 'text') {
         return `<pre class="viewer-text">${escapeHtml(content)}</pre>`;
     } else if (fieldType === 'code') {
-        return `<div class="viewer-code"><pre><code class="language-${fieldDef?.language || 'python'}">${escapeHtml(content)}</code></pre></div>`;
+        // Language can come from field definition or card data (for source files)
+        const language = fieldDef?.language || card.language || 'python';
+        return `<div class="viewer-code"><pre><code class="language-${language}">${escapeHtml(content)}</code></pre></div>`;
     } else {
         return `<div class="md-content viewer-markdown">${renderMarkdownWithLinks(content)}</div>`;
     }
@@ -2417,8 +2537,13 @@ function renderViewerActions(card, template, isSystemNote) {
     }
 
     // Common actions
-    actions += `<button class="btn btn-secondary btn-small" onclick="editViewerCard()">✎ Edit</button>`;
-    actions += `<button class="btn btn-secondary btn-small" onclick="deleteViewerCard()">× Delete</button>`;
+    // Hide edit/delete for source cards unless source_cards_editable is enabled
+    const isSourceCard = templateName === 'source';
+    const canEdit = !isSourceCard || notebookSettings.source_cards_editable;
+    if (canEdit) {
+        actions += `<button class="btn btn-secondary btn-small" onclick="editViewerCard()">✎ Edit</button>`;
+        actions += `<button class="btn btn-secondary btn-small" onclick="deleteViewerCard()">× Delete</button>`;
+    }
 
     return actions;
 }
@@ -5255,6 +5380,12 @@ async function loadFromFilesystem(dirHandle) {
         await loadCardTypeAssets(additionalTypes);
     }
 
+    // Auto-enable preserve_dir_names if source files detected and setting wasn't explicitly set
+    if (inUseTypes.has('source') && notebookSettings?._fromDefaults?.has('preserve_dir_names')) {
+        notebookSettings.preserve_dir_names = true;
+        console.log('[Settings] Auto-enabled preserve_dir_names (source files detected)');
+    }
+
     await loadAuthors(dirHandle);
 
     // Inject template CSS variables and load user theme
@@ -5588,6 +5719,14 @@ async function loadFromFilesystem(dirHandle) {
                             card._source.subdir = subdirPath;
                         }
                         card._fileModified = file.lastModified;
+                        // Set modified date from file if not in frontmatter (for source files)
+                        if (!card.modified && file.lastModified) {
+                            card.modified = new Date(file.lastModified).toISOString();
+                        }
+                        // Compute line count for source/code files
+                        if (card.code) {
+                            card.lineCount = card.code.split('\n').length;
+                        }
                         items.push(card);
                     }
                 } catch (e) {
@@ -5734,7 +5873,7 @@ async function loadFromFilesystem(dirHandle) {
             loadedData.sections.push(section);
         }
 
-        // Update the settings card to reflect discovered sections
+        // Update the settings card to reflect discovered sections and auto-detected settings
         // (The card was created before section discovery, so it may be out of sync)
         const notebookSection = loadedData.sections.find(s => s._dirName === '.notebook');
         const settingsCard = notebookSection?.items.find(n => n.template === 'settings');
@@ -5743,6 +5882,11 @@ async function loadFromFilesystem(dirHandle) {
                 dir: s._dirName,
                 visible: s.visible !== false
             }));
+            // Sync settings to card so editor shows correct values (including auto-detected ones)
+            settingsCard.preserve_dir_names = notebookSettings?.preserve_dir_names ?? false;
+            settingsCard.source_cards_editable = notebookSettings?.source_cards_editable ?? false;
+            settingsCard.quiz_template_mode = notebookSettings?.quiz_template_mode ?? false;
+            settingsCard.compact_cards = notebookSettings?.compact_cards ?? false;
         }
 
         return loadedData;
@@ -5832,15 +5976,20 @@ async function saveCardFile(sectionId, card) {
 
     // Settings card is handled specially
     if (card.template === 'settings' || card.filename === 'settings.yaml') {
-        // Update notebookSettings from the card fields
+        // Update notebookSettings from the card fields, preserving existing values for unlisted fields
         notebookSettings = buildSettingsObject({
+            ...notebookSettings,  // Preserve existing settings (e.g., auto-detected preserve_dir_names)
             notebook_title: card.notebook_title,
             notebook_subtitle: card.notebook_subtitle,
             sections: card.sections || notebookSettings?.sections,
             default_author: card.default_author,
             authors: card.authors,
             theme: card.theme,
-            enabled_templates: card.enabled_templates
+            enabled_templates: card.enabled_templates,
+            quiz_template_mode: card.quiz_template_mode,
+            source_cards_editable: card.source_cards_editable,
+            preserve_dir_names: card.preserve_dir_names,
+            compact_cards: card.compact_cards
         });
         // Also update data.title/subtitle so UI reflects changes
         data.title = notebookSettings.notebook_title;
@@ -7758,6 +7907,9 @@ function render() {
     document.getElementById('headerSubtitle').textContent = data.subtitle || 'Bookmarks, notes, and connections';
     document.title = title;
 
+    // Apply compact cards mode if enabled
+    document.body.classList.toggle('compact-cards', notebookSettings?.compact_cards === true);
+
     const content = document.getElementById('content');
 
     // Filter sections by visibility and focus
@@ -7947,12 +8099,24 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
     });
 });
 
-// Close modals on Escape key
+// Global keyboard shortcuts
 document.addEventListener('keydown', (e) => {
+    // Escape closes modals
     if (e.key === 'Escape') {
         closeSectionModal();
         closeEditor();
         closeViewer();
+    }
+
+    // Skip shortcuts if typing in an input/textarea
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        return;
+    }
+
+    // Cmd/Ctrl + Shift + E = Toggle expand all subdirectories
+    if (e.key.toLowerCase() === 'e' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+        e.preventDefault();
+        expandAllSubdirs();
     }
 });
 

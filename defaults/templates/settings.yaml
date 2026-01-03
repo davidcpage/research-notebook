@@ -41,6 +41,18 @@ schema:
     type: boolean
     default: false
     description: When enabled, quizzes are read-only templates (for bulk grading workflows)
+  source_cards_editable:
+    type: boolean
+    default: false
+    description: When enabled, source code files can be edited (saves without frontmatter)
+  preserve_dir_names:
+    type: boolean
+    default: false
+    description: When enabled, directory names are shown as-is instead of Title Case
+  compact_cards:
+    type: boolean
+    default: false
+    description: Smaller cards for viewing large codebases
 card:
   layout: yaml
   placeholder: "⚙"
@@ -68,6 +80,15 @@ editor:
       showIf:
         field: enabled_templates
         includes: quiz
+    - field: source_cards_editable
+      label: Source Files Editable
+      showIf:
+        field: enabled_templates
+        includes: source
+    - field: preserve_dir_names
+      label: Preserve Directory Names
+    - field: compact_cards
+      label: Compact Cards
 style:
   variables:
     --preview-bg: "#f5f5f5"
