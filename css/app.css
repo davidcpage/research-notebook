@@ -401,6 +401,24 @@ body.compact-cards .subdir-node {
     margin-bottom: 0.35rem;
 }
 
+body.compact-cards .section-header {
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+}
+
+body.compact-cards .section-title {
+    font-size: 1.1rem;
+}
+
+body.compact-cards .section-count {
+    font-size: 0.7rem;
+}
+
+body.compact-cards .section-toggle {
+    font-size: 0.8rem;
+}
+
 /* Subsection headers for grouped items within a section */
 .subsection-header {
     grid-column: 1 / -1;
