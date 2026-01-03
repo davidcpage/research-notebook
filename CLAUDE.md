@@ -483,5 +483,20 @@ tags: [completed, architecture]
 
 **Key functions**: `normalizeTags()` (handles array/string/YAML formats), `renderTagBadges()`
 
+### Card Ordering
+Cards support an optional `number` field for explicit sorting within sections/subdirectories:
+- Supports version-style numbers: `1`, `1.1`, `1.10`, `2.0` (semantic comparison)
+- Cards with `number` sort before cards without
+- Fallback: modified date (newest first)
+
+```yaml
+# In frontmatter
+number: 1.2
+```
+
+**Lesson cards**: Already have `number` for lesson numbering (e.g., "1.1"), which doubles as sort order. To interleave other cards with lessons, give them a `number` value between lesson numbers.
+
+**Key functions**: `compareVersionNumbers()`, `sortSectionItems()`
+
 ### Known Gotcha: System Notes Leak
 When creating a new notebook folder, always clear `data.systemNotes = []` in addition to `data.sections`. Otherwise, system notes from the previously open notebook get copied to the new folder.

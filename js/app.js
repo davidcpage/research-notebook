@@ -1734,21 +1734,25 @@ function serializeCard(card) {
         }
     }
 
-    // Clone card data without internal fields
-    const { _source, _filename, type, ...cardData } = card;
+    // Clone card data without internal fields (underscore-prefixed and type)
+    const frontmatter = {};
+    for (const [key, value] of Object.entries(card)) {
+        if (!key.startsWith('_') && key !== 'type') {
+            frontmatter[key] = value;
+        }
+    }
 
     // Extract body field for formats that separate it
     let body = null;
-    const frontmatter = { ...cardData };
 
     if (bodyField && format !== 'yaml' && format !== 'json') {
         body = frontmatter[bodyField];
         delete frontmatter[bodyField];
     }
 
-    // For JSON format (bookmarks), keep all fields together
-    if (format === 'json') {
-        frontmatter.type = type;  // Keep type for backwards compatibility
+    // For JSON format (bookmarks), keep type for backwards compatibility
+    if (format === 'json' && card.type) {
+        frontmatter.type = card.type;
     }
 
     const serializer = serializers[format];
@@ -1793,6 +1797,38 @@ function renderTagBadges(card, containerClass = 'tag-badges', noWrapper = false)
         return `<span class="tag-badge" data-tag="${escapeHtml(normalizedTag)}">${escapeHtml(tag)}</span>`;
     }).join('');
     return noWrapper ? badges : `<div class="${containerClass}">${badges}</div>`;
+}
+
+// Compare version-style numbers (e.g., "1.1" < "1.2" < "1.10" < "2.0")
+function compareVersionNumbers(a, b) {
+    const aParts = String(a).split('.').map(Number);
+    const bParts = String(b).split('.').map(Number);
+    for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+        const aVal = aParts[i] || 0;
+        const bVal = bParts[i] || 0;
+        if (aVal !== bVal) return aVal - bVal;
+    }
+    return 0;
+}
+
+// Sort section items by: number field, then modified date
+function sortSectionItems(section) {
+    section.items.sort((a, b) => {
+        // 1. Number field (supports "1.1" versioning for explicit ordering)
+        if (a.number != null && b.number != null) {
+            const cmp = compareVersionNumbers(a.number, b.number);
+            if (cmp !== 0) return cmp;
+        } else if (a.number != null) {
+            return -1;  // Items with number come first
+        } else if (b.number != null) {
+            return 1;
+        }
+
+        // 2. Modified date (newest first)
+        const aTime = a._fileModified || new Date(a.modified || 0).getTime();
+        const bTime = b._fileModified || new Date(b.modified || 0).getTime();
+        return bTime - aTime;
+    });
 }
 
 function renderCard(sectionId, card) {
@@ -2935,7 +2971,7 @@ function openEditor(templateName, sectionId, card = null) {
         bodyEl.appendChild(fieldEl);
     }
 
-    // Universal tags field (for all card types except system cards like settings)
+    // Universal tags and order fields (for all card types except system cards)
     if (!['settings', 'template'].includes(templateName)) {
         const tagsGroup = document.createElement('div');
         tagsGroup.className = 'form-group';
@@ -2946,6 +2982,19 @@ function openEditor(templateName, sectionId, card = null) {
             <span class="field-hint">Comma-separated. Status tags (completed, ongoing, future) get traffic light colors.</span>
         `;
         bodyEl.appendChild(tagsGroup);
+
+        // Number field (for explicit sorting) - skip if template has its own 'number' field (like lesson)
+        if (!template.schema?.number) {
+            const numberGroup = document.createElement('div');
+            numberGroup.className = 'form-group form-group-quarter';
+            const numberValue = card?.number ?? '';
+            numberGroup.innerHTML = `
+                <label for="editorNumber">Number</label>
+                <input type="text" id="editorNumber" value="${escapeHtml(String(numberValue))}" placeholder="e.g., 1.2">
+                <span class="field-hint">Sort position (1, 1.1, 2.0)</span>
+            `;
+            bodyEl.appendChild(numberGroup);
+        }
     }
 
     // Handle output display for code templates
@@ -5007,6 +5056,19 @@ async function saveEditor() {
         }
     }
 
+    // Parse number from universal number field (for sorting)
+    const numberInput = document.getElementById('editorNumber');
+    if (numberInput) {
+        const numberValue = numberInput.value.trim();
+        if (numberValue) {
+            // Store as number if it's a simple integer, otherwise as string for "1.2" style
+            const numVal = Number(numberValue);
+            cardData.number = !isNaN(numVal) && String(numVal) === numberValue ? numVal : numberValue;
+        } else {
+            delete cardData.number;
+        }
+    }
+
     // Use stored location path (computed in openEditor, not editable by user)
     cardData._path = editingCard.locationPath || card._path;
 
@@ -5093,6 +5155,8 @@ async function saveEditor() {
                     section.items[idx] = cardData;
                 }
             }
+            // Re-sort section after modification (order field may have changed)
+            sortSectionItems(section);
         }
 
         await saveData();
@@ -5700,47 +5764,7 @@ async function loadFromFilesystem(dirHandle) {
             // Store all discovered subdirectory paths (including empty ones)
             section._subdirPaths = loadedItems._subdirPaths || [];
 
-            // Sort items: quiz first, then summaries (by folder), then others (by subfolder, then date)
-            section.items.sort((a, b) => {
-                // Template priority: quiz=0, quiz-response-summary=1, others=2
-                const getPriority = (item) => {
-                    if (item.template === 'quiz') return 0;
-                    if (item.template === 'quiz-response-summary') return 1;
-                    return 2;
-                };
-                const aPriority = getPriority(a);
-                const bPriority = getPriority(b);
-                if (aPriority !== bPriority) return aPriority - bPriority;
-
-                // Within summaries, sort by responseFolder or cohort
-                if (aPriority === 1) {
-                    const aFolder = a.responseFolder || getSubdirFromPath(a._path) || '';
-                    const bFolder = b.responseFolder || getSubdirFromPath(b._path) || '';
-                    return aFolder.localeCompare(bFolder);
-                }
-
-                // For other items, sort by subfolder first, then by modified date
-                const aSubdir = getSubdirFromPath(a._path) || '';
-                const bSubdir = getSubdirFromPath(b._path) || '';
-                if (aSubdir !== bSubdir) return aSubdir.localeCompare(bSubdir);
-
-                // Within same subfolder, sort by lesson number if present (0.0 < 0.1 < 1.0 < 1.1)
-                if (a.number && b.number) {
-                    const aParts = String(a.number).split('.').map(Number);
-                    const bParts = String(b.number).split('.').map(Number);
-                    for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
-                        const aVal = aParts[i] || 0;
-                        const bVal = bParts[i] || 0;
-                        if (aVal !== bVal) return aVal - bVal;
-                    }
-                }
-
-                // Within same subfolder, sort by modified date (newest first)
-                const aTime = a._fileModified || 0;
-                const bTime = b._fileModified || 0;
-                return bTime - aTime;
-            });
-
+            sortSectionItems(section);
             loadedData.sections.push(section);
         }
 
