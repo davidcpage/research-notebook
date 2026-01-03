@@ -46,6 +46,7 @@ let expandedSubdirs = new Set();
 
 // Saved state for expand all toggle (revert on second press)
 let savedExpandedSubdirs = null;
+let savedCollapsedSections = null;
 
 // Focus mode: scope UI to a subdirectory path (null = show all)
 // Path format: "section" or "section/subdir/path" (e.g., "2024-25/year-8-set-1")
@@ -80,6 +81,13 @@ function toggleSubdir(sectionId, subdirPath) {
     const key = `${sectionId}/${subdirPath}`;
     if (expandedSubdirs.has(key)) {
         expandedSubdirs.delete(key);
+        // Clear expansion state for all child subdirectories
+        const prefix = `${key}/`;
+        for (const k of [...expandedSubdirs]) {
+            if (k.startsWith(prefix)) {
+                expandedSubdirs.delete(k);
+            }
+        }
     } else {
         expandedSubdirs.add(key);
     }
@@ -95,10 +103,12 @@ function isSubdirExpanded(sectionId, subdirPath) {
 
 // Expand all subdirectories in all sections (toggle: second press reverts)
 function expandAllSubdirs() {
-    // Build set of all possible subdirs
+    // Build set of all possible subdirs from visible sections
     const allSubdirs = new Set();
+    const visibleSectionIds = new Set();
     for (const section of data.sections) {
         if (!section.visible) continue;
+        visibleSectionIds.add(section.id);
         for (const item of section.items) {
             const subdir = getSubdirFromPath(item._path);
             if (subdir) {
@@ -111,22 +121,33 @@ function expandAllSubdirs() {
         }
     }
 
-    // Check if already fully expanded
-    const isFullyExpanded = allSubdirs.size > 0 &&
+    // Check if already fully expanded (all sections uncollapsed AND all subdirs expanded)
+    const allSectionsExpanded = [...visibleSectionIds].every(id => !collapsedSections.has(id));
+    const allSubdirsExpanded = allSubdirs.size > 0 &&
         [...allSubdirs].every(key => expandedSubdirs.has(key));
+    const isFullyExpanded = allSectionsExpanded && allSubdirsExpanded;
 
-    if (isFullyExpanded && savedExpandedSubdirs) {
+    if (isFullyExpanded && savedExpandedSubdirs && savedCollapsedSections) {
         // Revert to saved state
         expandedSubdirs = new Set(savedExpandedSubdirs);
+        collapsedSections = new Set(savedCollapsedSections);
         savedExpandedSubdirs = null;
+        savedCollapsedSections = null;
         saveExpandedSubdirs();
+        saveCollapsedSections();
         render();
         showToast('Reverted to previous state');
     } else {
         // Save current state and expand all
         savedExpandedSubdirs = new Set(expandedSubdirs);
+        savedCollapsedSections = new Set(collapsedSections);
         expandedSubdirs = allSubdirs;
+        // Uncollapse all visible sections
+        for (const id of visibleSectionIds) {
+            collapsedSections.delete(id);
+        }
         saveExpandedSubdirs();
+        saveCollapsedSections();
         render();
         showToast('Expanded all subdirectories');
     }
@@ -7574,6 +7595,14 @@ function toggleSection(sectionId) {
         collapsedSections.delete(sectionId);
     } else {
         collapsedSections.add(sectionId);
+        // Clear expansion state for all subdirectories in this section
+        const prefix = `${sectionId}/`;
+        for (const key of [...expandedSubdirs]) {
+            if (key.startsWith(prefix)) {
+                expandedSubdirs.delete(key);
+            }
+        }
+        saveExpandedSubdirs();
     }
     saveCollapsedSections();
     render();
