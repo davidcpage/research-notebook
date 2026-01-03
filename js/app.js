@@ -108,13 +108,12 @@ function getSectionFromPath(path) {
 
 // Format directory name for display (kebab-case → Title Case)
 // Preserves date patterns like 2025-26 or 2024-2025
-// Special cases: '.' → '[root]', '.notebook' → '.notebook'
+// Special cases: '.' and '.notebook' display as-is (dot-prefixed system directories)
 function formatDirName(dirName) {
     if (!dirName) return '';
 
-    // Special cases for system directories
-    if (dirName === '.') return '[root]';
-    if (dirName === '.notebook') return '.notebook';
+    // Special cases for system directories - display as-is
+    if (dirName === '.' || dirName === '.notebook') return dirName;
 
     // Split on hyphens and underscores
     const parts = dirName.split(/[-_]/);
@@ -2115,6 +2114,7 @@ function openViewer(sectionId, itemId) {
     }
 
     // Set meta info
+    const isSystemNote = card.system && card.type === 'note';
     let metaText;
     if (isSystemNote) {
         metaText = card.modified ? `Modified ${formatDate(card.modified)}` : '';
@@ -5426,8 +5426,9 @@ async function loadFromFilesystem(dirHandle) {
             const notebookSettingsMatch = notebookSettings?.sections?.find(s =>
                 typeof s === 'object' && s.dir === '.notebook'
             );
-            // Track subdirs from _path fields
-            const subdirPaths = [...new Set(notebookItems.map(i => i._path).filter(p => p && p !== '.notebook'))];
+            // Track subdirs from _path fields (relative to section root, not full paths)
+            const subdirPaths = [...new Set(notebookItems.map(i => i._path).filter(p => p && p !== '.notebook'))]
+                .map(p => p.startsWith('.notebook/') ? p.slice('.notebook/'.length) : p);
             loadedData.sections.push({
                 id: 'section-.notebook',
                 items: notebookItems,
@@ -5869,9 +5870,6 @@ async function saveCardFile(sectionId, card) {
                 }
                 if (!dirName) continue;
 
-                // Skip System section (dir includes '.') - it's virtual, not a directory
-                if (sectionPathIncludesRoot(dirName)) continue;
-
                 // Find section by matching _dirName
                 let section = data.sections.find(s => s._dirName === dirName);
 
@@ -5881,8 +5879,9 @@ async function saveCardFile(sectionId, card) {
                         section.visible = sectionRecord.visible !== false;
                     }
                     newOrder.push(section);
-                } else {
+                } else if (dirName !== '.') {
                     // New section added via settings - create it
+                    // Skip [root] section (dir === '.') - it's virtual, not a directory
                     const newSection = {
                         id: 'section-' + dirName,
                         items: [],

@@ -189,7 +189,7 @@ data = {
       ]
     }
   ]
-  // Root files (README.md, CLAUDE.md) are in section '.' ([root])
+  // Root files (README.md, CLAUDE.md) are in section '.'
   // Config files (.notebook/*) are in section '.notebook'
 }
 ```
@@ -204,7 +204,7 @@ data = {
 
 ### Special Sections
 Two special sections exist for system files:
-- **`section-.`** ("[root]"): Root files (README.md, CLAUDE.md, etc.) - hidden by default
+- **`section-.`** ("."): Root files (README.md, CLAUDE.md, etc.) - hidden by default
 - **`section-.notebook`** (".notebook"): Config files (settings.yaml, theme.css, templates/) - hidden by default
 
 These sections have fixed names (cannot be renamed in the UI) but can have visibility toggled in Settings.
@@ -238,7 +238,7 @@ notebook-folder/
 
 **Subdirectories (Progressive Disclosure):** Sections support arbitrary directory depth. Subdirectories render as collapsible nodes (collapsed by default). Click to expand and reveal items + nested subdirs. Items have `_path` field tracking their full path from notebook root (e.g., `research/responses/batch1`). Use `getSubdirFromPath(_path)` to extract subdir within section. Expansion state persists in localStorage per-notebook via `expandedSubdirs` Set. Key functions: `buildSubdirTree()`, `renderSubdirNode()`, `toggleSubdir()`, `isSubdirExpanded()`, `getSubdirFromPath()`, `getSectionFromPath()`.
 
-**Special sections:** Root files (README.md, CLAUDE.md) appear in section `section-.` ("[root]"), and config files (.notebook/*) appear in section `section-.notebook` (".notebook"). Both are hidden by default. Toggle visibility in Settings. These sections have fixed names (cannot be renamed) but support the standard visibility toggle. Items have `system: true` flag and use `_path` for subdirectory tracking (e.g., `.notebook/templates`).
+**Special sections:** Root files (README.md, CLAUDE.md) appear in section `section-.` ("."), and config files (.notebook/*) appear in section `section-.notebook` (".notebook"). Both are hidden by default. Toggle visibility in Settings. These sections have fixed names (cannot be renamed) but support the standard visibility toggle. Items have `system: true` flag and use `_path` for subdirectory tracking (e.g., `.notebook/templates`).
 
 **Why Filesystem?** Claude Code integration, Git versioning, portable files, no size limits.
 
