@@ -255,50 +255,18 @@
 {"ts":"2026-01-01T18:01:01Z","type":"created","id":"dp-108","title":"Apps Script for Google Drive export with import skill","issue_type":"feature","priority":2,"description":"Google Apps Script that teacher runs in their school account to export folder structure with file URLs. Plus /import-drive-structure skill to bootstrap notebook from export. Include README with step-by-step instructions for running on teacher's machine. Part of teacher workspace feature (see dev/planning/features/teacher-workspace.md)","labels":["teacher-workspace"]}
 {"ts":"2026-01-01T18:05:00Z","type":"closed","id":"dp-107","reason":"Done - Created lesson card type with template.yaml, styles.css, and index.js for custom rendering. Includes fields for lesson number, status, Drive links (teacher/student slides, audio, handout), objectives, vocab, grammar, and notes. Added sample lesson file to demo notebook."}
 {"ts":"2026-01-01T18:28:13Z","type":"closed","id":"dp-108","reason":"Done - Created tools/drive-export/ with Apps Script and README, plus .claude/skills/import-drive-structure/ skill. Includes example-export.json for testing."}
-{"ts":"2026-01-02T13:45:36Z","type":"created","id":"dp-110","title":"Unify directory naming: infer display names from filesystem","issue_type":"feature","priority":2,"description":"Currently sections have a name mapping in settings (dir → display name) but subdirectories show raw filesystem names (e.g., `module-1-la-rentree`). This creates UI inconsistency, especially in focus mode where subdirs act like sections.
-
-**Changes:**
-
-1. **Add `formatDirName(dirName)` function:**
-   - Convert kebab-case/snake_case to Title Case
-   - Preserve date patterns: `2025-26` stays as \"2025-26\" not \"2025 26\"
-   - Examples: `module-1-la-rentree` → \"Module 1 La Rentree\", `french-2025-26` → \"French 2025-26\"
-
-2. **Remove section name mapping from settings:**
-   - Settings only stores `{dir, visible}` for sections
-   - Display names inferred from dir via `formatDirName()`
-   - Simpler, single source of truth (filesystem)
-
-3. **Section rename = folder rename:**
-   - Add `toDirName(displayName)` to convert back to kebab-case
-   - `updateSectionName()` renames folder on disk via File System API
-   - Update all item `_path` fields when section renames
-   - Handle errors gracefully (permissions, open files)
-
-4. **Add \"New Folder\" button to sections:**
-   - Button alongside card type buttons in section header
-   - Prompts for folder name, creates subdirectory
-   - Completes filesystem features (create folders, not just files)
-
-**Benefits:**
-- Consistent display names for sections and subdirs
-- No settings/filesystem desync bugs
-- Filesystem is true source of truth
-- Aligns with thin-wrapper-on-filesystem philosophy
-
-**Edge cases:**
-- Folder rename fails → show error, keep old name
-- Empty folder creation → just mkdir
-- Nested folder creation → create parent path if needed
-
-Related: dp-106 (focus mode), dp-093 (unified _path field)","labels":["ui","architecture","filesystem"]}
-{"ts":"2026-01-02T13:56:15Z","type":"note","id":"dp-110","content":"Implementation complete:
-
-1. Added formatDirName() - converts kebab-case to Title Case, preserving date patterns (2025-26)
-2. Added toDirName() - converts display name back to kebab-case
-3. Updated section/subdir headers, focus breadcrumb to use formatDirName()
-4. Section rename now renames folder on disk via renameSectionDir()
-5. Settings now stores {dir, visible} instead of {name, path, visible}
-6. Added New Folder button (📁+) to section headers - creates subfolders, respects focus mode
-
-Backwards compatible with legacy settings format."}
+{"ts":"2026-01-02T13:45:36Z","type":"created","id":"dp-110","title":"Unify directory naming: infer display names from filesystem","issue_type":"feature","priority":2,"description":"Currently sections have a name mapping in settings (dir → display name) but subdirectories show raw filesystem names (e.g., `module-1-la-rentree`). This creates UI inconsistency, especially in focus mode where subdirs act like sections.\n\n**Changes:**\n\n1. **Add `formatDirName(dirName)` function:**\n   - Convert kebab-case/snake_case to Title Case\n   - Preserve date patterns: `2025-26` stays as \"2025-26\" not \"2025 26\"\n   - Examples: `module-1-la-rentree` → \"Module 1 La Rentree\", `french-2025-26` → \"French 2025-26\"\n\n2. **Remove section name mapping from settings:**\n   - Settings only stores `{dir, visible}` for sections\n   - Display names inferred from dir via `formatDirName()`\n   - Simpler, single source of truth (filesystem)\n\n3. **Section rename = folder rename:**\n   - Add `toDirName(displayName)` to convert back to kebab-case\n   - `updateSectionName()` renames folder on disk via File System API\n   - Update all item `_path` fields when section renames\n   - Handle errors gracefully (permissions, open files)\n\n4. **Add \"New Folder\" button to sections:**\n   - Button alongside card type buttons in section header\n   - Prompts for folder name, creates subdirectory\n   - Completes filesystem features (create folders, not just files)\n\n**Benefits:**\n- Consistent display names for sections and subdirs\n- No settings/filesystem desync bugs\n- Filesystem is true source of truth\n- Aligns with thin-wrapper-on-filesystem philosophy\n\n**Edge cases:**\n- Folder rename fails → show error, keep old name\n- Empty folder creation → just mkdir\n- Nested folder creation → create parent path if needed\n\nRelated: dp-106 (focus mode), dp-093 (unified _path field)","labels":["ui","architecture","filesystem"]}
+{"ts":"2026-01-02T13:56:15Z","type":"note","id":"dp-110","content":"Implementation complete:\n\n1. Added formatDirName() - converts kebab-case to Title Case, preserving date patterns (2025-26)\n2. Added toDirName() - converts display name back to kebab-case\n3. Updated section/subdir headers, focus breadcrumb to use formatDirName()\n4. Section rename now renames folder on disk via renameSectionDir()\n5. Settings now stores {dir, visible} instead of {name, path, visible}\n6. Added New Folder button (📁+) to section headers - creates subfolders, respects focus mode\n\nBackwards compatible with legacy settings format."}
+{"ts":"2026-01-02T14:00:00Z","type":"closed","id":"dp-110","reason":"Done - implemented formatDirName/toDirName for display names, section rename via folder rename, and New Folder button"}
+{"ts":"2026-01-03T15:55:45Z","type":"closed","id":"dp-006","reason":"Superseded by dp-086 (Tag filtering for cross-cutting navigation) which has a more complete design"}
+{"ts":"2026-01-03T15:58:28Z","type":"closed","id":"dp-049","reason":"Deferred - quiz styling works adequately with current themes. Can revisit if theming issues arise."}
+{"ts":"2026-01-03T15:58:28Z","type":"closed","id":"dp-050","reason":"Deferred - progress tracking is a nice-to-have. Can revisit when core quiz/grading workflow is more mature."}
+{"ts":"2026-01-03T15:59:32Z","type":"closed","id":"dp-106","reason":"Done - Focus mode implemented with breadcrumb navigation, URL persistence, and localStorage state"}
+{"ts":"2026-01-03T16:00:43Z","type":"closed","id":"dp-082","reason":"Done - Response viewer implemented with cohort organization, question-level grading, and summary cards"}
+{"ts":"2026-01-03T16:08:07Z","type":"closed","id":"dp-077","reason":"Done - quiz_template_mode setting implemented with conditional visibility in Settings editor (only shows when quiz card type is enabled)"}
+{"ts":"2026-01-03T16:09:36Z","type":"closed","id":"dp-064","reason":"Done - Quiz export implemented via forms-bridge CLI using Google Forms REST API (replaced clasp/Apps Script approach)"}
+{"ts":"2026-01-03T16:09:36Z","type":"closed","id":"dp-065","reason":"Done - Response import implemented via forms-bridge CLI using Google Forms REST API (replaced clasp/Apps Script approach)"}
+{"ts":"2026-01-03T17:17:19Z","type":"closed","id":"dp-102","reason":"Implemented instance card type overrides via .notebook/card-types/{type}/ directory. Supports template.yaml (deep-merged), styles.css (appended), and index.js (loaded via blob URL). Test files added to demo-notebook."}
+{"ts":"2026-01-03T17:46:12Z","type":"created","id":"dp-111","title":"Remove _system virtual section, use regular [root] and .notebook sections","issue_type":"task","priority":2}
+{"ts":"2026-01-03T17:46:35Z","type":"note","id":"dp-111","content":"Simplify System section architecture by removing virtual _system section, using regular [root] and .notebook sections instead.\n\nCURRENT STATE:\n- _system is virtual section aggregating root files + .notebook/*\n- Has special ID with ~15 special-case checks throughout codebase\n- Complex path normalization\n\nPROPOSED:\n- dir: '.' = root-level files (README.md, CLAUDE.md) - display as [root]\n- dir: '.notebook' = files in .notebook/ directory\n- Both hidden by default, toggleable in Settings\n\nIMPLEMENTATION STEPS:\n1. Update section discovery to include .notebook (line ~5659, allow .notebook through dotfile filter)\n2. Add root files section discovery (check for .md/.txt at root, create dir:'.' section)\n3. Update SETTINGS_SCHEMA defaults (add .notebook and . sections, hidden)\n4. Remove _system special-casing:\n   - data.systemNotes array\n   - loadSystemNotes() function\n   - render() System section block (~line 7908)\n   - saveCardFile() _system check (~line 6055)\n   - openEditor/openViewer isSystemNote checks\n   - getSystemSubdir() helper\n5. Update formatDirName() to display '.' as [root]\n6. Update CLAUDE.md docs\n\nKEY CODE LOCATIONS:\n- loadFromFilesystem() - section discovery\n- loadSystemNotes() - remove/repurpose\n- render() - remove special System rendering\n- saveCardFile() - remove _system case\n- SETTINGS_SCHEMA - update defaults\n\nBEHAVIOR:\n- Settings UI shows two rows: [root] and .notebook with visibility toggles\n- Focus mode correctly excludes both when focused elsewhere\n- File operations work as before\n\nEstimate: 30-60 min"}
+{"ts":"2026-01-03T18:04:19Z","type":"closed","id":"dp-111","reason":"Done - Removed virtual _system section architecture. Root files (README.md, CLAUDE.md) now appear in section '.' ([root]) and config files (.notebook/*) in section '.notebook'. Both are regular sections, hidden by default, with visibility toggleable in Settings. Key changes: removed systemNotes array, updated section discovery to create both sections, updated formatDirName() to display '.' as '[root]', removed ~15 special-case checks for _system throughout codebase, updated CLAUDE.md documentation."}

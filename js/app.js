@@ -5,10 +5,11 @@
 let data = {
     title: 'Research Notebook',
     subtitle: 'Bookmarks, notes, and connections',
-    sections: [],
-    systemNotes: [],  // Markdown files at notebook root (README.md, CLAUDE.md, etc.)
+    sections: []
     // Notes are stored in sections alongside bookmarks
     // Each item has a 'type' field: 'bookmark', 'note', or 'code'
+    // Root files (README.md, CLAUDE.md) are in section '.' ([root])
+    // Config files (.notebook/*) are in section '.notebook'
 };
 
 // Track collapsed sections (persisted to localStorage per-notebook)
@@ -107,8 +108,13 @@ function getSectionFromPath(path) {
 
 // Format directory name for display (kebab-case → Title Case)
 // Preserves date patterns like 2025-26 or 2024-2025
+// Special cases: '.' → '[root]', '.notebook' → '.notebook'
 function formatDirName(dirName) {
     if (!dirName) return '';
+
+    // Special cases for system directories
+    if (dirName === '.') return '[root]';
+    if (dirName === '.notebook') return '.notebook';
 
     // Split on hyphens and underscores
     const parts = dirName.split(/[-_]/);
@@ -696,6 +702,122 @@ async function detectInUseCardTypes(dirHandle) {
     return detected;
 }
 
+// Load instance card type overrides from .notebook/card-types/
+// These override core card types: template.yaml is deep-merged, styles.css appended, index.js replaces
+async function loadInstanceCardTypes(dirHandle) {
+    if (!dirHandle) return;
+
+    try {
+        // Get .notebook/card-types/ directory
+        const notebookDir = await dirHandle.getDirectoryHandle('.notebook', { create: false });
+        let cardTypesDir;
+        try {
+            cardTypesDir = await notebookDir.getDirectoryHandle('card-types', { create: false });
+        } catch (e) {
+            // .notebook/card-types/ doesn't exist, which is fine
+            return;
+        }
+
+        const cssBlocks = [];
+        let loadedCount = 0;
+
+        for await (const [moduleName, moduleHandle] of cardTypesDir.entries()) {
+            if (moduleHandle.kind !== 'directory') continue;
+
+            console.log(`[CardTypes] Loading instance override: ${moduleName}`);
+            let hasContent = false;
+
+            // Load template.yaml (deep merge with existing)
+            try {
+                const templateHandle = await moduleHandle.getFileHandle('template.yaml');
+                const templateFile = await templateHandle.getFile();
+                const yamlContent = await templateFile.text();
+                const template = jsyaml.load(yamlContent);
+
+                if (template && template.name) {
+                    // Deep merge with existing template (instance wins)
+                    const existingTemplate = templateRegistry[template.name];
+                    if (existingTemplate) {
+                        templateRegistry[template.name] = deepMerge(existingTemplate, template);
+                        console.log(`[CardTypes] ${moduleName}: merged template.yaml`);
+                    } else {
+                        templateRegistry[template.name] = template;
+                        console.log(`[CardTypes] ${moduleName}: added new template`);
+                    }
+                    hasContent = true;
+                }
+            } catch (e) {
+                // template.yaml is optional for overrides
+            }
+
+            // Load styles.css (append after core styles)
+            try {
+                const cssHandle = await moduleHandle.getFileHandle('styles.css');
+                const cssFile = await cssHandle.getFile();
+                const css = await cssFile.text();
+                if (css.trim()) {
+                    cssBlocks.push(`/* instance: ${moduleName} */\n${css}`);
+                    console.log(`[CardTypes] ${moduleName}: loaded styles.css`);
+                    hasContent = true;
+                }
+            } catch (e) {
+                // styles.css is optional
+            }
+
+            // Load index.js via blob URL (replaces core renderers)
+            try {
+                const jsHandle = await moduleHandle.getFileHandle('index.js');
+                const jsFile = await jsHandle.getFile();
+                const jsText = await jsFile.text();
+                const blob = new Blob([jsText], { type: 'application/javascript' });
+                const blobUrl = URL.createObjectURL(blob);
+
+                try {
+                    const jsModule = await import(blobUrl);
+                    if (jsModule) {
+                        cardTypeModules[moduleName] = jsModule;
+
+                        // Register render functions if provided (override existing)
+                        if (jsModule.renderPreview || jsModule.renderViewer) {
+                            cardTypeRenderers[moduleName] = {
+                                renderPreview: jsModule.renderPreview,
+                                renderViewer: jsModule.renderViewer
+                            };
+                            console.log(`[CardTypes] ${moduleName}: loaded index.js with renderers`);
+                        } else {
+                            console.log(`[CardTypes] ${moduleName}: loaded index.js`);
+                        }
+                        hasContent = true;
+                    }
+                } finally {
+                    URL.revokeObjectURL(blobUrl);
+                }
+            } catch (e) {
+                // index.js is optional, but log actual errors (not just 404)
+                if (e.name !== 'NotFoundError') {
+                    console.warn(`[CardTypes] ${moduleName}: error loading index.js:`, e);
+                }
+            }
+
+            if (hasContent) loadedCount++;
+        }
+
+        // Inject instance CSS (after core CSS, so instance wins in cascade)
+        if (cssBlocks.length > 0) {
+            appendCardTypeStyles(cssBlocks.join('\n\n'));
+        }
+
+        if (loadedCount > 0) {
+            console.log(`[CardTypes] Loaded ${loadedCount} instance override(s)`);
+        }
+    } catch (e) {
+        // .notebook/ doesn't exist or other error
+        if (e.name !== 'NotFoundError') {
+            console.error('[CardTypes] Error loading instance overrides:', e);
+        }
+    }
+}
+
 // Fetch default theme.css content from /defaults/theme.css
 async function fetchDefaultThemeContent() {
     if (defaultThemeContentCache !== null) {
@@ -855,8 +977,9 @@ const SETTINGS_SCHEMA = {
     notebook_title: { default: 'Research Notebook' },
     notebook_subtitle: { default: 'Bookmarks, notes, and connections' },
     sections: { default: [
-        { name: 'Assets', path: 'assets', visible: false },
-        { name: 'System', path: '.', visible: false }
+        { dir: 'assets', visible: false },
+        { dir: '.', visible: false },
+        { dir: '.notebook', visible: false }
     ] },
     default_author: { default: null },
     authors: { default: [{ name: 'Claude', icon: 'claude.svg' }] },
@@ -937,54 +1060,53 @@ async function loadSettings(dirHandle) {
     return notebookSettings;
 }
 
-// Check if a section path includes root directory ('.')
-// This identifies the System section
-// Path can be '.' or an array like ['.', '.notebook', '.notebook/templates']
-function sectionPathIncludesRoot(path) {
-    if (!path) return false;
-    if (Array.isArray(path)) return path.includes('.');
-    return path === '.';
+// Check if a section dir is a special section ([root] or .notebook)
+// These sections have fixed names and cannot be renamed
+function isSpecialSection(dirOrPath) {
+    if (!dirOrPath) return false;
+    if (Array.isArray(dirOrPath)) return dirOrPath.includes('.') || dirOrPath.includes('.notebook');
+    return dirOrPath === '.' || dirOrPath === '.notebook';
 }
 
-// Normalize sections format: convert string array to records format
-// Old format: ['research', 'projects']
-// New format: [{name: 'research', visible: true}, {name: 'projects', visible: true}]
+// Legacy alias for backwards compatibility
+function sectionPathIncludesRoot(path) {
+    return isSpecialSection(path);
+}
+
+// Normalize sections format: convert various formats to canonical {dir, visible} records
+// Supported formats:
+//   - String: 'research' -> {dir: 'research', visible: true}
+//   - New format: {dir: 'research', visible: true}
+//   - Legacy format: {name: 'Research', visible: true} or {name: 'Research', path: 'research'}
+//   - Root/config sections: {dir: '.'} or {dir: '.notebook'}
 function normalizeSectionsFormat(sections) {
     if (!Array.isArray(sections)) return [];
     const normalized = sections.map(s => {
         if (typeof s === 'string') {
-            return { name: s, visible: true };
+            return { dir: s, visible: true };
         }
-        // Already an object, preserve path and ensure visible has a default
-        const record = { name: s.name || '', visible: s.visible !== false };
-        if (s.path) record.path = s.path;
-        // Normalize System section path to canonical array
-        // This upgrades old `path: '.'` to the full array
-        if (sectionPathIncludesRoot(record.path)) {
-            record.path = ['.', '.notebook', '.notebook/templates'];
+        // Determine dir from available fields (prefer dir, then path, then slugified name)
+        let dir = s.dir || s.path || (s.name ? slugify(s.name) : '');
+        // Handle legacy array path format (e.g., ['.', '.notebook'] → '.')
+        if (Array.isArray(dir)) {
+            dir = dir.includes('.') ? '.' : dir[0] || '';
         }
+        const record = { dir, visible: s.visible !== false };
         return record;
     });
-    // Ensure System section always exists (hidden by default)
-    // Path array documents what it covers (actual loading is hardcoded)
-    if (!normalized.some(s => sectionPathIncludesRoot(s.path))) {
-        normalized.push({ name: 'System', path: ['.', '.notebook', '.notebook/templates'], visible: false });
+    // Ensure root and .notebook sections always exist (hidden by default)
+    if (!normalized.some(s => s.dir === '.')) {
+        normalized.push({ dir: '.', visible: false });
+    }
+    if (!normalized.some(s => s.dir === '.notebook')) {
+        normalized.push({ dir: '.notebook', visible: false });
     }
     return normalized;
 }
 
-// Convert sections records to simple names array for filesystem operations
-function getSectionNames(sections) {
-    return normalizeSectionsFormat(sections).map(s => s.name);
-}
-
-// Check if the System section (root files) is visible in settings
-function getSystemSectionVisible() {
-    if (!notebookSettings?.sections) return false;
-    const systemSection = notebookSettings.sections.find(s =>
-        typeof s === 'object' && sectionPathIncludesRoot(s.path)
-    );
-    return systemSection?.visible === true;
+// Convert sections records to directory names array for filesystem operations
+function getSectionDirs(sections) {
+    return normalizeSectionsFormat(sections).map(s => s.dir);
 }
 
 // Load roster from .notebook/roster.yaml (optional student name mappings)
@@ -1098,7 +1220,7 @@ async function loadAuthors(dirHandle) {
     return authorRegistry;
 }
 
-// Load templates from .notebook/templates/
+// Load templates: core card types + instance overrides from .notebook/card-types/
 async function loadTemplates(dirHandle) {
     // Fetch default templates from server (ensures settings is always available)
     // Pass enabled_templates from settings to control which card types get fully loaded
@@ -1110,60 +1232,9 @@ async function loadTemplates(dirHandle) {
         return templateRegistry;
     }
 
-    const templatesToUpdate = [];
-
-    // Load from .notebook/templates/
-    const templatesDir = await getNotebookTemplatesDir(dirHandle, false);
-    if (templatesDir) {
-        try {
-            for await (const [name, handle] of templatesDir.entries()) {
-                if (handle.kind === 'file' && name.endsWith('.yaml')) {
-                    try {
-                        const file = await handle.getFile();
-                        const content = await file.text();
-                        const template = jsyaml.load(content);
-                        if (template && template.name) {
-                            // Deep merge: user overrides win, but new default fields are inherited
-                            const defaultTemplate = defaults[template.name];
-                            const mergedTemplate = defaultTemplate
-                                ? deepMerge(defaultTemplate, template)
-                                : template;
-                            templateRegistry[template.name] = mergedTemplate;
-
-                            // Check if merge added new fields - if so, save updated template
-                            if (defaultTemplate) {
-                                const mergedYaml = jsyaml.dump(mergedTemplate, { indent: 2, lineWidth: -1, quotingType: '"', forceQuotes: false });
-                                if (mergedYaml !== content) {
-                                    templatesToUpdate.push({ name, handle, content: mergedYaml });
-                                    console.log(`[Templates] Loaded ${name} (will update with new defaults)`);
-                                } else {
-                                    console.log(`[Templates] Loaded ${name}`);
-                                }
-                            } else {
-                                console.log(`[Templates] Loaded ${name} (custom template)`);
-                            }
-                        }
-                    } catch (e) {
-                        console.error(`[Templates] Error parsing ${name}:`, e);
-                    }
-                }
-            }
-        } catch (e) {
-            console.error('[Templates] Error scanning .notebook/templates/:', e);
-        }
-    }
-
-    // Save any templates that were updated with new defaults
-    for (const { name, handle, content } of templatesToUpdate) {
-        try {
-            const writable = await handle.createWritable();
-            await writable.write(content);
-            await writable.close();
-            console.log(`[Templates] Updated ${name} with new defaults`);
-        } catch (e) {
-            console.error(`[Templates] Error saving ${name}:`, e);
-        }
-    }
+    // Load instance card type overrides from .notebook/card-types/
+    // (template.yaml, styles.css, index.js - all optional, deep-merged with core)
+    await loadInstanceCardTypes(dirHandle);
 
     // Expose templateRegistry to framework.js for card type modules
     if (window.notebook) {
@@ -1266,21 +1337,14 @@ async function ensureTemplateFiles(dirHandle) {
 
     let createdFiles = [];
 
-    // Get or create .notebook directory
+    // Get or create .notebook directory (and .notebook/templates/ for user content)
     const configDir = await getNotebookConfigDir(dirHandle, true);
-    const templatesDir = await getNotebookTemplatesDir(dirHandle, true);
+    await getNotebookTemplatesDir(dirHandle, true);  // Create but don't populate
 
     // Files to create in .notebook/
     const configFiles = [
         { name: 'settings.yaml', getContent: getDefaultSettingsContent },
         { name: 'theme.css', getContent: getDefaultThemeContent }
-    ];
-
-    // Template files to create in .notebook/templates/
-    const templateFiles = [
-        { name: 'note.yaml', getContent: () => getTemplateFileContent('note') },
-        { name: 'code.yaml', getContent: () => getTemplateFileContent('code') },
-        { name: 'bookmark.yaml', getContent: () => getTemplateFileContent('bookmark') }
     ];
 
     // Create config files in .notebook/
@@ -1303,25 +1367,8 @@ async function ensureTemplateFiles(dirHandle) {
         }
     }
 
-    // Create template files in .notebook/templates/
-    for (const { name, getContent } of templateFiles) {
-        try {
-            await templatesDir.getFileHandle(name);
-            // File exists, don't overwrite
-        } catch (e) {
-            // File doesn't exist, create it
-            try {
-                const fileHandle = await templatesDir.getFileHandle(name, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(getContent());
-                await writable.close();
-                createdFiles.push(`.notebook/templates/${name}`);
-                console.log(`[Templates] Created .notebook/templates/${name}`);
-            } catch (writeError) {
-                console.error(`[Templates] Error creating .notebook/templates/${name}:`, writeError);
-            }
-        }
-    }
+    // Note: Card type templates are no longer auto-created here.
+    // Users can override card types via .notebook/card-types/{type}/
 
     // Ensure assets/author-icons directory and default claude.svg exist
     try {
@@ -1349,96 +1396,6 @@ async function ensureTemplateFiles(dirHandle) {
 
     if (createdFiles.length > 0) {
         showToast(`Created config files: ${createdFiles.join(', ')}`);
-    }
-
-    return createdFiles;
-}
-
-// Ensure template files exist for card types that are already in use
-// This supports customization of existing cards without auto-creating
-// templates the user may have intentionally removed
-async function ensureTemplatesForExistingCards(dirHandle, loadedData) {
-    if (!dirHandle) return [];
-
-    // Collect all template types in use across all sections
-    const templateTypesInUse = new Set();
-    for (const section of loadedData.sections || []) {
-        for (const item of section.items || []) {
-            const templateName = item.template || item.type;
-            if (templateName) {
-                templateTypesInUse.add(templateName);
-            }
-        }
-    }
-
-    if (templateTypesInUse.size === 0) {
-        return [];
-    }
-
-    // Standard template names we know about
-    const knownTemplates = ['note', 'code', 'bookmark'];
-
-    let createdFiles = [];
-
-    // Get .notebook/templates/ directory (may not exist yet)
-    const templatesDir = await getNotebookTemplatesDir(dirHandle, false);
-
-    for (const templateName of templateTypesInUse) {
-        if (!knownTemplates.includes(templateName)) continue;  // Skip unknown/custom templates
-
-        // Check if template file exists in .notebook/templates/
-        let exists = false;
-        if (templatesDir) {
-            try {
-                await templatesDir.getFileHandle(`${templateName}.yaml`);
-                exists = true;
-            } catch (e) {
-                // Not found
-            }
-        }
-
-        if (!exists) {
-            // Template doesn't exist, create it
-            try {
-                const newTemplatesDir = await getNotebookTemplatesDir(dirHandle, true);
-                const content = getTemplateFileContent(templateName);
-                const newFilename = `${templateName}.yaml`;
-                const fileHandle = await newTemplatesDir.getFileHandle(newFilename, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(content);
-                await writable.close();
-                const savedPath = `.notebook/templates/${newFilename}`;
-                createdFiles.push(savedPath);
-                console.log(`[Templates] Created ${savedPath} for existing ${templateName} cards`);
-
-                // Add to systemNotes so it appears in System section
-                const parsed = jsyaml.load(content);
-                loadedData.systemNotes.push({
-                    template: 'template',
-                    system: true,
-                    id: 'system-' + templateName + '.template.yaml',
-                    filename: savedPath,
-                    title: templateName + ' (template)',
-                    name: parsed.name || templateName,
-                    description: parsed.description || '',
-                    schema: parsed.schema || {},
-                    card: parsed.card || {},
-                    viewer: parsed.viewer || {},
-                    editor: parsed.editor || {},
-                    style: parsed.style || {},
-                    ui: parsed.ui || {},
-                    modified: new Date().toISOString()
-                });
-            } catch (writeError) {
-                console.error(`[Templates] Error creating template for ${templateName}:`, writeError);
-            }
-        }
-    }
-
-    if (createdFiles.length > 0) {
-        showToast(`Created templates for existing cards: ${createdFiles.join(', ')}`);
-        // Reload templates so the registry has the newly created templates
-        await loadTemplates(dirHandle);
     }
 
     return createdFiles;
@@ -2104,19 +2061,10 @@ function renderCardMeta(card, template) {
 let currentViewingCard = null;
 
 function openViewer(sectionId, itemId) {
-    let card;
-    const isSystemNote = sectionId === '_system';
     // Convert itemId to string for comparison (YAML may parse numeric IDs as numbers)
     const itemIdStr = String(itemId);
-
-    if (isSystemNote) {
-        card = data.systemNotes?.find(n => String(n.id) === itemIdStr);
-    } else {
-        const section = data.sections.find(s => s.id === sectionId);
-        if (section) {
-            card = section.items.find(i => String(i.id) === itemIdStr);
-        }
-    }
+    const section = data.sections.find(s => s.id === sectionId);
+    const card = section?.items.find(i => String(i.id) === itemIdStr);
 
     if (!card) {
         console.warn(`[Viewer] Card not found: ${sectionId}/${itemId}`);
@@ -2313,9 +2261,6 @@ function findCardById(cardId) {
         const item = section.items.find(i => String(i.id) === cardIdStr);
         if (item) return item;
     }
-    // Also check systemNotes
-    const systemNote = data.systemNotes?.find(n => String(n.id) === cardIdStr);
-    if (systemNote) return systemNote;
     return null;
 }
 
@@ -2498,29 +2443,9 @@ async function deleteViewerCard() {
     if (!currentViewingCard) return;
     const sectionId = currentViewingCard.sectionId;
     const cardId = currentViewingCard.id;
-    const isSystemNote = sectionId === '_system';
     const templateName = currentViewingCard.template || currentViewingCard.type;
     closeViewer();
-
-    if (isSystemNote) {
-        if (!confirm('Delete this system note? The file will be removed from your notebook folder.')) return;
-
-        const note = data.systemNotes?.find(n => n.id === cardId);
-        if (note && notebookDirHandle) {
-            try {
-                await notebookDirHandle.removeEntry(note.filename);
-            } catch (e) {
-                console.warn('[Filesystem] Could not delete system note file:', e);
-            }
-        }
-
-        data.systemNotes = data.systemNotes?.filter(n => n.id !== cardId) || [];
-        await saveData();
-        render();
-        showToast('System note deleted');
-    } else {
-        await confirmDeleteItem(sectionId, cardId, templateName);
-    }
+    await confirmDeleteItem(sectionId, cardId, templateName);
 }
 
 // Merge current template with defaults (adds missing fields, keeps customizations)
@@ -2551,14 +2476,15 @@ async function mergeTemplateDefaults() {
 
     const merged = deepMerge(defaults, currentValues);
 
-    // Find and update the actual system note
-    const systemNote = data.systemNotes?.find(n => n.id === card.id);
-    if (systemNote) {
-        Object.assign(systemNote, merged);
-        await saveCardFile('_system', systemNote);
+    // Find and update the actual card in its section
+    const section = data.sections.find(s => s.items.some(i => i.id === card.id));
+    const actualCard = section?.items.find(i => i.id === card.id);
+    if (actualCard && section) {
+        Object.assign(actualCard, merged);
+        await saveCardFile(section.id, actualCard);
         await loadTemplates();
         render();
-        openViewer('_system', card.id);
+        openViewer(section.id, card.id);
         showToast('Template merged with defaults');
     }
 }
@@ -2577,33 +2503,35 @@ async function resetSystemCardDefaults() {
     const filename = card.filename || (card.name + '.template.yaml');
     if (!confirm(`Reset ${filename} to defaults? Your customizations will be lost.`)) return;
 
-    // Find and update the actual system note
-    const systemNote = data.systemNotes?.find(n => n.id === card.id);
-    if (!systemNote) return;
+    // Find and update the actual card in its section
+    const section = data.sections.find(s => s.items.some(i => i.id === card.id));
+    const actualCard = section?.items.find(i => i.id === card.id);
+    if (!actualCard || !section) return;
 
     if (card.template === 'template') {
         // Template file - replace with default template object
         const defaults = getDefaultTemplates()[card.name];
         const preserved = {
-            id: systemNote.id,
-            filename: systemNote.filename,
-            template: systemNote.template,
-            system: systemNote.system,
-            title: systemNote.title,
+            id: actualCard.id,
+            filename: actualCard.filename,
+            _path: actualCard._path,
+            template: actualCard.template,
+            system: actualCard.system,
+            title: actualCard.title,
             modified: new Date().toISOString()
         };
-        Object.assign(systemNote, defaults, preserved);
-        await saveCardFile('_system', systemNote);
+        Object.assign(actualCard, defaults, preserved);
+        await saveCardFile(section.id, actualCard);
         await loadTemplates();
     } else {
         // Markdown file (README.md, CLAUDE.md) - replace content
-        systemNote.content = defaultContent;
-        systemNote.modified = new Date().toISOString();
-        await saveCardFile('_system', systemNote);
+        actualCard.content = defaultContent;
+        actualCard.modified = new Date().toISOString();
+        await saveCardFile(section.id, actualCard);
     }
 
     render();
-    openViewer('_system', card.id);
+    openViewer(section.id, card.id);
     showToast(`${filename} reset to defaults`);
 }
 
@@ -2914,57 +2842,44 @@ function openEditor(templateName, sectionId, card = null) {
     const bodyEl = document.getElementById('editorBody');
     bodyEl.innerHTML = '';
 
-    // Location display (read-only for regular cards)
-    if (sectionId !== '_system') {
-        const section = data.sections.find(s => s.id === sectionId);
-        const sectionDirName = section?._dirName || sectionId.replace('section-', '');
+    // Location display (read-only)
+    const section = data.sections.find(s => s.id === sectionId);
+    const sectionDirName = section?._dirName || sectionId.replace('section-', '');
 
-        // For existing cards, use their path; for new cards, use section + focused subdir
-        let locationPath;
-        if (card && card._path) {
-            locationPath = card._path;
-        } else {
-            // New card: inherit from focus mode or default to section root
-            const focusSubdir = focusedPath && focusedPath.includes('/')
-                ? getSubdirFromPath(focusedPath)
-                : null;
-            locationPath = focusSubdir ? `${sectionDirName}/${focusSubdir}` : sectionDirName;
-        }
-
-        // Store computed path for saveEditorCard
-        editingCard.locationPath = locationPath;
-
-        const locationGroup = document.createElement('div');
-        locationGroup.className = 'form-group';
-        locationGroup.innerHTML = `
-            <label>Location</label>
-            <input type="text" value="${escapeHtml(locationPath)}" disabled class="location-readonly" title="File location (use terminal to move files)">
-        `;
-        bodyEl.appendChild(locationGroup);
+    // For existing cards, use their path; for new cards, use section + focused subdir
+    let locationPath;
+    if (card && card._path) {
+        locationPath = card._path;
     } else {
-        // System section: show location selector using standard subdirectory UI
-        // Get subdirs from existing system notes using getSystemSubdir()
-        const systemSubdirs = [...new Set(data.systemNotes.map(n => getSystemSubdir(n)))].sort();
-        // Ensure all standard locations are available
-        const allLocations = [...new Set(['root', '.notebook', '.notebook/templates', ...systemSubdirs])].sort();
-        const currentSubdir = card ? getSystemSubdir(card) : 'root';
-
-        const subdirGroup = document.createElement('div');
-        subdirGroup.className = 'form-group';
-        subdirGroup.innerHTML = `
-            <label for="editorSubdir">Location</label>
-            <select id="editorSubdir">
-                ${allLocations.map(loc => `
-                    <option value="${escapeHtml(loc)}" ${loc === currentSubdir ? 'selected' : ''}>${escapeHtml(loc)}</option>
-                `).join('')}
-            </select>
-        `;
-        bodyEl.appendChild(subdirGroup);
+        // New card: inherit from focus mode or default to section root
+        const focusSubdir = focusedPath && focusedPath.includes('/')
+            ? getSubdirFromPath(focusedPath)
+            : null;
+        locationPath = focusSubdir ? `${sectionDirName}/${focusSubdir}` : sectionDirName;
     }
+
+    // Store computed path for saveEditorCard
+    editingCard.locationPath = locationPath;
+
+    const locationGroup = document.createElement('div');
+    locationGroup.className = 'form-group';
+    locationGroup.innerHTML = `
+        <label>Location</label>
+        <input type="text" value="${escapeHtml(locationPath)}" disabled class="location-readonly" title="File location (use terminal to move files)">
+    `;
+    bodyEl.appendChild(locationGroup);
 
     // Render each field from template.editor.fields
     const fields = template.editor?.fields || [];
     for (const fieldConfig of fields) {
+        // Check showIf condition (e.g., showIf: { field: 'enabled_templates', includes: 'quiz' })
+        if (fieldConfig.showIf) {
+            const checkValue = card?.[fieldConfig.showIf.field] || [];
+            const arr = Array.isArray(checkValue) ? checkValue : [checkValue];
+            if (fieldConfig.showIf.includes && !arr.includes(fieldConfig.showIf.includes)) {
+                continue; // Skip this field - condition not met
+            }
+        }
         const fieldDef = template.schema[fieldConfig.field];
         const value = card ? card[fieldConfig.field] : (fieldDef?.default || '');
         const fieldEl = renderEditorField(fieldConfig, fieldDef, value);
@@ -3603,8 +3518,8 @@ function createRecordsEditorItem(field, schema, record, index, allowDelete) {
     row.setAttribute('data-index', index);
     row.setAttribute('draggable', 'true');
 
-    // Detect if this is the System section (path includes '.')
-    const isSystemSection = sectionPathIncludesRoot(record.path);
+    // Detect if this is the System section (path or dir includes '.')
+    const isSystemSection = sectionPathIncludesRoot(record.path) || sectionPathIncludesRoot(record.dir);
     if (isSystemSection) {
         row.classList.add('is-system-section');
     }
@@ -5115,31 +5030,6 @@ async function saveEditor() {
     submitBtn.innerHTML = '<span class="loading-spinner"></span> Saving...';
 
     try {
-        // Handle system notes
-        if (sectionId === '_system') {
-            cardData.system = true;
-            // Get selected location for system notes (root, .notebook, .notebook/templates)
-            const subdirSelect = document.getElementById('editorSubdir');
-            const selectedLocation = subdirSelect ? subdirSelect.value : (card._path || 'root');
-            cardData._path = selectedLocation === 'root' ? null : selectedLocation;
-
-            const idx = data.systemNotes.findIndex(n => n.id === card.id);
-            if (idx >= 0) {
-                // Update existing system note
-                cardData.filename = card.filename;
-                data.systemNotes[idx] = { ...data.systemNotes[idx], ...cardData };
-            } else {
-                // Add new system note
-                data.systemNotes.push(cardData);
-            }
-            await saveData();
-            await saveCardFile('_system', cardData);
-            closeEditor();
-            render();
-            showToast('System note saved');
-            return;
-        }
-
         // Update or add card in section
         const section = data.sections.find(s => s.id === sectionId);
         if (section) {
@@ -5374,17 +5264,17 @@ async function loadFromFilesystem(dirHandle) {
     const loadedData = {
         title: notebookSettings?.notebook_title || 'Research Notebook',
         subtitle: notebookSettings?.notebook_subtitle || 'Bookmarks, notes, and connections',
-        sections: [],
-        systemNotes: []
+        sections: []
     };
 
     try {
 
-        // Read system notes:
-        // - Config files from .notebook/ (settings.yaml, theme.css, templates/*.yaml)
-        // - User files from root (README.md, CLAUDE.md, etc.)
+        // Load [root] section items (README.md, CLAUDE.md, etc.)
+        // and .notebook section items (settings.yaml, theme.css, templates/)
 
         const excludedExtensions = ['.json', '.html', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico'];
+        const rootItems = [];
+        const notebookItems = [];
 
         // Load config files from .notebook/ directory
         const configDir = await getNotebookConfigDir(dirHandle, false);
@@ -5393,11 +5283,12 @@ async function loadFromFilesystem(dirHandle) {
             try {
                 const settingsHandle = await configDir.getFileHandle('settings.yaml');
                 const file = await settingsHandle.getFile();
-                loadedData.systemNotes.push({
+                notebookItems.push({
                     template: 'settings',
                     system: true,
                     id: 'system-settings.yaml',
-                    filename: '.notebook/settings.yaml',
+                    filename: 'settings.yaml',
+                    _path: '.notebook',
                     title: 'Settings',
                     notebook_title: notebookSettings?.notebook_title || 'Research Notebook',
                     notebook_subtitle: notebookSettings?.notebook_subtitle || '',
@@ -5418,11 +5309,12 @@ async function loadFromFilesystem(dirHandle) {
                 const themeHandle = await configDir.getFileHandle('theme.css');
                 const file = await themeHandle.getFile();
                 const content = await file.text();
-                loadedData.systemNotes.push({
+                notebookItems.push({
                     template: 'theme',
                     system: true,
                     id: 'system-theme.css',
-                    filename: '.notebook/theme.css',
+                    filename: 'theme.css',
+                    _path: '.notebook',
                     title: 'Theme',
                     content: content,
                     modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
@@ -5442,11 +5334,12 @@ async function loadFromFilesystem(dirHandle) {
                         const content = await file.text();
                         const parsed = jsyaml.load(content);
                         const templateName = filename.replace(/\.yaml$/, '');
-                        loadedData.systemNotes.push({
+                        notebookItems.push({
                             template: 'template',
                             system: true,
                             id: 'system-' + templateName + '.template.yaml',
-                            filename: `.notebook/templates/${filename}`,
+                            filename: filename,
+                            _path: '.notebook/templates',
                             title: templateName + ' (template)',
                             name: parsed.name || templateName,
                             description: parsed.description || '',
@@ -5497,20 +5390,52 @@ async function loadFromFilesystem(dirHandle) {
                 if (isMarkdown) format = 'markdown';
                 else if (isYaml) format = 'yaml';
 
-                loadedData.systemNotes.push({
+                rootItems.push({
                     type: 'note',
                     system: true,
                     id: 'system-' + filename,
                     filename: filename,
+                    _path: '.',
                     title: titleFromFilename,
                     content: content,
                     format: format,
                     modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
                 });
-                console.log(`[Filesystem] Loaded system note: ${filename} (${format})`);
+                console.log(`[Filesystem] Loaded root file: ${filename} (${format})`);
             } catch (e) {
-                console.error(`[Filesystem] Error reading system note ${filename}:`, e);
+                console.error(`[Filesystem] Error reading root file ${filename}:`, e);
             }
+        }
+
+        // Create [root] section if it has items
+        if (rootItems.length > 0) {
+            const rootSettingsMatch = notebookSettings?.sections?.find(s =>
+                typeof s === 'object' && s.dir === '.'
+            );
+            loadedData.sections.push({
+                id: 'section-.',
+                items: rootItems,
+                visible: rootSettingsMatch?.visible === true,
+                _dirName: '.'
+            });
+            console.log(`[Filesystem] Created [root] section with ${rootItems.length} items`);
+        }
+
+        // Create .notebook section if it has items
+        if (notebookItems.length > 0) {
+            const notebookSettingsMatch = notebookSettings?.sections?.find(s =>
+                typeof s === 'object' && s.dir === '.notebook'
+            );
+            // Track subdirs from _path fields
+            const subdirPaths = [...new Set(notebookItems.map(i => i._path).filter(p => p && p !== '.notebook'))];
+            loadedData.sections.push({
+                id: 'section-.notebook',
+                items: notebookItems,
+                visible: notebookSettingsMatch?.visible === true,
+                _dirName: '.notebook',
+                _subdirPaths: subdirPaths
+            });
+            console.log(`[Filesystem] Created .notebook section with ${notebookItems.length} items`);
         }
 
         // Helper function to load cards from a section directory
@@ -5706,11 +5631,14 @@ async function loadFromFilesystem(dirHandle) {
         console.log(`[Filesystem] Discovered ${discoveredSections.size} section directories`);
 
         // Load sections and match to settings
-        // Filter out System section (path includes '.') and legacy _system - they're virtual, not directories
+        // Filter out [root] and .notebook sections (loaded specially above) and legacy _system
         const sectionsFromSettings = (notebookSettings?.sections || []).filter(s => {
             if (typeof s === 'string') return !s.startsWith('_');
-            if (sectionPathIncludesRoot(s.path)) return false; // System section (root files)
-            return s.name && !s.name.startsWith('_');
+            const dir = s.dir || s.path;
+            // Skip [root] section (dir === '.' or array containing '.') and .notebook section
+            if (dir === '.' || dir === '.notebook') return false;
+            if (Array.isArray(dir) && dir.includes('.')) return false;
+            return s.name || s.dir;  // Accept either name or dir field
         });
 
         // Build lookup map for matching directories to settings
@@ -5807,26 +5735,14 @@ async function loadFromFilesystem(dirHandle) {
 
         // Update the settings card to reflect discovered sections
         // (The card was created before section discovery, so it may be out of sync)
-        const settingsCard = loadedData.systemNotes.find(n => n.template === 'settings');
+        const notebookSection = loadedData.sections.find(s => s._dirName === '.notebook');
+        const settingsCard = notebookSection?.items.find(n => n.template === 'settings');
         if (settingsCard) {
             settingsCard.sections = loadedData.sections.map(s => ({
                 dir: s._dirName,
                 visible: s.visible !== false
             }));
-            // Ensure System section (root files, dir includes '.') is included
-            if (!settingsCard.sections.some(s => sectionPathIncludesRoot(s.dir))) {
-                // Check original settings for visibility preference
-                const originalSystem = notebookSettings?.sections?.find(s =>
-                    typeof s === 'object' && sectionPathIncludesRoot(s.dir || s.path)
-                );
-                const visible = originalSystem?.visible === true;
-                settingsCard.sections.push({ dir: '.', visible });
-            }
         }
-
-        // Create template files for card types that exist but don't have template files
-        // This supports customization without auto-creating templates for empty types
-        await ensureTemplatesForExistingCards(dirHandle, loadedData);
 
         return loadedData;
 
@@ -5860,36 +5776,7 @@ async function saveToFilesystem(dirHandle) {
 
         // Note: Section directories are created by createSectionDir() after this function
         // Card files are saved incrementally by saveCardFile()
-
-        // Write system notes (text files at root)
-        if (data.systemNotes) {
-            for (const note of data.systemNotes) {
-                // For raw text/yaml notes, preserve original filename
-                // For markdown notes, use title + .md
-                const newFilename = (note.format === 'text' || note.format === 'yaml') ? note.filename : (note.title + '.md');
-                const oldFilename = note.filename;
-
-                // If filename changed (markdown notes only), delete old file
-                if (oldFilename && oldFilename !== newFilename) {
-                    try {
-                        await dirHandle.removeEntry(oldFilename);
-                        console.log(`[Filesystem] Deleted old system note: ${oldFilename}`);
-                    } catch (e) {
-                        // Old file might not exist
-                    }
-                }
-
-                // Write with filename
-                const fileHandle = await dirHandle.getFileHandle(newFilename, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(note.content);
-                await writable.close();
-
-                // Update filename in note object
-                note.filename = newFilename;
-                note.id = 'system-' + newFilename;
-            }
-        }
+        // Root files and .notebook files are saved via saveCardFile() for their sections
 
         console.log('[Filesystem] Save complete');
     } catch (error) {
@@ -6096,27 +5983,32 @@ async function saveCardFile(sectionId, card) {
         return;
     }
 
-    // System notes are handled specially (saved with raw content)
-    if (sectionId === '_system' && card.system) {
-        const baseFilename = card.filename
-            ? card.filename.split('/').pop()  // Get just the filename part if path included
-            : (card.title + '.md');
+    // System notes (root files like README.md, CLAUDE.md) are saved with raw content
+    // They're in section '.' and have system: true flag
+    if (card.system && card.type === 'note') {
+        const baseFilename = card.filename || (card.title + '.md');
 
+        // Cards in section '.' go to root, cards in section '.notebook' follow _path
         let targetDir, savedPath;
+        const section = data.sections.find(s => s.id === sectionId);
+        const sectionDir = section?._dirName;
 
-        // Handle location selection: 'root', '.notebook', '.notebook/templates', or null
-        // System cards use _path for location (e.g., '.notebook/templates', '.notebook', or root)
-        const systemPath = card._path || null;
-        if (systemPath === '.notebook/templates') {
-            // Save to .notebook/templates/ directory
-            targetDir = await getNotebookTemplatesDir(notebookDirHandle, true);
-            savedPath = `.notebook/templates/${baseFilename}`;
-        } else if (systemPath === '.notebook') {
-            // Save to .notebook/ directory
-            targetDir = await getNotebookConfigDir(notebookDirHandle, true);
-            savedPath = `.notebook/${baseFilename}`;
+        if (sectionDir === '.') {
+            // Root files (README.md, CLAUDE.md)
+            targetDir = notebookDirHandle;
+            savedPath = baseFilename;
+        } else if (sectionDir === '.notebook') {
+            // .notebook files - check _path for subdirs like templates/
+            const subPath = card._path;
+            if (subPath === '.notebook/templates') {
+                targetDir = await getNotebookTemplatesDir(notebookDirHandle, true);
+                savedPath = `.notebook/templates/${baseFilename}`;
+            } else {
+                targetDir = await getNotebookConfigDir(notebookDirHandle, true);
+                savedPath = `.notebook/${baseFilename}`;
+            }
         } else {
-            // Save to root (includes 'root' value and null/undefined)
+            // Shouldn't happen, but fallback to regular save path
             targetDir = notebookDirHandle;
             savedPath = baseFilename;
         }
@@ -6125,8 +6017,7 @@ async function saveCardFile(sectionId, card) {
         const writable = await fileHandle.createWritable();
         await writable.write(card.content);
         await writable.close();
-        card.filename = savedPath;
-        card.id = 'system-' + savedPath.replace('/', '-');
+        card.filename = baseFilename;
         recordSave(savedPath);
         console.log('[Filesystem] Saved system note:', savedPath);
         return;
@@ -6256,6 +6147,15 @@ async function getSectionDirHandle(sectionOrName, options = {}) {
 
     // Use stored _dirName if available (from filesystem load), otherwise slugify name
     const sectionSlug = section?._dirName || slugify(section?.name || sectionOrName);
+
+    // Special handling for root and .notebook directories
+    if (sectionSlug === '.') {
+        return { handle: notebookDirHandle, path: '.' };
+    }
+    if (sectionSlug === '.notebook') {
+        const handle = await notebookDirHandle.getDirectoryHandle('.notebook', options);
+        return { handle, path: '.notebook' };
+    }
 
     const handle = await notebookDirHandle.getDirectoryHandle(sectionSlug, options);
     return { handle, path: sectionSlug };
@@ -6539,7 +6439,6 @@ async function linkNotebookFolder() {
         } else {
             // New notebook: start empty, user adds sections via Add Section button
             data.sections = [];
-            data.systemNotes = [];  // Clear system notes from previous notebook
             await saveToFilesystem(handle);
             await ensureTemplateFiles(handle);  // Create template files for new notebooks
             // Reload to pick up the newly created system notes
@@ -6801,8 +6700,9 @@ async function createSection() {
 // Open settings editor (template-based approach)
 // This opens the generic editor for the settings.yaml system card
 function openSettingsEditor() {
-    // Find the settings card in systemNotes
-    let settingsCard = data.systemNotes?.find(n => n.template === 'settings' || n.filename === 'settings.yaml');
+    // Find the settings card in the .notebook section
+    const notebookSection = data.sections.find(s => s._dirName === '.notebook');
+    let settingsCard = notebookSection?.items.find(n => n.template === 'settings' || n.filename === 'settings.yaml');
 
     // If no settings card exists, create one with current values
     if (!settingsCard) {
@@ -6811,21 +6711,30 @@ function openSettingsEditor() {
             system: true,
             id: 'system-settings.yaml',
             filename: 'settings.yaml',
+            _path: '.notebook',
             title: 'Settings',
             notebook_title: data.title || 'Research Notebook',
             notebook_subtitle: data.subtitle || '',
-            sections: data.sections.map(s => ({ name: slugify(s.name), visible: s.visible !== false })),
+            sections: data.sections.map(s => ({ dir: s._dirName, visible: s.visible !== false })),
             theme: notebookSettings?.theme || null,
             enabled_templates: notebookSettings?.enabled_templates || null,
             modified: new Date().toISOString()
         };
-        // Add to systemNotes so it appears in the list
-        if (!data.systemNotes) data.systemNotes = [];
-        data.systemNotes.unshift(settingsCard);
+        // Add to .notebook section (create section if needed)
+        if (!notebookSection) {
+            data.sections.push({
+                id: 'section-.notebook',
+                items: [settingsCard],
+                visible: false,
+                _dirName: '.notebook'
+            });
+        } else {
+            notebookSection.items.unshift(settingsCard);
+        }
     }
 
     // Open the generic editor with the settings card
-    openEditor('settings', '_system', settingsCard);
+    openEditor('settings', 'section-.notebook', settingsCard);
 }
 
 // Change to a different notebook folder
@@ -7819,14 +7728,6 @@ function renderItemsWithSubsections(items, sectionId, getSubdir = item => getSub
     return html;
 }
 
-// Helper: derive subdirectory from system note filename
-function getSystemSubdir(note) {
-    const filename = note.filename || '';
-    if (filename.startsWith('.notebook/templates/')) return '.notebook/templates';
-    if (filename.startsWith('.notebook/')) return '.notebook';
-    return 'root';  // Root files (CLAUDE.md, README.md, etc.)
-}
-
 // Render focus breadcrumb bar
 function renderFocusBreadcrumb() {
     if (!focusedPath) return '';
@@ -7865,14 +7766,10 @@ function render() {
         .filter(s => s.visible !== false)
         .filter(s => sectionMatchesFocus(s));
 
-    // Check if _system section is visible (from settings) - hide when focused
-    const systemSectionVisible = getSystemSectionVisible() && !focusedPath;
-    const hasSystemNotes = systemSectionVisible && data.systemNotes && data.systemNotes.length > 0;
-
     // Start with breadcrumb if focused
     let sectionsHtml = renderFocusBreadcrumb();
 
-    if (visibleSections.length === 0 && !hasSystemNotes) {
+    if (visibleSections.length === 0) {
         if (focusedPath) {
             // Focus path doesn't match any section
             content.innerHTML = sectionsHtml + `
@@ -7948,32 +7845,6 @@ function render() {
             </div>
         </div>
     `}).join('');
-
-    // Add System section if enabled and has notes
-    if (hasSystemNotes) {
-        const isCollapsed = collapsedSections.has('_system');
-        const itemCount = data.systemNotes.length;
-
-        sectionsHtml += `
-        <div class="section section-system" data-section-id="_system">
-            <div class="section-header">
-                <button class="section-toggle ${isCollapsed ? 'collapsed' : ''}" onclick="toggleSection('_system')" title="${isCollapsed ? 'Expand' : 'Collapse'}">▼</button>
-                <h2 class="section-title">
-                    <span style="color: var(--text-muted);">System</span>
-                    ${isCollapsed && itemCount > 0 ? `<span class="section-count">(${itemCount})</span>` : ''}
-                </h2>
-                <div class="section-actions">
-                    <button class="btn btn-note btn-small" onclick="openEditor('note', '_system')">
-                        + Note
-                    </button>
-                </div>
-            </div>
-            <div class="items-grid ${isCollapsed ? 'collapsed' : ''}">
-                ${renderItemsWithSubsections(data.systemNotes, '_system', getSystemSubdir)}
-            </div>
-        </div>
-        `;
-    }
 
     content.innerHTML = sectionsHtml;
 

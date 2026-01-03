@@ -3,8 +3,11 @@
   "url": "https://github.com/davidcpage/research-notebook",
   "title": "Research Notebook on GitHub",
   "description": "The source code repository for Research Notebook - a browser-based tool for organizing bookmarks, markdown notes, and executable Python code.\n\nFeatures include:\n- Filesystem-based storage for git versioning\n- In-browser Python execution via Pyodide\n- LaTeX math rendering\n- Internal linking between items",
-  "thumbnail": "../../assets/thumbnails/bookmark-github-repo.png",
+  "thumbnail": "../assets/thumbnails/bookmark-github-repo.png",
   "created": "2024-12-08T09:00:00Z",
-  "modified": "2025-12-08T09:17:16.050Z",
+  "modified": "2026-01-03T17:15:54.582Z",
+  "sectionId": "section-research",
+  "template": "bookmark",
+  "number": 0,
   "type": "bookmark"
 }

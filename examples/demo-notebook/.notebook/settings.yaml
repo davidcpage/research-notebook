@@ -1,18 +1,14 @@
 notebook_title: Research Notebook
 notebook_subtitle: Bookmarks, notes, and connections
 sections:
-  - name: Research
+  - dir: assets
+    visible: false
+  - dir: research
     visible: true
-    path: research
-  - name: Assets
+  - dir: .
+    visible: true
+  - dir: .notebook
     visible: false
-    path: assets
-  - name: System
-    visible: false
-    path:
-      - .
-      - .notebook
-      - .notebook/templates
 default_author: ""
 authors:
   - name: Claude Opus
@@ -23,6 +19,7 @@ hidden_templates: []
 enabled_templates:
   - bookmark
   - code
+  - lesson
   - note
 quiz_template_mode: false
 grading: null

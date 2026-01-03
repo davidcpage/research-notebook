@@ -67,7 +67,12 @@ To add a new card type:
 
 Card rendering, viewer display, and editing all work automatically via templates. CSS is injected into `@layer templates` at runtime.
 
-User overrides: Notebooks can override templates via `.notebook/templates/{type}.yaml`.
+**User overrides**: `.notebook/card-types/{type}/` - complete module override
+
+Instance card type modules in `.notebook/card-types/` are deep-merged with core modules:
+- `template.yaml` - merged (instance wins for conflicting fields)
+- `styles.css` - appended after core CSS (instance wins via cascade)
+- `index.js` - replaces core renderers (must use absolute imports like `/js/framework.js`)
 
 ### Troubleshooting: "Unknown template" errors
 If cards fail to render with `[Render] Unknown template: X` in the console, check for **YAML syntax errors** in the template file.
@@ -81,13 +86,13 @@ If cards fail to render with `[Render] Unknown template: X` in the console, chec
 2. Validate the template file: `python3 -c "import yaml; yaml.safe_load(open('card-types/X/template.yaml'))"`
 3. Common culprits: unquoted colons in descriptions (e.g., `description: Array of {foo: bar}` needs quotes)
 
-**Do NOT** create `.notebook/templates/X.yaml` in a user's notebook to "fix" this - that just works around a broken default template. Fix the source file in `card-types/{type}/template.yaml`.
+**Do NOT** work around template errors by creating overrides in the user's notebook. Fix the source file in `card-types/{type}/template.yaml`.
 
-### System cards (settings, templates, theme)
-- `.notebook/settings.yaml` and `.notebook/templates/*.yaml` are system cards with special templates using `yaml` layout
+### System cards (settings, theme)
+- `.notebook/settings.yaml` is a system card with special `yaml` layout
 - **Theme card**: `.notebook/theme.css` loaded as system card, saving reloads CSS via `loadThemeCss()`
-- **Auto-creation**: `ensureTemplateFiles()` creates `.notebook/` directory structure with settings, theme, and templates for new notebooks. `ensureTemplatesForExistingCards()` creates template files only for card types that have cards but missing templates
-- **Modified indicator**: Template files (note, code, bookmark), README.md, CLAUDE.md, and theme.css show orange "MODIFIED" badge when they differ from defaults. Viewer shows "Show Diff" button (uses jsdiff library), "Merge Defaults" (templates only), and "Reset to Defaults" buttons. Key functions: `isSystemCardModified()`, `getSystemCardDefaultContent()`, `showSystemCardDiff()`, `resetSystemCardDefaults()`
+- **Auto-creation**: `ensureTemplateFiles()` creates `.notebook/` directory structure with settings and theme for new notebooks
+- **Modified indicator**: README.md, CLAUDE.md, and theme.css show orange "MODIFIED" badge when they differ from defaults. Viewer shows "Show Diff" button (uses jsdiff library) and "Reset to Defaults" buttons. Key functions: `isSystemCardModified()`, `getSystemCardDefaultContent()`, `showSystemCardDiff()`, `resetSystemCardDefaults()`
 
 ### Theming
 The app uses a two-layer theme system: base themes + notebook customizations.
@@ -183,8 +188,9 @@ data = {
         { type: 'code', title, code, language, ... }
       ]
     }
-  ],
-  systemNotes: [...]  // Files from notebook root (_system section)
+  ]
+  // Root files (README.md, CLAUDE.md) are in section '.' ([root])
+  // Config files (.notebook/*) are in section '.notebook'
 }
 ```
 
@@ -196,11 +202,12 @@ data = {
 - Generic editor: `editingCard` (in GENERIC_EDITOR section)
 - CodeMirror: `codeMirrorInstances`, `codeMirrorModules` (in GENERIC_EDITOR section)
 
-### System Notes
-- Files at notebook root loaded as "system notes" in `_system` section
-- **Loaded**: `.md`, `.txt`, `.yaml`, `.css` (non-hidden)
-- **Excluded**: `.json`, `.html`, `.js`, images, dotfiles
-- Format field: `.md` → `format: 'markdown'`, others → `format: 'text'`
+### Special Sections
+Two special sections exist for system files:
+- **`section-.`** ("[root]"): Root files (README.md, CLAUDE.md, etc.) - hidden by default
+- **`section-.notebook`** (".notebook"): Config files (settings.yaml, theme.css, templates/) - hidden by default
+
+These sections have fixed names (cannot be renamed in the UI) but can have visibility toggled in Settings.
 
 ### Storage Architecture
 **Filesystem-based** via File System Access API (Chrome/Edge required):
@@ -231,7 +238,7 @@ notebook-folder/
 
 **Subdirectories (Progressive Disclosure):** Sections support arbitrary directory depth. Subdirectories render as collapsible nodes (collapsed by default). Click to expand and reveal items + nested subdirs. Items have `_path` field tracking their full path from notebook root (e.g., `research/responses/batch1`). Use `getSubdirFromPath(_path)` to extract subdir within section. Expansion state persists in localStorage per-notebook via `expandedSubdirs` Set. Key functions: `buildSubdirTree()`, `renderSubdirNode()`, `toggleSubdir()`, `isSubdirExpanded()`, `getSubdirFromPath()`, `getSectionFromPath()`.
 
-**System section:** Config files (`.notebook/*`) and root files (CLAUDE.md, README.md) appear in a virtual "System" section. The section's path is normalized to `['.', '.notebook', '.notebook/templates']` on load. Name and path are frozen in the UI; only visibility is editable. System notes are grouped by filename path (root / .notebook / .notebook/templates). New notes can be created in the System section via the "+ Note" button, with a location selector to choose root, .notebook, or .notebook/templates.
+**Special sections:** Root files (README.md, CLAUDE.md) appear in section `section-.` ("[root]"), and config files (.notebook/*) appear in section `section-.notebook` (".notebook"). Both are hidden by default. Toggle visibility in Settings. These sections have fixed names (cannot be renamed) but support the standard visibility toggle. Items have `system: true` flag and use `_path` for subdirectory tracking (e.g., `.notebook/templates`).
 
 **Why Filesystem?** Claude Code integration, Git versioning, portable files, no size limits.
 
@@ -497,6 +504,3 @@ number: 1.2
 **Lesson cards**: Already have `number` for lesson numbering (e.g., "1.1"), which doubles as sort order. To interleave other cards with lessons, give them a `number` value between lesson numbers.
 
 **Key functions**: `compareVersionNumbers()`, `sortSectionItems()`
-
-### Known Gotcha: System Notes Leak
-When creating a new notebook folder, always clear `data.systemNotes = []` in addition to `data.sections`. Otherwise, system notes from the previously open notebook get copied to the new folder.
