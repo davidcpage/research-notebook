@@ -27,6 +27,11 @@
         padding: 0;
         box-sizing: border-box;
     }
+
+    /* Loading state - hide content until app initializes to prevent FOUC */
+    body.loading {
+        visibility: hidden;
+    }
 }
 
 @layer base {

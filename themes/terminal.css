@@ -1,27 +1,36 @@
 /*
  * Research Notebook Theme: "Terminal"
  *
- * Dark hacker aesthetic with phosphor green accents.
- * Inspired by classic CRT terminals and retro computing.
+ * Modern dark theme with slate tones and sky blue accents.
+ * Clean, sophisticated aesthetic inspired by contemporary dev tools.
  */
 
 /* ========================================
-   Global Colors - Dark with Green Accents
+   Global Colors - Slate Dark Palette
    ======================================== */
 
 :root {
-    --bg-primary: #0a0a0a;
-    --bg-secondary: #111111;
-    --text-primary: #00ff00;
-    --text-secondary: #00cc00;
-    --text-muted: #006600;
-    --accent: #00ff00;
-    --border: #1a1a1a;
-    --link-color: #00ffaa;
-    --link-hover: #00ffcc;
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
+    --accent: #38bdf8;
+    --accent-hover: #7dd3fc;
+    --accent-muted: #0ea5e9;
+    --border: #334155;
+    --border-subtle: #1e293b;
+    --link-color: #38bdf8;
+    --link-hover: #7dd3fc;
 
-    /* Phosphor glow effect */
-    --glow: 0 0 10px rgba(0, 255, 0, 0.3);
+    /* Soft shadows for depth */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+
+    /* Card type overrides for dark mode */
+    --note-border: #334155;
 }
 
 /* ========================================
@@ -29,185 +38,876 @@
    ======================================== */
 
 body {
-    background:
-        /* Scanline effect */
-        repeating-linear-gradient(
-            0deg,
-            transparent,
-            transparent 2px,
-            rgba(0, 0, 0, 0.1) 2px,
-            rgba(0, 0, 0, 0.1) 4px
-        ),
-        var(--bg-primary);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+main {
+    background: var(--bg-secondary);
 }
 
 /* ========================================
-   Typography - Monospace Everything
+   Header
    ======================================== */
 
-header h1 {
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    font-weight: normal;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    text-shadow: var(--glow);
+header {
+    background: var(--bg-primary);
+    color: var(--text-primary);
 }
 
-header h2 {
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    color: var(--text-muted);
-    font-size: 0.9rem;
+header::before {
+    background: none;
 }
 
 /* ========================================
-   Note Cards - Dark Terminal
+   Typography
+   ======================================== */
+
+h1 {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+}
+
+h2 {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+/* ========================================
+   Note Cards - Dark Slate
    ======================================== */
 
 .card[data-template="note"],
 .modal.viewer[data-template="note"] {
-    --template-border: #1a3a1a;
-    --template-bg: #0d1a0d;
-    --template-preview-bg: #0a140a;
-    --template-title-text: #00ff00;
-    --template-meta-text: #006600;
-    --template-heading-font: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    --template-border: var(--border);
+    --template-bg: var(--bg-secondary);
+    --template-preview-bg: #1a2536;
+    --template-title-text: var(--text-primary);
+    --template-meta-text: var(--text-muted);
+    --template-heading-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
 .card[data-template="note"] {
-    background: var(--template-bg);
-    border: 1px solid var(--template-border);
-    border-radius: 0;
-    box-shadow:
-        inset 0 0 30px rgba(0, 255, 0, 0.03),
-        0 0 1px rgba(0, 255, 0, 0.5);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
 }
 
 .card[data-template="note"]:hover {
-    box-shadow:
-        inset 0 0 30px rgba(0, 255, 0, 0.05),
-        0 0 5px rgba(0, 255, 0, 0.3);
+    border-color: var(--accent-muted);
+    box-shadow: var(--shadow-md);
 }
 
 .card[data-template="note"] .card-title {
-    font-family: var(--template-heading-font);
-    text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+    color: var(--text-primary);
+}
+
+.card[data-template="note"] .card-meta {
+    color: var(--text-muted);
 }
 
 .card[data-template="note"] .card-preview {
-    border-bottom: 1px solid var(--template-border);
+    background: #1a2536;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.card[data-template="note"] .preview-content {
+    background: transparent;
+    color: var(--text-secondary);
+}
+
+/* Override parchment preview page */
+.card[data-template="note"] .preview-page {
+    background: #1a2536;
+}
+
+.card[data-template="note"] .preview-page::after {
+    background: linear-gradient(transparent, #1a2536);
+}
+
+.card[data-template="note"] .preview-content code {
+    background: var(--bg-primary);
+    color: #7dd3fc;
+}
+
+.card[data-template="note"] .preview-content pre {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
 }
 
 /* Note viewer */
+.modal.viewer[data-template="note"] {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+}
+
+.modal.viewer[data-template="note"] .modal-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.modal.viewer[data-template="note"] .modal-header h2 {
+    color: var(--text-primary);
+}
+
 .modal.viewer[data-template="note"] .viewer-content {
-    font-family: var(--template-heading-font);
-    line-height: 1.6;
-    background: var(--template-bg);
-    color: #00dd00;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+.modal.viewer[data-template="note"] .viewer-markdown {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
 }
 
 .modal.viewer[data-template="note"] h1,
 .modal.viewer[data-template="note"] h2,
 .modal.viewer[data-template="note"] h3 {
-    color: var(--template-title-text);
-    text-shadow: var(--glow);
-    border-bottom-color: var(--template-border);
+    color: var(--text-primary);
+    border-bottom-color: var(--border);
 }
 
 .modal.viewer[data-template="note"] code {
-    background: #001a00;
-    color: #00ff88;
+    background: #0f172a;
+    color: #7dd3fc;
+}
+
+.modal.viewer[data-template="note"] pre {
+    background: #0f172a;
+    border: 1px solid var(--border);
+}
+
+.modal.viewer[data-template="note"] pre code {
+    background: transparent;
 }
 
 .modal.viewer[data-template="note"] a {
     color: var(--link-color);
 }
 
+.modal.viewer[data-template="note"] a:hover {
+    color: var(--link-hover);
+}
+
+.modal.viewer[data-template="note"] blockquote {
+    border-left-color: var(--accent);
+    background: rgba(56, 189, 248, 0.05);
+    color: var(--text-secondary);
+}
+
+.modal.viewer[data-template="note"] table th {
+    background: var(--bg-tertiary);
+}
+
+.modal.viewer[data-template="note"] table tr:nth-child(even) {
+    background: var(--bg-primary);
+}
+
 /* ========================================
-   Code Cards - Matrix Style
+   Code Cards - Deep Dark
    ======================================== */
 
 .card[data-template="code"],
 .modal.viewer[data-template="code"] {
-    --template-border: #1a1a1a;
-    --template-bg: #000000;
-    --template-output-bg: #0a0a0a;
-    --template-code-bg: #000000;
-    --template-code-text: #00ff00;
-    --template-title-text: #00ff00;
-    --template-meta-text: #006600;
+    --template-border: var(--border);
+    --template-bg: #0c1322;
+    --template-output-bg: #0f172a;
+    --template-code-bg: #0c1322;
+    --template-code-text: #e2e8f0;
+    --template-title-text: var(--text-primary);
+    --template-meta-text: var(--text-muted);
 }
 
 .card[data-template="code"] {
-    border-radius: 0;
-    box-shadow: 0 0 1px rgba(0, 255, 0, 0.5);
+    background: var(--template-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
 }
 
 .card[data-template="code"]:hover {
-    box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+    border-color: var(--accent-muted);
+    box-shadow: var(--shadow-md);
+}
+
+.card[data-template="code"] .card-title {
+    color: var(--text-primary);
+}
+
+.card[data-template="code"] .card-meta {
+    color: var(--text-muted);
 }
 
 /* ========================================
-   Bookmark Cards - Dark Links
+   Bookmark Cards - Dark with Accent
    ======================================== */
 
+.card[data-template="bookmark"],
+.modal.viewer[data-template="bookmark"] {
+    --template-border: var(--border);
+    --template-bg: var(--bg-secondary);
+    --template-preview-bg: #1a2536;
+    --template-title-text: var(--text-primary);
+    --template-meta-text: var(--text-muted);
+}
+
 .card[data-template="bookmark"] {
-    background: #0a0a0a;
-    border: 1px solid #1a1a1a;
-    border-radius: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
 }
 
 .card[data-template="bookmark"]:hover {
-    border-color: #00ff00;
-    box-shadow: 0 0 5px rgba(0, 255, 0, 0.2);
+    border-color: var(--accent-muted);
+    box-shadow: var(--shadow-md);
 }
 
 .card[data-template="bookmark"] .card-title {
-    color: #00ff00;
+    color: var(--text-primary);
 }
 
 .card[data-template="bookmark"] .card-meta {
-    color: #006600;
+    color: var(--text-muted);
+}
+
+.card[data-template="bookmark"] .card-preview {
+    background: var(--template-preview-bg);
+}
+
+/* Bookmark viewer */
+.modal.viewer[data-template="bookmark"] {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+}
+
+.modal.viewer[data-template="bookmark"] .viewer-description {
+    background: var(--bg-primary);
+    color: var(--text-secondary);
 }
 
 /* ========================================
-   Section Headers - Terminal Prompt
+   Image Cards
    ======================================== */
 
-.section-header h3 {
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    font-size: 0.75rem;
-    color: #00aa00;
-    border-bottom: 1px solid #1a3a1a;
+.card[data-template="image"],
+.modal.viewer[data-template="image"] {
+    --template-border: var(--border);
+    --template-bg: var(--bg-secondary);
+    --template-preview-bg: #1a2536;
+    --template-title-text: var(--text-primary);
+    --template-meta-text: var(--text-muted);
 }
 
-.section-header h3::before {
-    content: "> ";
-    color: #00ff00;
+.card[data-template="image"] {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.card[data-template="image"]:hover {
+    border-color: var(--accent-muted);
 }
 
 /* ========================================
-   Toolbar - Command Line
+   Lesson Cards
+   ======================================== */
+
+.card[data-template="lesson"],
+.modal.viewer[data-template="lesson"] {
+    --template-border: var(--border);
+    --template-bg: var(--bg-secondary);
+    --template-preview-bg: #1a2536;
+    --template-title-text: var(--text-primary);
+    --template-meta-text: var(--text-muted);
+}
+
+.card[data-template="lesson"] {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.card[data-template="lesson"]:hover {
+    border-color: var(--accent-muted);
+}
+
+.modal.viewer[data-template="lesson"] {
+    background: var(--bg-secondary);
+}
+
+.modal.viewer[data-template="lesson"] .viewer-content {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+/* ========================================
+   Quiz Cards
+   ======================================== */
+
+.card[data-template="quiz"],
+.modal.viewer[data-template="quiz"] {
+    --template-border: var(--border);
+    --template-bg: var(--bg-secondary);
+    --template-title-text: var(--text-primary);
+    --template-meta-text: var(--text-muted);
+}
+
+.card[data-template="quiz"] {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.card[data-template="quiz"]:hover {
+    border-color: var(--accent-muted);
+}
+
+.modal.viewer[data-template="quiz"] {
+    background: var(--bg-secondary);
+}
+
+.modal.viewer[data-template="quiz"] .viewer-content {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+/* ========================================
+   Quiz Response Cards
+   ======================================== */
+
+.card[data-template="quiz-response"],
+.modal.viewer[data-template="quiz-response"],
+.card[data-template="quiz-response-summary"],
+.modal.viewer[data-template="quiz-response-summary"] {
+    --template-border: var(--border);
+    --template-bg: var(--bg-secondary);
+    --template-title-text: var(--text-primary);
+    --template-meta-text: var(--text-muted);
+}
+
+.card[data-template="quiz-response"],
+.card[data-template="quiz-response-summary"] {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.card[data-template="quiz-response"]:hover,
+.card[data-template="quiz-response-summary"]:hover {
+    border-color: var(--accent-muted);
+}
+
+/* ========================================
+   Source Cards
+   ======================================== */
+
+.card[data-template="source"],
+.modal.viewer[data-template="source"] {
+    --template-border: var(--border);
+    --template-bg: var(--bg-secondary);
+    --template-title-text: var(--text-primary);
+    --template-meta-text: var(--text-muted);
+}
+
+.card[data-template="source"] {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.card[data-template="source"]:hover {
+    border-color: var(--accent-muted);
+}
+
+/* ========================================
+   System Cards (Settings, Theme)
+   ======================================== */
+
+.card[data-template="settings"],
+.modal.viewer[data-template="settings"],
+.card[data-template="theme"],
+.modal.viewer[data-template="theme"] {
+    --template-border: var(--border);
+    --template-bg: var(--bg-secondary);
+    --template-title-text: var(--text-primary);
+    --template-meta-text: var(--text-muted);
+}
+
+.card[data-template="settings"],
+.card[data-template="theme"] {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.modal.viewer[data-template="settings"],
+.modal.viewer[data-template="theme"] {
+    background: var(--bg-secondary);
+}
+
+/* ========================================
+   Section Headers - match subdir card style
+   ======================================== */
+
+.section-header {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+    transition: background-color 0.15s ease;
+}
+
+.section-header:hover {
+    background: var(--bg-tertiary);
+}
+
+.section-title {
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+.section-title input {
+    color: var(--text-primary);
+    background: transparent;
+}
+
+.section-title input::placeholder {
+    color: var(--text-muted);
+}
+
+.section-count {
+    color: var(--text-muted);
+}
+
+.section-toggle {
+    color: var(--text-muted);
+}
+
+.section-toggle:hover {
+    color: var(--text-primary);
+}
+
+/* ========================================
+   Subdirectory Nodes - same card style
+   ======================================== */
+
+.subdir-node {
+    margin-top: 0.5rem;
+}
+
+.subdir-header {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    transition: background-color 0.15s ease;
+}
+
+.subdir-header:hover {
+    background: var(--bg-tertiary);
+}
+
+.subdir-name {
+    color: var(--text-primary);
+}
+
+.subdir-count {
+    color: var(--text-muted);
+}
+
+.subdir-toggle {
+    color: var(--text-muted);
+}
+
+/* ========================================
+   Toolbar
    ======================================== */
 
 .toolbar {
-    background: #050505;
-    border-bottom: 1px solid #1a1a1a;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
 }
 
 .toolbar button {
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    border-radius: 0;
+    color: var(--text-secondary);
+    border-radius: 6px;
 }
 
 .toolbar button:hover {
-    background: #1a3a1a;
-    color: #00ff00;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.toolbar button.active {
+    background: var(--accent-muted);
+    color: var(--text-primary);
 }
 
 /* ========================================
-   Scrollbars - Matrix Green
+   Modals - Base Styling
+   ======================================== */
+
+.modal-backdrop {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+    color: var(--text-primary);
+}
+
+.modal-close {
+    color: var(--text-muted);
+}
+
+.modal-close:hover {
+    color: var(--text-primary);
+}
+
+/* ========================================
+   Editor Modal
+   ======================================== */
+
+.modal.editor {
+    background: var(--bg-secondary);
+}
+
+.editor-main {
+    background: var(--bg-secondary);
+}
+
+.editor-sidebar {
+    background: var(--bg-primary);
+    border-left: 1px solid var(--border);
+}
+
+.editor-tab-button {
+    color: var(--text-muted);
+}
+
+.editor-tab-button:hover,
+.editor-tab-button.active {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+
+/* ========================================
+   Form Elements - Critical Fix
+   ======================================== */
+
+.form-group label {
+    color: var(--text-secondary);
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 6px;
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+    color: var(--text-muted);
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    border-color: var(--accent);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+.form-group input[readonly],
+.form-group textarea[readonly] {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+}
+
+.form-group select option {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* Code editor textarea */
+.form-group textarea.code-editor {
+    background: #0c1322;
+    border-color: var(--border);
+    color: #e2e8f0;
+}
+
+.form-group textarea.code-editor:focus {
+    border-color: var(--accent);
+    background: #0c1322;
+}
+
+/* ========================================
+   List Editor
+   ======================================== */
+
+.list-editor-input {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 4px;
+}
+
+.list-editor-input:focus {
+    border-color: var(--accent);
+}
+
+.list-editor-input[readonly] {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+}
+
+/* ========================================
+   Records Editor (Sections, Authors, etc.)
+   ======================================== */
+
+.records-editor {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.records-editor th {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.records-editor-row {
+    background: var(--bg-primary);
+}
+
+.records-editor-row:hover {
+    background: var(--bg-secondary);
+}
+
+.records-editor-row:not(:last-child) td {
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.records-editor-input {
+    background: transparent;
+    color: var(--text-primary);
+}
+
+.records-editor-input:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border);
+}
+
+.records-editor-input:focus {
+    background: var(--bg-secondary);
+    border-color: var(--accent);
+}
+
+.records-editor-input::placeholder {
+    color: var(--text-muted);
+}
+
+.records-editor-toggle {
+    background: var(--bg-tertiary);
+    border-color: var(--border);
+}
+
+.records-editor-toggle:hover {
+    background: var(--bg-secondary);
+}
+
+.records-editor-toggle.is-checked {
+    background: var(--accent-muted);
+    border-color: var(--accent);
+    color: white;
+}
+
+.records-editor-drag-handle {
+    color: var(--text-muted);
+}
+
+.records-editor-drag-handle:hover {
+    color: var(--text-secondary);
+}
+
+.records-editor-add {
+    background: var(--bg-secondary);
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+}
+
+.records-editor-add:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+/* ========================================
+   Buttons
+   ======================================== */
+
+.btn {
+    border-radius: 6px;
+}
+
+.btn-primary,
+button.primary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.btn-primary:hover,
+button.primary:hover {
+    background: var(--bg-primary);
+    border-color: var(--accent);
+}
+
+.btn-secondary,
+button.secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.btn-secondary:hover,
+button.secondary:hover {
+    background: var(--bg-primary);
+}
+
+/* Add Note button - override light parchment */
+.btn-note {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.btn-note:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent);
+}
+
+/* Add Code button - override light green */
+.btn-code {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.btn-code:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent);
+}
+
+.btn-danger,
+button.danger {
+    background: #dc2626;
+    color: white;
+    border-radius: 6px;
+}
+
+.btn-danger:hover,
+button.danger:hover {
+    background: #ef4444;
+}
+
+/* Other card-type buttons (bookmark, lesson, quiz, etc.) */
+.btn-bookmark,
+.btn-lesson,
+.btn-quiz,
+.btn-image,
+.btn-source {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.btn-bookmark:hover,
+.btn-lesson:hover,
+.btn-quiz:hover,
+.btn-image:hover,
+.btn-source:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent);
+}
+
+/* Small buttons in section headers */
+.btn-small {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.btn-small:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* ========================================
+   Tags
+   ======================================== */
+
+.tag-badge {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border-radius: 4px;
+}
+
+/* ========================================
+   Author Badges
+   ======================================== */
+
+.author-badge {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+/* ========================================
+   Toast Notifications
+   ======================================== */
+
+.toast {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+}
+
+.toast.success {
+    border-left: 3px solid #22c55e;
+}
+
+.toast.error {
+    border-left: 3px solid #ef4444;
+}
+
+/* ========================================
+   Scrollbars
    ======================================== */
 
 ::-webkit-scrollbar {
@@ -216,23 +916,148 @@ header h2 {
 }
 
 ::-webkit-scrollbar-track {
-    background: #0a0a0a;
+    background: var(--bg-primary);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #003300;
-    border-radius: 0;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #004400;
+    background: var(--text-muted);
 }
 
 /* ========================================
-   Cursor Blink Animation (optional)
+   Links in Content
    ======================================== */
 
-@keyframes blink {
-    0%, 50% { opacity: 1; }
-    51%, 100% { opacity: 0; }
+a {
+    color: var(--link-color);
+}
+
+a:hover {
+    color: var(--link-hover);
+}
+
+/* ========================================
+   Selection
+   ======================================== */
+
+::selection {
+    background: rgba(56, 189, 248, 0.3);
+    color: var(--text-primary);
+}
+
+/* ========================================
+   Empty States & Placeholders
+   ======================================== */
+
+.empty-state {
+    color: var(--text-muted);
+}
+
+/* ========================================
+   Markdown Content in Dark Mode
+   ======================================== */
+
+.md-content {
+    color: var(--text-secondary);
+}
+
+.md-content h1,
+.md-content h2,
+.md-content h3,
+.md-content h4,
+.md-content h5,
+.md-content h6 {
+    color: var(--text-primary);
+}
+
+.md-content code {
+    background: var(--bg-primary);
+    color: #7dd3fc;
+}
+
+.md-content pre {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+}
+
+.md-content blockquote {
+    border-left-color: var(--accent);
+    background: rgba(56, 189, 248, 0.05);
+}
+
+.md-content table {
+    border-color: var(--border);
+}
+
+.md-content th {
+    background: var(--bg-tertiary);
+    border-color: var(--border);
+}
+
+.md-content td {
+    border-color: var(--border);
+}
+
+.md-content hr {
+    border-color: var(--border);
+}
+
+/* ========================================
+   Context Menu
+   ======================================== */
+
+.context-menu {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+}
+
+.context-menu-item {
+    color: var(--text-secondary);
+}
+
+.context-menu-item:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.context-menu-item.danger {
+    color: #ef4444;
+}
+
+.context-menu-item.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* ========================================
+   Diff Viewer
+   ======================================== */
+
+.diff-line.added {
+    background: rgba(34, 197, 94, 0.15);
+}
+
+.diff-line.removed {
+    background: rgba(239, 68, 68, 0.15);
+}
+
+/* ========================================
+   CodeMirror Editor Overrides
+   ======================================== */
+
+.cm-editor {
+    background: var(--bg-primary) !important;
+}
+
+.cm-gutters {
+    background: var(--bg-secondary) !important;
+    border-right-color: var(--border) !important;
+}
+
+.cm-activeLineGutter {
+    background: var(--bg-tertiary) !important;
 }

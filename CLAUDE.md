@@ -102,7 +102,7 @@ The app uses a two-layer theme system: base themes + notebook customizations.
 **Base themes** (in `/themes/` directory):
 - `manuscript` - Warm, scholarly parchment aesthetic with textured backgrounds
 - `minimal` - Clean, sparse design with subtle accents and generous whitespace
-- `terminal` - Dark hacker aesthetic with green-on-black terminal feel
+- `terminal` - Modern dark theme with slate tones and sky blue accents
 - `friendly` - Accessible, warm aesthetic with light blue accents for learning
 - `handwritten` - Calligraphic style with handwriting fonts for personal journal feel
 

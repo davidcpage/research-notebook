@@ -8257,5 +8257,8 @@ async function init() {
         // No folder linked - show onboarding
         showOnboarding();
     }
+
+    // Remove loading state to reveal content (prevents FOUC)
+    document.body.classList.remove('loading');
 }
 init();
