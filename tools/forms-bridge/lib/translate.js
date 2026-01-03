@@ -77,6 +77,10 @@ function convertFormItemToQuestion(item) {
     convertScaleQuestion(question, q.scaleQuestion);
   } else if (q.rowQuestion) {
     convertRowQuestion(question, q.rowQuestion, grading);
+  } else if (q.dateQuestion) {
+    convertDateQuestion(question, q.dateQuestion);
+  } else if (q.timeQuestion) {
+    convertTimeQuestion(question, q.timeQuestion);
   } else {
     // Unknown question type
     question.type = 'short_answer';
@@ -160,6 +164,33 @@ function convertRowQuestion(question, rowQ, grading) {
   // Note: Grid questions in Forms are more complex - this is simplified
   // Full implementation would need to handle rowQuestion structure
   console.warn('Grid question conversion is simplified');
+}
+
+/**
+ * Convert date question
+ */
+function convertDateQuestion(question, dateQ) {
+  // If includeTime is true, it's a datetime; otherwise just date
+  if (dateQ.includeTime) {
+    question.type = 'datetime';
+  } else {
+    question.type = 'date';
+  }
+  // Preserve Forms options for round-tripping
+  if (dateQ.includeYear === false) {
+    question.includeYear = false;
+  }
+}
+
+/**
+ * Convert time question
+ */
+function convertTimeQuestion(question, timeQ) {
+  question.type = 'time';
+  // Preserve Forms options for round-tripping
+  if (timeQ.includeDuration) {
+    question.includeDuration = true;
+  }
 }
 
 // ============================================================
@@ -276,6 +307,26 @@ function convertQuestionToFormRequest(q, index) {
       // Grid questions are complex - simplified handling
       console.warn('Grid question export is simplified');
       questionItem.question.textQuestion = { paragraph: true };
+      break;
+
+    case 'date':
+      questionItem.question.dateQuestion = {
+        includeTime: false,
+        includeYear: q.includeYear !== false // default true
+      };
+      break;
+
+    case 'time':
+      questionItem.question.timeQuestion = {
+        includeDuration: q.includeDuration || false
+      };
+      break;
+
+    case 'datetime':
+      questionItem.question.dateQuestion = {
+        includeTime: true,
+        includeYear: q.includeYear !== false // default true
+      };
       break;
 
     default:

@@ -21,7 +21,7 @@ schema:
       properties:
         type:
           type: text
-          enum: [multiple_choice, checkbox, dropdown, numeric, short_answer, worked, scale, grid]
+          enum: [multiple_choice, checkbox, dropdown, numeric, short_answer, worked, scale, grid, date, time, datetime]
           required: true
         question:
           type: markdown

@@ -41,6 +41,10 @@ function quizHasGradedQuestions(questions) {
                 return q.correctAnswers && (Array.isArray(q.correctAnswers) ? q.correctAnswers.length > 0 : Object.keys(q.correctAnswers).length > 0);
             case 'numeric':
                 return q.answer !== undefined;
+            case 'date':
+            case 'time':
+            case 'datetime':
+                return q.correct !== undefined;
             case 'short_answer':
             case 'worked':
                 return true; // Needs review
@@ -346,6 +350,12 @@ function renderQuizAnswerArea(question, attemptAnswer, isInteractive = false, qu
             return renderScaleAnswer(question, attemptAnswer, isInteractive, questionIndex);
         case 'grid':
             return renderGridAnswer(question, attemptAnswer, isInteractive, questionIndex);
+        case 'date':
+            return renderDateAnswer(question, attemptAnswer, isInteractive, questionIndex);
+        case 'time':
+            return renderTimeAnswer(question, attemptAnswer, isInteractive, questionIndex);
+        case 'datetime':
+            return renderDatetimeAnswer(question, attemptAnswer, isInteractive, questionIndex);
         default:
             return '<div class="quiz-unknown-type">Unknown question type</div>';
     }
@@ -716,6 +726,120 @@ function renderGridAnswer(question, attemptAnswer, isInteractive = false, questi
     return html;
 }
 
+// Date: date picker input
+function renderDateAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
+    const correctAnswer = question.correct;
+    const userAnswer = attemptAnswer?.answer;
+
+    let html = '<div class="quiz-date">';
+    if (isInteractive) {
+        html += `<input type="date" class="quiz-date-input" data-question-index="${questionIndex}"
+                   onchange="updateQuizAnswer(${questionIndex}, this.value)">`;
+    } else if (attemptAnswer) {
+        // Review mode: show user answer and correct answer if defined
+        const formattedUser = userAnswer ? formatDateDisplay(userAnswer) : '—';
+        html += `<div class="quiz-date-user">Your answer: <strong>${formattedUser}</strong></div>`;
+        if (correctAnswer !== undefined) {
+            const isCorrect = userAnswer === correctAnswer;
+            const formattedCorrect = formatDateDisplay(correctAnswer);
+            if (!isCorrect) {
+                html += `<div class="quiz-date-correct">Expected: <strong>${formattedCorrect}</strong></div>`;
+            }
+        }
+    }
+    html += '</div>';
+    return html;
+}
+
+// Time: time picker input
+function renderTimeAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
+    const correctAnswer = question.correct;
+    const userAnswer = attemptAnswer?.answer;
+
+    let html = '<div class="quiz-time">';
+    if (isInteractive) {
+        html += `<input type="time" class="quiz-time-input" data-question-index="${questionIndex}"
+                   onchange="updateQuizAnswer(${questionIndex}, this.value)">`;
+    } else if (attemptAnswer) {
+        // Review mode: show user answer and correct answer if defined
+        const formattedUser = userAnswer ? formatTimeDisplay(userAnswer) : '—';
+        html += `<div class="quiz-time-user">Your answer: <strong>${formattedUser}</strong></div>`;
+        if (correctAnswer !== undefined) {
+            const isCorrect = userAnswer === correctAnswer;
+            const formattedCorrect = formatTimeDisplay(correctAnswer);
+            if (!isCorrect) {
+                html += `<div class="quiz-time-correct">Expected: <strong>${formattedCorrect}</strong></div>`;
+            }
+        }
+    }
+    html += '</div>';
+    return html;
+}
+
+// Datetime: datetime-local picker input
+function renderDatetimeAnswer(question, attemptAnswer, isInteractive = false, questionIndex = 0) {
+    const correctAnswer = question.correct;
+    const userAnswer = attemptAnswer?.answer;
+
+    let html = '<div class="quiz-datetime">';
+    if (isInteractive) {
+        html += `<input type="datetime-local" class="quiz-datetime-input" data-question-index="${questionIndex}"
+                   onchange="updateQuizAnswer(${questionIndex}, this.value)">`;
+    } else if (attemptAnswer) {
+        // Review mode: show user answer and correct answer if defined
+        const formattedUser = userAnswer ? formatDatetimeDisplay(userAnswer) : '—';
+        html += `<div class="quiz-datetime-user">Your answer: <strong>${formattedUser}</strong></div>`;
+        if (correctAnswer !== undefined) {
+            const isCorrect = userAnswer === correctAnswer;
+            const formattedCorrect = formatDatetimeDisplay(correctAnswer);
+            if (!isCorrect) {
+                html += `<div class="quiz-datetime-correct">Expected: <strong>${formattedCorrect}</strong></div>`;
+            }
+        }
+    }
+    html += '</div>';
+    return html;
+}
+
+// Helper: format date for display (YYYY-MM-DD → readable format)
+function formatDateDisplay(isoDate) {
+    if (!isoDate) return '';
+    try {
+        const [year, month, day] = isoDate.split('-');
+        const date = new Date(year, month - 1, day);
+        return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    } catch {
+        return isoDate;
+    }
+}
+
+// Helper: format time for display (HH:MM → readable format)
+function formatTimeDisplay(isoTime) {
+    if (!isoTime) return '';
+    try {
+        const [hours, minutes] = isoTime.split(':');
+        const date = new Date();
+        date.setHours(parseInt(hours), parseInt(minutes));
+        return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    } catch {
+        return isoTime;
+    }
+}
+
+// Helper: format datetime for display
+function formatDatetimeDisplay(isoDatetime) {
+    if (!isoDatetime) return '';
+    try {
+        const date = new Date(isoDatetime);
+        return date.toLocaleString(undefined, {
+            year: 'numeric', month: 'long', day: 'numeric',
+            hour: 'numeric', minute: '2-digit'
+        });
+    } catch {
+        return isoDatetime;
+    }
+}
+
 // ========== INTERACTION HANDLERS ==========
 
 // Quiz interaction: select multiple choice option
@@ -1025,6 +1149,24 @@ function gradeQuizAttempt(card, answers) {
                     }
                 } else {
                     // No correct answers - survey question (just record response)
+                    result.autoGrade.status = 'answered';
+                    result.autoGrade.score = null;
+                    result.autoGrade.maxScore = null;
+                }
+                break;
+
+            case 'date':
+            case 'time':
+            case 'datetime':
+                // Auto-grade if correct value specified (exact match)
+                if (q.correct !== undefined) {
+                    if (userAnswer === q.correct) {
+                        result.autoGrade.status = 'correct';
+                        result.autoGrade.score = maxPoints;
+                        correctCount++;
+                    }
+                } else {
+                    // No correct answer - survey question (just record response)
                     result.autoGrade.status = 'answered';
                     result.autoGrade.score = null;
                     result.autoGrade.maxScore = null;

@@ -597,6 +597,48 @@
     box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
 
+/* Date/Time/Datetime inputs */
+.quiz-date,
+.quiz-time,
+.quiz-datetime {
+    padding: 0.75rem;
+    background: var(--template-preview-bg);
+    border-radius: 6px;
+}
+
+.quiz-date-user,
+.quiz-date-correct,
+.quiz-time-user,
+.quiz-time-correct,
+.quiz-datetime-user,
+.quiz-datetime-correct {
+    margin: 0.25rem 0;
+}
+
+.quiz-date-correct,
+.quiz-time-correct,
+.quiz-datetime-correct {
+    color: var(--quiz-correct-text);
+}
+
+.quiz-date-input,
+.quiz-time-input,
+.quiz-datetime-input {
+    padding: 0.75rem;
+    font-size: 1rem;
+    border: 1px solid var(--template-border);
+    border-radius: 6px;
+    background: var(--quiz-option-bg);
+}
+
+.quiz-date-input:focus,
+.quiz-time-input:focus,
+.quiz-datetime-input:focus {
+    outline: none;
+    border-color: #2196f3;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
 /* Interactive Short Answer */
 .quiz-short-answer-input {
     width: 100%;
