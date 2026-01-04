@@ -397,6 +397,19 @@ python3 -m http.server 8080
 
 ## Creating Notebook Content via Files (for Claude Code)
 
+### Using the `nb` CLI (Recommended)
+
+The `nb` command creates cards with correct frontmatter:
+
+```bash
+nb types                        # List available card types
+nb schema note                  # Show schema and example frontmatter
+nb schema code --json           # JSON output for parsing
+nb create note "Title" section/ # Create card with correct frontmatter
+```
+
+**Always use `nb schema <type>` before creating cards manually** to get the correct format.
+
 ### Notes (.md files)
 ```markdown
 ---
@@ -504,3 +517,31 @@ number: 1.2
 **Lesson cards**: Already have `number` for lesson numbering (e.g., "1.1"), which doubles as sort order. To interleave other cards with lessons, give them a `number` value between lesson numbers.
 
 **Key functions**: `compareVersionNumbers()`, `sortSectionItems()`
+
+---
+
+## Using Notebooks in Other Projects
+
+The `/notebook` skill (`.claude/skills/notebook/`) provides Claude with notebook instructions without polluting project-specific CLAUDE.md files.
+
+### Setup in Another Project
+
+```bash
+# In the other project
+mkdir -p .claude/skills
+ln -s /path/to/research-notebook/.claude/skills/notebook .claude/skills/notebook
+```
+
+### What the Skill Provides
+
+- File structure and naming conventions
+- Settings configuration (authors, themes, sections)
+- Tags, ordering, and common operations
+- Delegates schema queries to `nb` CLI for lean context
+
+### Invoking the Skill
+
+1. **User-invocable**: Type `/notebook` to load instructions
+2. **In project CLAUDE.md**: Reference the skill, e.g., "Use /notebook skill when creating or editing notebook cards"
+
+The skill teaches Claude to use `nb schema <type>` for on-demand schema queries rather than embedding all schemas in the skill itself.

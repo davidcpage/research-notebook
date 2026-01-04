@@ -49,17 +49,66 @@ Available templates:
 - `dev-notebook` - Terminal theme, code-focused
 - `tutor-notebook` - Friendly theme, learning-focused
 
+## Card CLI (`nb`)
+
+The `nb` command helps create cards with correct frontmatter:
+
+```bash
+# List available card types
+nb types
+
+# Show schema and example frontmatter for a type
+nb schema note
+nb schema code
+nb schema bookmark
+
+# Create cards
+nb create note "My Research Note" research/
+nb create code "Data Analysis" research/experiments/
+nb create bookmark "Useful Reference" references/
+```
+
+The CLI reads schemas directly from `card-types/{type}/template.yaml`, so it always reflects the current schema.
+
+## Using Notebooks in Other Projects
+
+You can use research notebooks in any project (code repos, documentation, etc.) without polluting your CLAUDE.md with notebook instructions.
+
+### Setup
+
+```bash
+# In your project
+mkdir -p .claude/skills
+
+# Symlink the notebook skill
+ln -s /path/to/research-notebook/.claude/skills/notebook .claude/skills/notebook
+
+# Ensure nb CLI is available (run once in research-notebook repo)
+cd /path/to/research-notebook && npm link
+```
+
+### Usage
+
+The `/notebook` skill provides Claude with instructions for creating and managing cards. You can:
+
+1. **Invoke directly**: Type `/notebook` to load the skill
+2. **Reference in CLAUDE.md**: Add a note like "Use /notebook skill when creating cards"
+
+The skill teaches Claude to use `nb schema <type>` for on-demand schema queries, keeping context lean.
+
 ## Application Structure
 
 ```
 repo/
-├── package.json        # npm package (provides 'notebook' command)
+├── package.json        # npm package (provides 'notebook' and 'nb' commands)
 ├── cli.js              # Local server
+├── nb.js               # Card CLI (types, schema, create)
 ├── index.html          # HTML shell (~210 lines)
 ├── css/app.css         # Application styles (~2800 lines)
 ├── js/app.js           # Application logic (~6500 lines)
 ├── defaults/           # Default templates and theme
 ├── themes/             # Built-in themes (manuscript, terminal, etc.)
+├── card-types/         # Card type modules (template.yaml, styles.css)
 └── examples/           # Example notebooks
 ```
 
