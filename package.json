@@ -4,7 +4,11 @@
   "description": "File-based notebook for notes, code, and bookmarks - works with Claude Code",
   "type": "module",
   "bin": {
-    "notebook": "./cli.js"
+    "notebook": "./cli.js",
+    "nb": "./nb.js"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
   },
   "scripts": {
     "start": "node cli.js"

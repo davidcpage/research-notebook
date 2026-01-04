@@ -13,3 +13,4 @@ my_notebook*.json
 # Ignore external skill symlinks, but track project skills
 .claude/skills/*
 !.claude/skills/import-drive-structure/
+!.claude/skills/notebook/

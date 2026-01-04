@@ -3,7 +3,8 @@
     "allow": [
       "Bash(issues:*)",
       "Bash(sessions:*)",
-      "Bash(adr:*)"
+      "Bash(adr:*)",
+      "Bash(nb:*)"
     ]
   },
   "sandbox": {
