@@ -1774,7 +1774,9 @@ function loadCard(filename, content, sectionName, companionData = {}) {
 
     // Ensure ID exists and is always a string (YAML may parse numeric IDs as numbers)
     if (!frontmatter.id) {
-        frontmatter.id = Date.now().toString();
+        // Generate unique ID from filename + timestamp to avoid collisions
+        // when multiple files (especially source files) are loaded in the same millisecond
+        frontmatter.id = `${slugify(filename)}-${Date.now()}`;
     } else {
         frontmatter.id = String(frontmatter.id);
     }
