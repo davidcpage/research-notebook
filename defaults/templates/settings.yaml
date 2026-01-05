@@ -45,6 +45,23 @@ schema:
     type: boolean
     default: false
     description: When enabled, source code files can be edited (saves without frontmatter)
+  notes_editable:
+    type: boolean
+    default: true
+    description: When disabled, markdown notes are read-only (for viewing foreign repos without adding frontmatter)
+  sort_by:
+    type: select
+    default: modified
+    options:
+      - value: modified
+        label: Modified Date (newest first)
+      - value: title
+        label: Title (A-Z)
+      - value: created
+        label: Created Date (newest first)
+      - value: filename
+        label: Filename (A-Z)
+    description: How to sort cards within each type group (cards with number field always sort first)
   preserve_dir_names:
     type: boolean
     default: false
@@ -85,6 +102,10 @@ editor:
       showIf:
         field: enabled_templates
         includes: source
+    - field: notes_editable
+      label: Notes Editable
+    - field: sort_by
+      label: Sort Cards By
     - field: preserve_dir_names
       label: Preserve Directory Names
     - field: compact_cards

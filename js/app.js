@@ -1108,6 +1108,8 @@ const SETTINGS_SCHEMA = {
     enabled_templates: { default: ['note', 'bookmark', 'code'] }, // Card types available in this notebook
     quiz_template_mode: { default: false }, // Disable quiz-taking in viewer (for quiz templates)
     source_cards_editable: { default: false }, // Allow editing source code files (default: read-only)
+    notes_editable: { default: true }, // Allow editing markdown notes (default: true, disable for foreign repos)
+    sort_by: { default: 'modified' }, // Sort cards by: 'modified', 'title', 'created', 'filename'
     preserve_dir_names: { default: false }, // Show directory names as-is (default: Title Case)
     compact_cards: { default: false }, // Smaller cards for viewing large codebases
     grading: { default: null }            // Grading settings: { roster_path, show_student_names }
@@ -1950,10 +1952,25 @@ function sortSectionItems(section) {
         const bOrder = bTypeIdx >= 0 ? bTypeIdx : 999;
         if (aOrder !== bOrder) return aOrder - bOrder;
 
-        // 3. Modified date (newest first)
-        const aTime = a._fileModified || new Date(a.modified || 0).getTime();
-        const bTime = b._fileModified || new Date(b.modified || 0).getTime();
-        return bTime - aTime;
+        // 3. Sort by setting (default: modified date newest first)
+        const sortBy = notebookSettings?.sort_by || 'modified';
+        switch (sortBy) {
+            case 'title':
+                return (a.title || '').localeCompare(b.title || '');
+            case 'filename':
+                const aFile = a._source?.filename || a.title || '';
+                const bFile = b._source?.filename || b.title || '';
+                return aFile.localeCompare(bFile);
+            case 'created':
+                const aCreated = new Date(a.created || 0).getTime();
+                const bCreated = new Date(b.created || 0).getTime();
+                return bCreated - aCreated;  // newest first
+            case 'modified':
+            default:
+                const aTime = a._fileModified || new Date(a.modified || 0).getTime();
+                const bTime = b._fileModified || new Date(b.modified || 0).getTime();
+                return bTime - aTime;  // newest first
+        }
     });
 }
 
@@ -2615,8 +2632,12 @@ function renderViewerActions(card, template, isSystemNote) {
 
     // Common actions
     // Hide edit/delete for source cards unless source_cards_editable is enabled
+    // Hide edit/delete for note cards unless notes_editable is enabled (default true)
     const isSourceCard = templateName === 'source';
-    const canEdit = !isSourceCard || notebookSettings.source_cards_editable;
+    const isNoteCard = templateName === 'note';
+    const canEditSource = !isSourceCard || notebookSettings.source_cards_editable;
+    const canEditNote = !isNoteCard || notebookSettings.notes_editable !== false;
+    const canEdit = canEditSource && canEditNote;
     if (canEdit) {
         actions += `<button class="btn btn-secondary btn-small" onclick="editViewerCard()">✎ Edit</button>`;
         actions += `<button class="btn btn-secondary btn-small" onclick="deleteViewerCard()">× Delete</button>`;
@@ -3527,6 +3548,21 @@ function renderEditorField(fieldConfig, fieldDef, value) {
             updateQuestionEditorIndices();
         };
         div.appendChild(addBtn);
+    } else if (type === 'select') {
+        // Generic select dropdown with options from schema
+        inputEl = document.createElement('select');
+        inputEl.id = `editor-${field}`;
+
+        const options = fieldDef?.options || [];
+        options.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt.value;
+            option.textContent = opt.label;
+            option.selected = opt.value === value;
+            inputEl.appendChild(option);
+        });
+
+        div.appendChild(inputEl);
     } else if (type === 'theme') {
         // Theme picker dropdown - populated from theme registry
         inputEl = document.createElement('select');
@@ -5962,6 +5998,8 @@ async function loadFromFilesystem(dirHandle) {
             // Sync settings to card so editor shows correct values (including auto-detected ones)
             settingsCard.preserve_dir_names = notebookSettings?.preserve_dir_names ?? false;
             settingsCard.source_cards_editable = notebookSettings?.source_cards_editable ?? false;
+            settingsCard.notes_editable = notebookSettings?.notes_editable ?? true;
+            settingsCard.sort_by = notebookSettings?.sort_by ?? 'modified';
             settingsCard.quiz_template_mode = notebookSettings?.quiz_template_mode ?? false;
             settingsCard.compact_cards = notebookSettings?.compact_cards ?? false;
         }
@@ -6065,6 +6103,8 @@ async function saveCardFile(sectionId, card) {
             enabled_templates: card.enabled_templates,
             quiz_template_mode: card.quiz_template_mode,
             source_cards_editable: card.source_cards_editable,
+            notes_editable: card.notes_editable,
+            sort_by: card.sort_by,
             preserve_dir_names: card.preserve_dir_names,
             compact_cards: card.compact_cards
         });
