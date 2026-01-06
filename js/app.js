@@ -2076,7 +2076,7 @@ function renderDocumentPreview(card, template) {
         return `<pre class="preview-code"><code class="language-${language}">${codePreview || 'No code'}</code></pre>`;
     } else if (fieldType === 'markdown' || field === 'content') {
         // Use existing renderNotePreview for markdown
-        const previewHtml = renderNotePreview(content, format);
+        const previewHtml = renderNotePreview(content, format, 1200, card._path);
         if (!previewHtml) {
             return `<div class="preview-placeholder">${placeholder}</div>`;
         }
@@ -2443,7 +2443,7 @@ function renderViewerDocument(card, template) {
         const language = fieldDef?.language || card.language || 'python';
         return `<div class="viewer-code"><pre><code class="language-${language}">${escapeHtml(content)}</code></pre></div>`;
     } else {
-        return `<div class="md-content viewer-markdown">${renderMarkdownWithLinks(content)}</div>`;
+        return `<div class="md-content viewer-markdown">${renderMarkdownWithLinks(content, card._path)}</div>`;
     }
 }
 
@@ -2519,7 +2519,7 @@ function renderViewerImage(card, template) {
     }
 
     if (content) {
-        html += `<div class="md-content viewer-description">${renderMarkdownWithLinks(content)}</div>`;
+        html += `<div class="md-content viewer-description">${renderMarkdownWithLinks(content, card._path)}</div>`;
     }
 
     html += '</div>';
@@ -2593,7 +2593,7 @@ function renderViewerSections(card, template) {
         let html = '';
 
         if (fieldDef?.type === 'markdown') {
-            html = renderMarkdownWithLinks(content);
+            html = renderMarkdownWithLinks(content, card._path);
         } else {
             html = `<p>${escapeHtml(content)}</p>`;
         }
@@ -5021,7 +5021,7 @@ function switchEditorTab(tab) {
 
         const format = editingCard.card.format || 'markdown';
         if (format === 'markdown') {
-            preview.innerHTML = renderMarkdownWithLinks(content);
+            preview.innerHTML = renderMarkdownWithLinks(content, editingCard.card._path);
         } else {
             preview.innerHTML = `<pre>${escapeHtml(content)}</pre>`;
         }
@@ -5469,6 +5469,65 @@ async function verifyDirPermission(handle) {
     }
 }
 
+// Resolve relative image paths in markdown content to data URLs
+// basePath: the card's directory path (e.g., 'decisions' or 'decisions/subdir')
+async function resolveMarkdownImages(content, basePath, rootHandle) {
+    if (!content || !basePath || !rootHandle) return content;
+
+    // Find all markdown image references: ![alt](path)
+    const imagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    const matches = [...content.matchAll(imagePattern)];
+
+    if (matches.length === 0) return content;
+
+    let result = content;
+    for (const match of matches) {
+        const [fullMatch, alt, src] = match;
+
+        // Skip absolute paths, URLs, and data URIs
+        if (src.startsWith('/') || src.startsWith('http://') ||
+            src.startsWith('https://') || src.startsWith('data:')) {
+            continue;
+        }
+
+        try {
+            // Navigate to the image file from root
+            // basePath is 'decisions', src is 'diagrams/foo.png'
+            // Full path: 'decisions/diagrams/foo.png'
+            const fullPath = basePath + '/' + src;
+            const pathParts = fullPath.split('/');
+            const filename = pathParts.pop();
+
+            // Navigate through directories
+            let currentHandle = rootHandle;
+            for (const dir of pathParts) {
+                currentHandle = await currentHandle.getDirectoryHandle(dir);
+            }
+
+            // Get the file
+            const fileHandle = await currentHandle.getFileHandle(filename);
+            const file = await fileHandle.getFile();
+
+            // Convert to data URL
+            const dataUrl = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+
+            // Replace the markdown image with data URL version
+            result = result.replace(fullMatch, `![${alt}](${dataUrl})`);
+            console.log(`[Filesystem] Resolved image: ${src}`);
+        } catch (e) {
+            // Image not found or couldn't be loaded - leave original reference
+            console.warn(`[Filesystem] Could not resolve image: ${src}`, e.message);
+        }
+    }
+
+    return result;
+}
+
 // Load notebook data from filesystem
 async function loadFromFilesystem(dirHandle) {
     console.log('[Filesystem] Loading from directory...');
@@ -5839,6 +5898,10 @@ async function loadFromFilesystem(dirHandle) {
                         // Compute line count for source/code files
                         if (card.code) {
                             card.lineCount = card.code.split('\n').length;
+                        }
+                        // Resolve relative image paths in markdown content to data URLs
+                        if (card.content && card._path) {
+                            card.content = await resolveMarkdownImages(card.content, card._path, dirHandle);
                         }
                         items.push(card);
                     }
@@ -7286,7 +7349,8 @@ sys.stderr = sys.__stderr__
 // Wiki-style [[links]]: renderMarkdownWithLinks, renderNotePreview, resolveLink, findBacklinks, navigateToItem
 
 // Internal linking
-function renderMarkdownWithLinks(text, containerId = null) {
+// basePath: directory path for resolving relative image URLs (e.g., 'decisions' for 'decisions/foo.md')
+function renderMarkdownWithLinks(text, basePath = null) {
     if (!text) return '';
     
     // Store all special elements to protect from markdown processing
@@ -7358,12 +7422,31 @@ function renderMarkdownWithLinks(text, containerId = null) {
                 return match;
         }
     });
-    
+
+    // Rewrite relative image URLs if basePath is provided
+    // basePath is the item's directory path (e.g., 'decisions' or 'decisions/subdir')
+    if (basePath) {
+        // Ensure basePath ends with / for path joining
+        const baseDir = basePath.endsWith('/') ? basePath : basePath + '/';
+
+        // Rewrite relative image src attributes
+        html = html.replace(/<img([^>]*)\ssrc=["']([^"']+)["']/gi, (match, attrs, src) => {
+            // Skip absolute paths, URLs, and data URIs
+            if (src.startsWith('/') || src.startsWith('http://') ||
+                src.startsWith('https://') || src.startsWith('data:')) {
+                return match;
+            }
+            // Prepend base directory to relative path
+            const resolvedSrc = baseDir + src;
+            return `<img${attrs} src="${resolvedSrc}"`;
+        });
+    }
+
     return html;
 }
 
 // Render preview for note cards (truncated, with clickable links)
-function renderNotePreview(text, format = 'markdown', maxLength = 1200) {
+function renderNotePreview(text, format = 'markdown', maxLength = 1200, basePath = null) {
     if (!text) return '';
 
     // For raw text or yaml format, just escape and truncate
@@ -7395,7 +7478,7 @@ function renderNotePreview(text, format = 'markdown', maxLength = 1200) {
         truncated += '...';
     }
 
-    return renderMarkdownWithLinks(truncated);
+    return renderMarkdownWithLinks(truncated, basePath);
 }
 
 function resolveLink(linkText) {
