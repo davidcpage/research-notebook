@@ -11,6 +11,11 @@
       "description": "Clean, sparse design with subtle accents and generous whitespace"
     },
     {
+      "id": "studio",
+      "name": "Studio",
+      "description": "Hybrid light/dark: light UI and notes, dark code cells for visual contrast"
+    },
+    {
       "id": "terminal",
       "name": "Terminal",
       "description": "Modern dark theme with slate tones and sky blue accents"

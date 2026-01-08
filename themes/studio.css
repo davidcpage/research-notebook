@@ -1,0 +1,413 @@
+/*
+ * Research Notebook Theme: "Studio"
+ *
+ * A hybrid light/dark theme: light UI and markdown notes,
+ * dark code cells. The contrast creates clear visual distinction
+ * between prose and code content.
+ *
+ * Optimized for repo mode and git diffs.
+ */
+
+/* ========================================
+   Global Colors - Light UI
+   ======================================== */
+
+:root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f6f8fa;
+    --bg-accent: #24292f;
+    --text-primary: #24292f;
+    --text-secondary: #57606a;
+    --text-muted: #8b949e;
+    --accent: #0969da;
+    --border: #d0d7de;
+    --link-color: #0969da;
+    --link-hover: #0550ae;
+}
+
+/* ========================================
+   Typography - System Fonts
+   ======================================== */
+
+body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+header h1 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+}
+
+header h2 {
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* ========================================
+   Note Cards - Clean White
+   ======================================== */
+
+.card[data-template="note"],
+.modal.viewer[data-template="note"] {
+    --template-border: #d0d7de;
+    --template-bg: #ffffff;
+    --template-preview-bg: #f6f8fa;
+    --template-title-text: #24292f;
+    --template-meta-text: #57606a;
+    --template-heading-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.card[data-template="note"] {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(31, 35, 40, 0.04);
+}
+
+.card[data-template="note"]:hover {
+    border-color: #0969da;
+    box-shadow: 0 1px 3px rgba(31, 35, 40, 0.08);
+}
+
+.card[data-template="note"] .card-preview {
+    border-bottom: 1px solid #eaeef2;
+}
+
+.modal.viewer[data-template="note"] .viewer-content {
+    line-height: 1.65;
+    background: white;
+}
+
+/* ========================================
+   Bookmark Cards - Clean Border
+   ======================================== */
+
+.card[data-template="bookmark"],
+.modal.viewer[data-template="bookmark"] {
+    --template-border: #d0d7de;
+    --template-bg: #ffffff;
+    --template-preview-bg: #f6f8fa;
+    --template-title-text: #24292f;
+    --template-meta-text: #57606a;
+}
+
+.card[data-template="bookmark"] {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.card[data-template="bookmark"]:hover {
+    border-color: #0969da;
+}
+
+/* ========================================
+   Lesson Cards - Light Variant
+   ======================================== */
+
+.card[data-template="lesson"],
+.modal.viewer[data-template="lesson"] {
+    --template-border: #d0d7de;
+    --template-bg: #fff8f3;
+    --template-preview-bg: #fff8f3;
+    --template-title-text: #24292f;
+}
+
+.card[data-template="lesson"] {
+    background: #fff8f3;
+    border: 1px solid #f0d7c8;
+}
+
+.card[data-template="lesson"]:hover {
+    border-color: #e07a5f;
+}
+
+/* ========================================
+   Git Diff Styling
+   ======================================== */
+
+/* Preserve dark styling for code diffs */
+.modal.viewer[data-template="code"] .viewer-diff,
+.modal.viewer[data-template="source"] .viewer-diff {
+    background: #1e1e1e;
+    color: #d4d4d4;
+}
+
+.modal.viewer[data-template="code"] .diff-removed,
+.modal.viewer[data-template="source"] .diff-removed {
+    background: rgba(244, 67, 54, 0.2);
+    color: #f48771;
+}
+
+.modal.viewer[data-template="code"] .diff-added,
+.modal.viewer[data-template="source"] .diff-added {
+    background: rgba(76, 175, 80, 0.2);
+    color: #89d185;
+}
+
+.modal.viewer[data-template="code"] .diff-context,
+.modal.viewer[data-template="source"] .diff-context {
+    color: #d4d4d4;
+}
+
+.modal.viewer[data-template="code"] .diff-hunk,
+.modal.viewer[data-template="source"] .diff-hunk {
+    color: #569cd6;
+    background: rgba(86, 156, 214, 0.1);
+}
+
+/* Card diff stats badges - white background works on both light and dark cards */
+.card .diff-stats {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #d0d7de;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.card .diff-stats .additions {
+    color: #1a7f37;
+}
+
+.card .diff-stats .deletions {
+    color: #cf222e;
+}
+
+/* Rich inline diff blocks (markdown viewer) */
+.diff-block-added {
+    background: #dafbe1;
+    border-left-color: #1a7f37;
+}
+
+.diff-block-added .diff-block-marker {
+    color: #1a7f37;
+}
+
+.diff-block-removed {
+    background: #ffebe9;
+    border-left-color: #cf222e;
+}
+
+.diff-block-removed .diff-block-marker {
+    color: #cf222e;
+}
+
+/* Inline word-level diffs */
+.diff-ins {
+    background: #aceebb;
+    color: #116329;
+}
+
+.diff-del {
+    background: #ffc0c0;
+    color: #82071e;
+    text-decoration: line-through;
+}
+
+/* Diff legend samples */
+.diff-removed-sample {
+    background: #ffebe9;
+    color: #cf222e;
+}
+
+.diff-added-sample {
+    background: #dafbe1;
+    color: #1a7f37;
+}
+
+/* ========================================
+   Commit Selector - Light Style
+   ======================================== */
+
+.commit-selector-dropdown {
+    background: #ffffff;
+    border-color: #d0d7de;
+    box-shadow: 0 8px 24px rgba(31, 35, 40, 0.12);
+}
+
+.commit-selector-header {
+    background: #f6f8fa;
+    border-bottom-color: #d0d7de;
+}
+
+.commit-selector-item {
+    border-bottom-color: #eaeef2;
+}
+
+.commit-selector-item:hover {
+    background: #f6f8fa;
+}
+
+.commit-hash {
+    color: #0550ae;
+    background: #f6f8fa;
+}
+
+/* ========================================
+   Section Headers - Subtle
+   ======================================== */
+
+.section-header h3 {
+    font-weight: 500;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+}
+
+/* ========================================
+   Toolbar
+   ======================================== */
+
+.toolbar {
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border);
+}
+
+/* ========================================
+   Modals - Clean
+   ======================================== */
+
+.modal {
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+}
+
+.modal-header {
+    border-bottom-color: #eaeef2;
+}
+
+.modal-footer {
+    border-top-color: #eaeef2;
+    background: #f6f8fa;
+}
+
+/* ========================================
+   Viewer - Light Background (for notes)
+   ======================================== */
+
+.modal.viewer[data-template="note"] .viewer-content,
+.modal.viewer[data-template="bookmark"] .viewer-content,
+.modal.viewer[data-template="lesson"] .viewer-content {
+    background: #ffffff;
+}
+
+.viewer-header {
+    border-bottom-color: #eaeef2;
+}
+
+/* ========================================
+   Editor - Light Elements
+   ======================================== */
+
+.editor-field input,
+.editor-field textarea,
+.editor-field select {
+    background: #ffffff;
+    border-color: #d0d7de;
+    color: #24292f;
+}
+
+.editor-field input:focus,
+.editor-field textarea:focus,
+.editor-field select:focus {
+    border-color: #0969da;
+    box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+}
+
+/* ========================================
+   Buttons
+   ======================================== */
+
+.btn-primary {
+    background: #2da44e;
+    border-color: #2da44e;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #2c974b;
+    border-color: #2c974b;
+}
+
+.btn-secondary {
+    background: #f6f8fa;
+    border-color: #d0d7de;
+    color: #24292f;
+}
+
+.btn-secondary:hover {
+    background: #eaeef2;
+}
+
+/* ========================================
+   Scrollbars - Subtle Light
+   ======================================== */
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #d0d7de;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #8b949e;
+}
+
+/* ========================================
+   Markdown Content - Light Inline Code
+   ======================================== */
+
+.md-content code {
+    background: #f6f8fa;
+    color: #24292f;
+    border: 1px solid #eaeef2;
+}
+
+.md-content pre {
+    background: #f6f8fa;
+    border: 1px solid #eaeef2;
+}
+
+.md-content pre code {
+    border: none;
+}
+
+.md-content blockquote {
+    border-left-color: #d0d7de;
+    background: #f6f8fa;
+    color: #57606a;
+}
+
+/* ========================================
+   Tags - Softer Colors
+   ======================================== */
+
+.tag-badge {
+    background: #eaeef2;
+    color: #57606a;
+}
+
+.tag-badge.tag-completed {
+    background: #aceebb;
+    color: #116329;
+}
+
+.tag-badge.tag-ongoing {
+    background: #fdeeca;
+    color: #744210;
+}
+
+.tag-badge.tag-future {
+    background: #ddf4ff;
+    color: #0550ae;
+}
