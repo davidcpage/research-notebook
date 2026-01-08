@@ -94,6 +94,29 @@ If cards fail to render with `[Render] Unknown template: X` in the console, chec
 - **Auto-creation**: `ensureTemplateFiles()` creates `.notebook/` directory structure with settings and theme for new notebooks
 - **Modified indicator**: README.md, CLAUDE.md, and theme.css show orange "MODIFIED" badge when they differ from defaults. Viewer shows "Show Diff" button (uses jsdiff library) and "Reset to Defaults" buttons. Key functions: `isSystemCardModified()`, `getSystemCardDefaultContent()`, `showSystemCardDiff()`, `resetSystemCardDefaults()`
 
+### Adding new settings fields
+To add a new setting, update these two files:
+
+1. **js/app.js** - Add to `SETTINGS_SCHEMA` with default value:
+   ```javascript
+   my_setting: { default: 'value' },
+   ```
+
+2. **defaults/templates/settings.yaml** - Add schema and editor field:
+   ```yaml
+   # In schema section:
+   my_setting:
+     type: boolean  # or text, list, select, etc.
+     default: false
+     description: What this setting does
+
+   # In editor.fields section:
+   - field: my_setting
+     label: My Setting
+   ```
+
+The save/load flows iterate over `SETTINGS_SCHEMA` keys automatically, so no other changes needed for basic settings. For settings that require side effects (like `excluded_paths` triggering a reload), add handling in `saveCardFile()`.
+
 ### Theming
 The app uses a two-layer theme system: base themes + notebook customizations.
 

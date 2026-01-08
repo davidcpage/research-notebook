@@ -70,6 +70,11 @@ schema:
     type: boolean
     default: false
     description: Smaller cards for viewing large codebases
+  excluded_paths:
+    type: list
+    default:
+      - node_modules
+    description: Directory names to skip when scanning (e.g., node_modules, __pycache__, dist)
 card:
   layout: yaml
   placeholder: "⚙"
@@ -110,6 +115,8 @@ editor:
       label: Preserve Directory Names
     - field: compact_cards
       label: Compact Cards
+    - field: excluded_paths
+      label: Excluded Directories
 style:
   variables:
     --preview-bg: "#f5f5f5"

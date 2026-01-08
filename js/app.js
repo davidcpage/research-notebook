@@ -794,8 +794,10 @@ async function detectInUseCardTypes(dirHandle) {
         try {
             for await (const entry of handle.values()) {
                 if (entry.kind === 'directory') {
-                    // Skip hidden directories and reserved paths
-                    if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+                    // Skip hidden directories and excluded paths
+                    if (entry.name.startsWith('.')) continue;
+                    const excludedPaths = notebookSettings?.excluded_paths ?? ['node_modules'];
+                    if (excludedPaths.includes(entry.name)) continue;
                     try {
                         const subHandle = await handle.getDirectoryHandle(entry.name);
                         await scanDir(subHandle);
@@ -1112,6 +1114,7 @@ const SETTINGS_SCHEMA = {
     sort_by: { default: 'modified' }, // Sort cards by: 'modified', 'title', 'created', 'filename'
     preserve_dir_names: { default: false }, // Show directory names as-is (default: Title Case)
     compact_cards: { default: false }, // Smaller cards for viewing large codebases
+    excluded_paths: { default: ['node_modules'] }, // Directory names to skip during scan
     grading: { default: null }            // Grading settings: { roster_path, show_student_names }
 };
 
@@ -5755,6 +5758,11 @@ async function loadFromFilesystem(dirHandle) {
                 if (name.startsWith('_') || name.startsWith('.')) continue;  // Skip metadata/hidden files
 
                 if (handle.kind === 'directory') {
+                    // Skip excluded directories (e.g., node_modules)
+                    const excludedPaths = notebookSettings?.excluded_paths ?? ['node_modules'];
+                    if (excludedPaths.includes(name)) {
+                        continue;
+                    }
                     // Collect all subdirectories for recursive loading
                     subdirs[name] = handle;
                     continue;
@@ -6054,17 +6062,18 @@ async function loadFromFilesystem(dirHandle) {
         const notebookSection = loadedData.sections.find(s => s._dirName === '.notebook');
         const settingsCard = notebookSection?.items.find(n => n.template === 'settings');
         if (settingsCard) {
+            // Sync all settings from notebookSettings to card (for editor display)
+            // This avoids having to explicitly list each field (which is error-prone)
+            for (const key of Object.keys(SETTINGS_SCHEMA)) {
+                if (notebookSettings?.[key] !== undefined) {
+                    settingsCard[key] = notebookSettings[key];
+                }
+            }
+            // Override sections with actual discovered sections (includes visibility)
             settingsCard.sections = loadedData.sections.map(s => ({
                 dir: s._dirName,
                 visible: s.visible !== false
             }));
-            // Sync settings to card so editor shows correct values (including auto-detected ones)
-            settingsCard.preserve_dir_names = notebookSettings?.preserve_dir_names ?? false;
-            settingsCard.source_cards_editable = notebookSettings?.source_cards_editable ?? false;
-            settingsCard.notes_editable = notebookSettings?.notes_editable ?? true;
-            settingsCard.sort_by = notebookSettings?.sort_by ?? 'modified';
-            settingsCard.quiz_template_mode = notebookSettings?.quiz_template_mode ?? false;
-            settingsCard.compact_cards = notebookSettings?.compact_cards ?? false;
         }
 
         return loadedData;
@@ -6154,23 +6163,18 @@ async function saveCardFile(sectionId, card) {
 
     // Settings card is handled specially
     if (card.template === 'settings' || card.filename === 'settings.yaml') {
-        // Update notebookSettings from the card fields, preserving existing values for unlisted fields
-        notebookSettings = buildSettingsObject({
-            ...notebookSettings,  // Preserve existing settings (e.g., auto-detected preserve_dir_names)
-            notebook_title: card.notebook_title,
-            notebook_subtitle: card.notebook_subtitle,
-            sections: card.sections || notebookSettings?.sections,
-            default_author: card.default_author,
-            authors: card.authors,
-            theme: card.theme,
-            enabled_templates: card.enabled_templates,
-            quiz_template_mode: card.quiz_template_mode,
-            source_cards_editable: card.source_cards_editable,
-            notes_editable: card.notes_editable,
-            sort_by: card.sort_by,
-            preserve_dir_names: card.preserve_dir_names,
-            compact_cards: card.compact_cards
-        });
+        // Track if excluded_paths changed (requires filesystem reload)
+        const oldExcludedPaths = JSON.stringify(notebookSettings?.excluded_paths ?? ['node_modules']);
+
+        // Update notebookSettings from card fields defined in SETTINGS_SCHEMA
+        // This avoids having to explicitly list each field (which is error-prone)
+        const updatedSettings = { ...notebookSettings };
+        for (const key of Object.keys(SETTINGS_SCHEMA)) {
+            if (card[key] !== undefined) {
+                updatedSettings[key] = card[key];
+            }
+        }
+        notebookSettings = buildSettingsObject(updatedSettings);
         // Also update data.title/subtitle so UI reflects changes
         data.title = notebookSettings.notebook_title;
         data.subtitle = notebookSettings.notebook_subtitle;
@@ -6245,6 +6249,13 @@ async function saveCardFile(sectionId, card) {
         card.id = 'system-settings.yaml';
         recordSave('.notebook/settings.yaml');
         console.log('[Filesystem] Saved .notebook/settings.yaml');
+
+        // If excluded_paths changed, reload from filesystem to rescan directories
+        const newExcludedPaths = JSON.stringify(notebookSettings?.excluded_paths ?? ['node_modules']);
+        if (oldExcludedPaths !== newExcludedPaths) {
+            console.log('[Settings] excluded_paths changed, reloading from filesystem');
+            await reloadFromFilesystem(false);  // false = don't show notification
+        }
         return;
     }
 
