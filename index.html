@@ -79,7 +79,10 @@
             </button>
         </div>
         <div class="toolbar-group" style="margin-left: auto;">
-            <button class="btn btn-secondary" onclick="openSettingsEditor()" title="Settings" style="color: var(--text-muted);">
+            <button id="diffModeBtn" class="btn btn-secondary btn-icon-only" onclick="toggleDiffMode()" title="Compare with previous commit" style="display: none;">
+                <span class="btn-icon">◔</span>
+            </button>
+            <button class="btn btn-secondary btn-icon-only" onclick="openSettingsEditor()" title="Settings">
                 <span class="btn-icon">⚙</span>
             </button>
         </div>

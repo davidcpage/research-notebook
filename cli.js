@@ -7,14 +7,18 @@
  *   notebook              # Start server on port 8080, open browser
  *   notebook --port 3000  # Custom port
  *   notebook --no-open    # Don't auto-open browser
+ *   notebook /path/to/nb  # Enable git features for specified notebook
  */
 
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { join, extname } from 'node:path';
+import { join, extname, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { platform } from 'node:os';
+
+const execFileAsync = promisify(execFile);
 
 // Get the directory where this script lives (the repo root)
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -48,6 +52,7 @@ function parseArgs(args) {
     const options = {
         port: 8080,
         open: true,
+        notebookPath: null,  // Path to notebook for git features
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -65,19 +70,26 @@ function parseArgs(args) {
 Notebook - File-based notebook for notes, code, and bookmarks
 
 Usage:
-  notebook [options]
+  notebook [options] [notebook-path]
 
 Options:
   --port, -p <port>  Port to listen on (default: 8080)
   --no-open          Don't auto-open browser
   --help, -h         Show this help message
 
+Arguments:
+  notebook-path      Path to notebook directory (enables git history features)
+
 Examples:
   notebook              # Start on port 8080, open browser
   notebook -p 3000      # Start on port 3000
   notebook --no-open    # Start without opening browser
+  notebook ./my-notes   # Enable git features for ./my-notes
 `);
             process.exit(0);
+        } else if (!arg.startsWith('-')) {
+            // Positional argument is the notebook path
+            options.notebookPath = resolve(arg);
         }
     }
 
@@ -103,6 +115,209 @@ function openBrowser(url) {
             console.log(`Could not open browser automatically. Please visit: ${url}`);
         }
     });
+}
+
+// Git API: Get commit log (repo-level or file-level)
+async function gitLog(notebookPath, filePath = null, limit = 20) {
+    // If filePath provided, validate it
+    if (filePath) {
+        const fullPath = join(notebookPath, filePath);
+        const relativePath = relative(notebookPath, fullPath);
+
+        if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
+            throw new Error('Invalid path');
+        }
+    }
+
+    try {
+        const args = [
+            'log',
+            `--max-count=${limit}`,
+            '--format=%H%x00%h%x00%s%x00%ai%x00%an'
+        ];
+
+        // Add file-specific options if path provided
+        if (filePath) {
+            args.push('--follow', '--', filePath);
+        }
+
+        const { stdout } = await execFileAsync('git', args, { cwd: notebookPath });
+
+        if (!stdout.trim()) {
+            return [];
+        }
+
+        return stdout.trim().split('\n').map(line => {
+            const [hash, shortHash, subject, date, author] = line.split('\x00');
+            return { hash, shortHash, subject, date, author };
+        });
+    } catch (err) {
+        if (err.message?.includes('not a git repository') || err.stderr?.includes('not a git repository')) {
+            return { error: 'not_a_repo' };
+        }
+        throw err;
+    }
+}
+
+// Git API: Get diff stats between a commit and working tree
+async function gitDiffStat(notebookPath, commit) {
+    // Security: sanitize commit ref
+    if (!/^[a-zA-Z0-9._\-/^~]+$/.test(commit)) {
+        throw new Error('Invalid commit ref');
+    }
+
+    try {
+        // Get list of changed files with stats
+        const { stdout } = await execFileAsync('git', [
+            'diff',
+            '--numstat',
+            commit
+        ], { cwd: notebookPath });
+
+        const files = {};
+
+        if (stdout.trim()) {
+            for (const line of stdout.trim().split('\n')) {
+                const [additions, deletions, filePath] = line.split('\t');
+                // Handle binary files (shown as - -)
+                files[filePath] = {
+                    additions: additions === '-' ? 0 : parseInt(additions, 10),
+                    deletions: deletions === '-' ? 0 : parseInt(deletions, 10),
+                    binary: additions === '-'
+                };
+            }
+        }
+
+        // Also check for untracked files
+        const { stdout: untrackedOut } = await execFileAsync('git', [
+            'ls-files',
+            '--others',
+            '--exclude-standard'
+        ], { cwd: notebookPath });
+
+        if (untrackedOut.trim()) {
+            for (const filePath of untrackedOut.trim().split('\n')) {
+                if (!files[filePath]) {
+                    files[filePath] = { additions: 0, deletions: 0, untracked: true };
+                }
+            }
+        }
+
+        return { files };
+    } catch (err) {
+        if (err.stderr?.includes('not a git repository')) {
+            return { error: 'not_a_repo' };
+        }
+        throw err;
+    }
+}
+
+// Git API: Get file content at a specific commit
+async function gitShow(notebookPath, filePath, commit) {
+    const fullPath = join(notebookPath, filePath);
+    const relativePath = relative(notebookPath, fullPath);
+
+    // Security: ensure path is within notebook
+    if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
+        throw new Error('Invalid path');
+    }
+
+    // Security: sanitize commit ref (allow only safe characters)
+    if (!/^[a-zA-Z0-9._\-/^~]+$/.test(commit)) {
+        throw new Error('Invalid commit ref');
+    }
+
+    try {
+        const { stdout } = await execFileAsync('git', [
+            'show',
+            `${commit}:${relativePath}`
+        ], { cwd: notebookPath, maxBuffer: 10 * 1024 * 1024 });
+
+        return { content: stdout };
+    } catch (err) {
+        if (err.stderr?.includes('does not exist')) {
+            return { error: 'not_found', message: 'File does not exist at this commit' };
+        }
+        if (err.stderr?.includes('not a git repository')) {
+            return { error: 'not_a_repo' };
+        }
+        throw err;
+    }
+}
+
+// Handle API requests
+async function handleApiRequest(req, res, url, notebookPath) {
+    res.setHeader('Content-Type', 'application/json');
+
+    if (!notebookPath) {
+        res.writeHead(503);
+        res.end(JSON.stringify({
+            error: 'git_not_configured',
+            message: 'Git features require starting server with notebook path: notebook /path/to/notebook'
+        }));
+        return true;
+    }
+
+    try {
+        if (url.pathname === '/api/git-log') {
+            const filePath = url.searchParams.get('path');  // Optional - null for repo-level
+            const limit = parseInt(url.searchParams.get('limit') || '20', 10);
+
+            const result = await gitLog(notebookPath, filePath, limit);
+            res.writeHead(200);
+            res.end(JSON.stringify(result));
+            return true;
+        }
+
+        if (url.pathname === '/api/git-diff-stat') {
+            const commit = url.searchParams.get('commit');
+
+            if (!commit) {
+                res.writeHead(400);
+                res.end(JSON.stringify({ error: 'missing_commit', message: 'commit parameter required' }));
+                return true;
+            }
+
+            const result = await gitDiffStat(notebookPath, commit);
+            if (result.error) {
+                res.writeHead(500);
+            } else {
+                res.writeHead(200);
+            }
+            res.end(JSON.stringify(result));
+            return true;
+        }
+
+        if (url.pathname === '/api/git-show') {
+            const filePath = url.searchParams.get('path');
+            const commit = url.searchParams.get('commit');
+
+            if (!filePath || !commit) {
+                res.writeHead(400);
+                res.end(JSON.stringify({ error: 'missing_params', message: 'path and commit required' }));
+                return true;
+            }
+
+            const result = await gitShow(notebookPath, filePath, commit);
+            if (result.error) {
+                res.writeHead(result.error === 'not_found' ? 404 : 500);
+            } else {
+                res.writeHead(200);
+            }
+            res.end(JSON.stringify(result));
+            return true;
+        }
+
+        // Unknown API endpoint
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'not_found' }));
+        return true;
+    } catch (err) {
+        console.error('API error:', err);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'server_error', message: err.message }));
+        return true;
+    }
 }
 
 // Serve a static file
@@ -149,6 +364,12 @@ async function main() {
             return;
         }
 
+        // Handle API requests
+        if (pathname.startsWith('/api/')) {
+            await handleApiRequest(req, res, url, options.notebookPath);
+            return;
+        }
+
         // Default to index.html
         if (pathname === '/') {
             pathname = '/index.html';
@@ -160,16 +381,23 @@ async function main() {
 
     server.listen(options.port, () => {
         const url = `http://localhost:${options.port}`;
+        const gitStatus = options.notebookPath
+            ? `Git:    ${options.notebookPath}`
+            : 'Git:    (not configured)';
+        const boxWidth = Math.max(41, gitStatus.length + 6);
+        const pad = (s, w) => s + ' '.repeat(w - s.length);
+
         console.log(`
-┌─────────────────────────────────────────┐
-│                                         │
-│   Notebook server running               │
-│                                         │
-│   Local:  ${url.padEnd(25)}  │
-│                                         │
-│   Press Ctrl+C to stop                  │
-│                                         │
-└─────────────────────────────────────────┘
+┌${'─'.repeat(boxWidth)}┐
+│${' '.repeat(boxWidth)}│
+│  Notebook server running${' '.repeat(boxWidth - 26)}│
+│${' '.repeat(boxWidth)}│
+│  Local:  ${pad(url, boxWidth - 10)}│
+│  ${pad(gitStatus, boxWidth - 3)}│
+│${' '.repeat(boxWidth)}│
+│  Press Ctrl+C to stop${' '.repeat(boxWidth - 23)}│
+│${' '.repeat(boxWidth)}│
+└${'─'.repeat(boxWidth)}┘
 `);
 
         if (options.open) {

@@ -2001,13 +2001,26 @@ function renderCard(sectionId, card) {
     const modifiedBadge = isModified ? '<span class="modified-badge">MODIFIED</span>' : '';
     const tagBadges = renderTagBadges(card);
 
+    // Check for git diff mode changes
+    const hasChanges = cardHasChanges(card);
+    const changesClass = hasChanges ? ' has-changes' : '';
+    const diffStats = getCardDiffStats(card);
+    const diffStatsBadge = diffStats ? `
+        <div class="diff-stats">
+            ${diffStats.additions > 0 ? `<span class="additions">+${diffStats.additions}</span>` : ''}
+            ${diffStats.deletions > 0 ? `<span class="deletions">-${diffStats.deletions}</span>` : ''}
+            ${diffStats.untracked ? '<span class="additions">new</span>' : ''}
+        </div>
+    ` : '';
+
     return `
-        <div class="card${modifiedClass}"
+        <div class="card${modifiedClass}${changesClass}"
              data-template="${template.name}"
              data-item-id="${card.id}"
              data-section-id="${sectionId}"
              onclick="openViewer('${sectionId}', '${card.id}')">
             ${modifiedBadge}
+            ${diffStatsBadge}
             <div class="card-preview">${preview}</div>
             <div class="card-content">
                 <h3 class="card-title">${titleHtml}</h3>
@@ -2293,14 +2306,51 @@ function openViewer(sectionId, itemId) {
 
     // Render content based on viewer layout, with author badge inside content area
     const contentEl = document.getElementById('viewerContent');
-    contentEl.innerHTML = renderViewerContent(card, template) + renderAuthorBadge(card);
 
-    // Apply syntax highlighting if needed
-    contentEl.querySelectorAll('pre code').forEach(el => {
-        if (!el.getAttribute('data-highlighted')) {
-            hljs.highlightElement(el);
-        }
-    });
+    // In diff mode with changes, show diff content
+    if (diffMode.active && cardHasChanges(card)) {
+        contentEl.innerHTML = '<div class="viewer-loading">Loading diff...</div>';
+        // Load diff asynchronously
+        getCardDiff(card).then(diffResult => {
+            if (diffResult) {
+                const diffStats = getCardDiffStats(card);
+                const statsText = diffStats ? `+${diffStats.additions} -${diffStats.deletions}` : '';
+
+                if (diffResult.type === 'rich') {
+                    // Rich diff for markdown - side by side rendered view
+                    contentEl.innerHTML = `
+                        <div class="viewer-diff-header">
+                            <span class="diff-comparing">Changes since ${diffMode.commitInfo?.shortHash || 'commit'}</span>
+                            <span class="diff-stats-inline">${statsText}</span>
+                        </div>
+                        ${diffResult.html}
+                    `;
+                } else {
+                    // Unified diff for code/other files
+                    contentEl.innerHTML = `
+                        <div class="viewer-diff-header">
+                            <span class="diff-comparing">Changes since ${diffMode.commitInfo?.shortHash || 'commit'}</span>
+                            <span class="diff-stats-inline">${statsText}</span>
+                        </div>
+                        <pre class="diff-content viewer-diff">${diffResult.html}</pre>
+                    `;
+                }
+            } else {
+                contentEl.innerHTML = renderViewerContent(card, template) + renderAuthorBadge(card);
+            }
+        });
+    } else {
+        contentEl.innerHTML = renderViewerContent(card, template) + renderAuthorBadge(card);
+    }
+
+    // Apply syntax highlighting if needed (for non-diff content)
+    if (!diffMode.active || !cardHasChanges(card)) {
+        contentEl.querySelectorAll('pre code').forEach(el => {
+            if (!el.getAttribute('data-highlighted')) {
+                hljs.highlightElement(el);
+            }
+        });
+    }
 
     // Add backlinks
     const backlinks = findBacklinks(itemId);
@@ -2830,6 +2880,475 @@ function formatDiffHtml(diff) {
 
 function closeDiffModal() {
     document.getElementById('diffModal').classList.remove('active');
+}
+
+// ========== Git Diff Mode ==========
+// Notebook-level diff mode: compare all cards against a selected commit
+
+let diffMode = {
+    active: false,
+    commit: null,           // Commit hash to compare against
+    commitInfo: null,       // { shortHash, subject, date }
+    changedFiles: {},       // Map of filePath -> { additions, deletions, status }
+    commits: [],            // Recent commits for selection
+    diffCache: {}           // Cache of file diffs: filePath -> diffHtml
+};
+
+// Format relative time for git commits
+function formatCommitTime(dateStr) {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now - date;
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(hours / 24);
+
+    if (hours < 1) return 'just now';
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    if (days < 30) return `${Math.floor(days / 7)}w ago`;
+    return date.toLocaleDateString();
+}
+
+// Fetch recent commits for the notebook
+async function fetchRecentCommits() {
+    try {
+        const response = await fetch('/api/git-log?limit=20');
+        if (!response.ok) {
+            const error = await response.json();
+            return { error: error.error };
+        }
+        return await response.json();
+    } catch (err) {
+        console.error('[Git] Failed to fetch commits:', err);
+        return null;
+    }
+}
+
+// Fetch diff stats between a commit and working tree
+async function fetchDiffStats(commit) {
+    try {
+        const response = await fetch(`/api/git-diff-stat?commit=${encodeURIComponent(commit)}`);
+        if (!response.ok) {
+            return null;
+        }
+        return await response.json();
+    } catch (err) {
+        console.error('[Git] Failed to fetch diff stats:', err);
+        return null;
+    }
+}
+
+// Toggle diff mode on/off
+async function toggleDiffMode() {
+    if (diffMode.active) {
+        exitDiffMode();
+        return;
+    }
+
+    // Fetch recent commits
+    const commits = await fetchRecentCommits();
+
+    if (!commits) {
+        showToast('Could not fetch git history');
+        return;
+    }
+
+    if (commits.error === 'git_not_configured') {
+        showToast('Git features require: notebook /path/to/notebook');
+        return;
+    }
+
+    if (commits.error === 'not_a_repo') {
+        showToast('Notebook is not a git repository');
+        return;
+    }
+
+    if (commits.length === 0) {
+        showToast('No git history available');
+        return;
+    }
+
+    diffMode.commits = commits;
+    showCommitSelector();
+}
+
+// Show commit selector dropdown
+function showCommitSelector() {
+    const existing = document.getElementById('commitSelectorDropdown');
+    if (existing) {
+        existing.remove();
+        return;
+    }
+
+    const dropdownHtml = `
+        <div class="commit-selector-dropdown" id="commitSelectorDropdown">
+            <div class="commit-selector-header">Compare working tree with...</div>
+            <div class="commit-selector-list">
+                ${diffMode.commits.map((c, i) => `
+                    <div class="commit-selector-item" data-commit="${escapeHtml(c.hash)}">
+                        <span class="git-commit-hash">${escapeHtml(c.shortHash)}</span>
+                        <span class="git-commit-subject">${escapeHtml(c.subject)}</span>
+                        <span class="git-commit-time">${formatCommitTime(c.date)}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+
+    // Add dropdown near the diff mode button (in toolbar)
+    const toolbar = document.querySelector('.toolbar');
+    toolbar.insertAdjacentHTML('beforeend', dropdownHtml);
+
+    // Add click handlers
+    document.querySelectorAll('.commit-selector-item').forEach(item => {
+        item.onclick = () => enterDiffMode(item.dataset.commit);
+    });
+
+    // Close on click outside
+    setTimeout(() => {
+        document.addEventListener('click', closeCommitSelector);
+    }, 0);
+}
+
+function closeCommitSelector(e) {
+    const dropdown = document.getElementById('commitSelectorDropdown');
+    if (dropdown && !dropdown.contains(e?.target) && !e?.target?.closest('.btn-diff-mode')) {
+        dropdown.remove();
+        document.removeEventListener('click', closeCommitSelector);
+    }
+}
+
+// Enter diff mode with selected commit
+async function enterDiffMode(commitHash) {
+    // Close dropdown
+    const dropdown = document.getElementById('commitSelectorDropdown');
+    if (dropdown) dropdown.remove();
+    document.removeEventListener('click', closeCommitSelector);
+
+    // Find commit info
+    const commitInfo = diffMode.commits.find(c => c.hash === commitHash);
+
+    // Fetch diff stats
+    const stats = await fetchDiffStats(commitHash);
+    if (!stats || stats.error) {
+        showToast('Could not fetch diff information');
+        return;
+    }
+
+    // Activate diff mode
+    diffMode.active = true;
+    diffMode.commit = commitHash;
+    diffMode.commitInfo = commitInfo;
+    diffMode.changedFiles = stats.files || {};
+    diffMode.diffCache = {};
+
+    // Update UI
+    document.body.classList.add('diff-mode-active');
+    updateDiffModeButton();
+    render();
+
+    const fileCount = Object.keys(diffMode.changedFiles).length;
+    showToast(`Diff mode: ${fileCount} file${fileCount !== 1 ? 's' : ''} changed since ${commitInfo?.shortHash || commitHash.slice(0, 7)}`);
+}
+
+// Exit diff mode
+function exitDiffMode() {
+    diffMode.active = false;
+    diffMode.commit = null;
+    diffMode.commitInfo = null;
+    diffMode.changedFiles = {};
+    diffMode.diffCache = {};
+
+    document.body.classList.remove('diff-mode-active');
+    updateDiffModeButton();
+    render();
+}
+
+// Update diff mode button state
+function updateDiffModeButton() {
+    const btn = document.getElementById('diffModeBtn');
+    if (!btn) return;
+
+    if (diffMode.active) {
+        btn.classList.add('active');
+        btn.title = `Comparing with ${diffMode.commitInfo?.subject || diffMode.commit}\nClick to exit diff mode`;
+    } else {
+        btn.classList.remove('active');
+        btn.title = 'Compare with previous commit';
+    }
+}
+
+// Check if git features are available and show/hide diff button
+async function checkGitAvailability() {
+    const btn = document.getElementById('diffModeBtn');
+    if (!btn) return;
+
+    try {
+        const response = await fetch('/api/git-log?limit=1');
+        const result = await response.json();
+
+        // Show button if git is available (not an error response)
+        if (!result.error) {
+            btn.style.display = '';
+        }
+    } catch (err) {
+        // Git not available - button stays hidden
+    }
+}
+
+// Check if a card has changes in diff mode
+function cardHasChanges(card) {
+    if (!diffMode.active) return false;
+    const filePath = getCardFilePath(card);
+    return filePath && diffMode.changedFiles[filePath];
+}
+
+// Get diff stats for a card
+function getCardDiffStats(card) {
+    if (!diffMode.active) return null;
+    const filePath = getCardFilePath(card);
+    return filePath ? diffMode.changedFiles[filePath] : null;
+}
+
+// Fetch and cache diff for a specific card
+async function getCardDiff(card) {
+    const filePath = getCardFilePath(card);
+    if (!filePath || !diffMode.active) return null;
+
+    // Check cache
+    if (diffMode.diffCache[filePath]) {
+        return diffMode.diffCache[filePath];
+    }
+
+    try {
+        // Fetch historical content
+        const response = await fetch(`/api/git-show?path=${encodeURIComponent(filePath)}&commit=${encodeURIComponent(diffMode.commit)}`);
+        const result = await response.json();
+
+        let historicalContent = '';
+        let isNewFile = false;
+        if (result.error === 'not_found') {
+            // New file - no historical content
+            historicalContent = '';
+            isNewFile = true;
+        } else if (result.error) {
+            return null;
+        } else {
+            historicalContent = result.content;
+        }
+
+        // Get current content
+        const currentContent = await getCurrentCardContent(card);
+        if (currentContent === null) {
+            return null;
+        }
+
+        // For markdown files, create a rich diff view
+        const isMarkdown = filePath.endsWith('.md');
+        if (isMarkdown) {
+            const richDiff = createRichMarkdownDiff(historicalContent, currentContent, isNewFile);
+            diffMode.diffCache[filePath] = { type: 'rich', html: richDiff };
+            return diffMode.diffCache[filePath];
+        }
+
+        // For other files, create unified diff
+        const diff = Diff.createTwoFilesPatch(
+            diffMode.commitInfo?.shortHash || 'old',
+            'current',
+            historicalContent,
+            currentContent,
+            `${diffMode.commitInfo?.shortHash || ''} ${diffMode.commitInfo?.subject || ''}`.trim(),
+            'Working tree'
+        );
+
+        const diffHtml = formatDiffHtml(diff);
+        diffMode.diffCache[filePath] = { type: 'unified', html: diffHtml };
+        return diffMode.diffCache[filePath];
+    } catch (err) {
+        console.error('[Git] Failed to get card diff:', err);
+        return null;
+    }
+}
+
+// Create rich inline diff for markdown files
+// Shows a single unified flow with removed sections in red, added in green
+function createRichMarkdownDiff(oldContent, newContent, isNewFile) {
+    // Parse frontmatter from both versions (skip it in diff view)
+    const oldBody = extractMarkdownBody(oldContent);
+    const newBody = extractMarkdownBody(newContent);
+
+    if (isNewFile) {
+        // New file - just show the new content with "new file" indicator
+        const rendered = renderMarkdownWithLinks(newBody);
+        return `
+            <div class="rich-diff-inline">
+                <div class="diff-block diff-block-added">
+                    <div class="diff-block-marker">new file</div>
+                    <div class="diff-block-content md-content">${rendered}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Split content into segments (code blocks vs prose) to diff atomically
+    const oldSegments = splitMarkdownSegments(oldBody);
+    const newSegments = splitMarkdownSegments(newBody);
+
+    // Diff at segment level - treats code blocks as atomic units
+    const diffResult = Diff.diffArrays(oldSegments, newSegments);
+
+    // Build unified inline diff with rendered markdown blocks
+    let html = '<div class="rich-diff-inline">';
+
+    for (const part of diffResult) {
+        // Join segments back together for rendering
+        const text = part.value.join('\n\n').trim();
+        if (!text) continue;
+
+        const rendered = renderMarkdownWithLinks(text);
+
+        if (part.added) {
+            html += `
+                <div class="diff-block diff-block-added">
+                    <div class="diff-block-marker">+</div>
+                    <div class="diff-block-content md-content">${rendered}</div>
+                </div>
+            `;
+        } else if (part.removed) {
+            html += `
+                <div class="diff-block diff-block-removed">
+                    <div class="diff-block-marker">−</div>
+                    <div class="diff-block-content md-content">${rendered}</div>
+                </div>
+            `;
+        } else {
+            // Unchanged - render normally without highlight
+            html += `
+                <div class="diff-block diff-block-unchanged">
+                    <div class="diff-block-content md-content">${rendered}</div>
+                </div>
+            `;
+        }
+    }
+
+    html += '</div>';
+
+    // Also provide expandable word-level diff for detailed inspection
+    const wordDiff = Diff.diffWords(oldBody, newBody);
+    let inlineDiff = '';
+    for (const part of wordDiff) {
+        const text = escapeHtml(part.value);
+        if (part.added) {
+            inlineDiff += `<ins class="diff-ins">${text}</ins>`;
+        } else if (part.removed) {
+            inlineDiff += `<del class="diff-del">${text}</del>`;
+        } else {
+            inlineDiff += text;
+        }
+    }
+
+    html += `
+        <details class="rich-diff-raw">
+            <summary>Show word-level changes</summary>
+            <pre class="diff-inline-content">${inlineDiff}</pre>
+        </details>
+    `;
+
+    return html;
+}
+
+// Split markdown into segments for diffing - keeps code blocks atomic
+// Returns array of segments (each is either a code block or prose block)
+function splitMarkdownSegments(content) {
+    const segments = [];
+    const lines = content.split('\n');
+    let currentSegment = [];
+    let inCodeBlock = false;
+
+    for (const line of lines) {
+        if (line.trim().startsWith('```')) {
+            if (inCodeBlock) {
+                // End of code block - include closing fence and finalize
+                currentSegment.push(line);
+                segments.push(currentSegment.join('\n'));
+                currentSegment = [];
+                inCodeBlock = false;
+            } else {
+                // Start of code block - finalize prose first
+                if (currentSegment.length > 0) {
+                    const prose = currentSegment.join('\n').trim();
+                    if (prose) segments.push(prose);
+                }
+                currentSegment = [line];
+                inCodeBlock = true;
+            }
+        } else {
+            currentSegment.push(line);
+        }
+    }
+
+    // Finalize last segment
+    if (currentSegment.length > 0) {
+        const text = currentSegment.join('\n').trim();
+        if (text) segments.push(text);
+    }
+
+    return segments;
+}
+
+// Extract markdown body (skip YAML frontmatter)
+function extractMarkdownBody(content) {
+    if (!content) return '';
+    if (content.startsWith('---')) {
+        const endIndex = content.indexOf('---', 3);
+        if (endIndex !== -1) {
+            return content.slice(endIndex + 3).trim();
+        }
+    }
+    return content.trim();
+}
+
+// Get current content of a card from its file
+async function getCurrentCardContent(card) {
+    if (!notebookDirHandle) return null;
+
+    // Get filename from _source (set during filesystem loading)
+    const filename = card._source?.filename || card.filename;
+    if (!filename) {
+        console.error('[Git] No filename for card:', card.id);
+        return null;
+    }
+
+    try {
+        // Navigate to the directory containing the file
+        let dirHandle = notebookDirHandle;
+
+        // _path is the directory path (e.g., 'research' or 'research/subdir')
+        if (card._path) {
+            const pathParts = card._path.split('/').filter(p => p);
+            for (const part of pathParts) {
+                dirHandle = await dirHandle.getDirectoryHandle(part);
+            }
+        }
+
+        const fileHandle = await dirHandle.getFileHandle(filename);
+        const file = await fileHandle.getFile();
+        return await file.text();
+    } catch (err) {
+        console.error('[Git] Failed to read current file:', err, { path: card._path, filename });
+        return null;
+    }
+}
+
+// Get full file path for git operations (directory path + filename)
+function getCardFilePath(card) {
+    const filename = card._source?.filename || card.filename;
+    if (!filename) return null;
+
+    if (card._path) {
+        return `${card._path}/${filename}`;
+    }
+    return filename;
 }
 
 async function runViewerCode() {
@@ -8509,6 +9028,9 @@ async function init() {
         // No folder linked - show onboarding
         showOnboarding();
     }
+
+    // Check if git features are available (non-blocking)
+    checkGitAvailability();
 
     // Remove loading state to reveal content (prevents FOUC)
     document.body.classList.remove('loading');

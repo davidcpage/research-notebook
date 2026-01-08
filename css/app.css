@@ -1072,6 +1072,314 @@ body.compact-cards .section-toggle {
     display: block;
 }
 
+/* Icon-only toolbar buttons */
+.btn-icon-only {
+    padding: 0.4rem 0.6rem;
+    color: var(--text-muted);
+    background: transparent;
+    border-color: transparent;
+}
+
+.btn-icon-only:hover {
+    color: var(--text-primary);
+    background: var(--hover-bg);
+    border-color: transparent;
+}
+
+.btn-icon-only .btn-icon {
+    font-size: 1.1rem;
+}
+
+/* Git Diff Mode button */
+#diffModeBtn.active {
+    color: var(--accent-color);
+}
+
+#diffModeBtn.active .btn-icon {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Commit Selector Dropdown */
+.commit-selector-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    min-width: 400px;
+    max-width: 520px;
+    max-height: 400px;
+    overflow: hidden;
+    z-index: 1000;
+}
+
+.commit-selector-header {
+    padding: 12px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-primary);
+}
+
+.commit-selector-list {
+    max-height: 340px;
+    overflow-y: auto;
+}
+
+.commit-selector-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    padding: 10px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.15s;
+    align-items: baseline;
+}
+
+.commit-selector-item:last-child {
+    border-bottom: none;
+}
+
+.commit-selector-item:hover {
+    background: var(--hover-bg);
+}
+
+.git-commit-hash {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--accent-color);
+    background: var(--bg-primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.git-commit-subject {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.git-commit-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* Card diff indicator */
+.card.has-changes {
+    box-shadow: 0 0 0 2px var(--accent-color);
+}
+
+.card.has-changes::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 10px;
+    height: 10px;
+    background: var(--accent-color);
+    border-radius: 50%;
+    z-index: 10;
+}
+
+.card .diff-stats {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    background: rgba(0, 0, 0, 0.7);
+    padding: 2px 6px;
+    border-radius: 4px;
+    z-index: 10;
+}
+
+.card .diff-stats .additions {
+    color: #4ade80;
+}
+
+.card .diff-stats .deletions {
+    color: #f87171;
+}
+
+/* Diff mode body state - hide unchanged cards and empty containers */
+body.diff-mode-active .card:not(.has-changes) {
+    display: none;
+}
+
+body.diff-mode-active .card-grid:not(:has(.card.has-changes)) {
+    display: none;
+}
+
+body.diff-mode-active .subdir-node:not(:has(.card.has-changes)) {
+    display: none;
+}
+
+body.diff-mode-active .section:not(:has(.card.has-changes)) {
+    display: none;
+}
+
+/* Toolbar position for dropdown */
+.toolbar {
+    position: relative;
+}
+
+/* Viewer diff mode */
+.viewer-diff-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 0;
+}
+
+.diff-comparing {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.diff-stats-inline {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+}
+
+.diff-stats-inline .additions,
+.diff-stats-inline {
+    color: #4ade80;
+}
+
+.viewer-diff {
+    margin: 0;
+    padding: 16px;
+    background: #1e1e1e;
+    border-radius: 0;
+    max-height: 60vh;
+    overflow: auto;
+}
+
+/* Rich inline diff for markdown - unified flow */
+.rich-diff-inline {
+    max-height: 60vh;
+    overflow: auto;
+    padding: 8px 0;
+}
+
+.diff-block {
+    display: flex;
+    margin: 0 0 2px 0;
+    border-radius: 4px;
+}
+
+.diff-block-marker {
+    flex-shrink: 0;
+    width: 28px;
+    padding: 8px 0;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.diff-block-content {
+    flex: 1;
+    padding: 8px 16px;
+    min-width: 0;
+}
+
+/* Unchanged blocks */
+.diff-block-unchanged {
+    background: transparent;
+}
+
+.diff-block-unchanged .diff-block-marker {
+    visibility: hidden;
+}
+
+/* Added blocks */
+.diff-block-added {
+    background: rgba(74, 222, 128, 0.12);
+    border-left: 3px solid #4ade80;
+}
+
+.diff-block-added .diff-block-marker {
+    color: #4ade80;
+}
+
+/* Removed blocks */
+.diff-block-removed {
+    background: rgba(248, 113, 113, 0.12);
+    border-left: 3px solid #f87171;
+}
+
+.diff-block-removed .diff-block-marker {
+    color: #f87171;
+}
+
+.diff-block-removed .diff-block-content {
+    opacity: 0.8;
+}
+
+/* Word-level diff view (expandable) */
+.rich-diff-raw {
+    margin: 16px 0 0 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.rich-diff-raw summary {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    background: var(--bg-primary);
+}
+
+.rich-diff-raw summary:hover {
+    color: var(--text-primary);
+}
+
+.diff-inline-content {
+    margin: 0;
+    padding: 16px;
+    background: var(--bg-secondary);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Word-level inline diff highlighting */
+.diff-ins {
+    background: rgba(74, 222, 128, 0.3);
+    color: #22c55e;
+    text-decoration: none;
+    padding: 1px 2px;
+    border-radius: 2px;
+}
+
+.diff-del {
+    background: rgba(248, 113, 113, 0.3);
+    color: #ef4444;
+    text-decoration: line-through;
+    padding: 1px 2px;
+    border-radius: 2px;
+}
+
 /* Card Preview Layouts */
 .preview-placeholder {
     font-size: 3rem;
@@ -1363,6 +1671,7 @@ body.compact-cards .section-toggle {
 .viewer-actions {
     display: flex;
     gap: 0.5rem;
+    position: relative;  /* For git history dropdown positioning */
 }
 
 /* Viewer content layouts - inherits from .md-content */
