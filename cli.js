@@ -23,6 +23,9 @@ const execFileAsync = promisify(execFile);
 // Get the directory where this script lives (the repo root)
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
+// Binary file extensions that need base64 encoding in git show
+const BINARY_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.svg']);
+
 // MIME types for static files
 const MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -227,11 +230,30 @@ async function gitShow(notebookPath, filePath, commit) {
         throw new Error('Invalid commit ref');
     }
 
+    // Check if this is a binary file (images)
+    const ext = extname(filePath).toLowerCase();
+    const isBinary = BINARY_EXTENSIONS.has(ext);
+
     try {
         const { stdout } = await execFileAsync('git', [
             'show',
             `${commit}:${relativePath}`
-        ], { cwd: notebookPath, maxBuffer: 10 * 1024 * 1024 });
+        ], {
+            cwd: notebookPath,
+            maxBuffer: 10 * 1024 * 1024,
+            encoding: isBinary ? 'buffer' : 'utf8'
+        });
+
+        if (isBinary) {
+            // Return base64-encoded content for binary files
+            const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
+            const base64 = stdout.toString('base64');
+            return {
+                content: `data:${mimeType};base64,${base64}`,
+                binary: true,
+                mimeType
+            };
+        }
 
         return { content: stdout };
     } catch (err) {

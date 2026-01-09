@@ -1380,6 +1380,59 @@ body.diff-mode-active .section:not(:has(.card.has-changes)) {
     border-radius: 2px;
 }
 
+/* Image diff view - side by side comparison */
+.image-diff-container {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.image-diff-panel {
+    flex: 1 1 300px;
+    max-width: 450px;
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.image-diff-panel img {
+    max-width: 100%;
+    max-height: 400px;
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+.image-diff-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: center;
+}
+
+.image-diff-old {
+    background: rgba(248, 113, 113, 0.15);
+    border: 2px solid #f87171;
+}
+
+.image-diff-old .image-diff-label {
+    color: #f87171;
+}
+
+.image-diff-new {
+    background: rgba(74, 222, 128, 0.15);
+    border: 2px solid #4ade80;
+}
+
+.image-diff-new .image-diff-label {
+    color: #4ade80;
+}
+
 /* Card Preview Layouts */
 .preview-placeholder {
     font-size: 3rem;

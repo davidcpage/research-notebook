@@ -2325,6 +2325,29 @@ function openViewer(sectionId, itemId) {
                         </div>
                         ${diffResult.html}
                     `;
+                } else if (diffResult.type === 'image') {
+                    // Image diff - show old and new side by side
+                    const oldPanel = diffResult.oldSrc
+                        ? `<div class="image-diff-panel image-diff-old">
+                               <div class="image-diff-label">Removed</div>
+                               <img src="${diffResult.oldSrc}" alt="Previous version">
+                           </div>`
+                        : '';
+                    const newPanel = diffResult.newSrc
+                        ? `<div class="image-diff-panel image-diff-new">
+                               <div class="image-diff-label">${diffResult.isNew ? 'New file' : 'Added'}</div>
+                               <img src="${diffResult.newSrc}" alt="Current version">
+                           </div>`
+                        : '';
+                    contentEl.innerHTML = `
+                        <div class="viewer-diff-header">
+                            <span class="diff-comparing">Changes since ${diffMode.commitInfo?.shortHash || 'commit'}</span>
+                        </div>
+                        <div class="image-diff-container">
+                            ${oldPanel}
+                            ${newPanel}
+                        </div>
+                    `;
                 } else {
                     // Unified diff for code/other files
                     contentEl.innerHTML = `
@@ -3137,6 +3160,26 @@ async function getCardDiff(card) {
             historicalContent = result.content;
         }
 
+        // Check if this is an image file
+        const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
+        const ext = filePath.substring(filePath.lastIndexOf('.')).toLowerCase();
+        const isImage = imageExtensions.includes(ext);
+
+        // For images, show side-by-side comparison
+        if (isImage) {
+            // Historical content is already a data URL from the server (or empty for new files)
+            const oldSrc = isNewFile ? null : historicalContent;
+            // Get current image as data URL
+            const currentSrc = await getCurrentCardContent(card, true);
+            diffMode.diffCache[filePath] = {
+                type: 'image',
+                oldSrc,
+                newSrc: currentSrc,
+                isNew: isNewFile
+            };
+            return diffMode.diffCache[filePath];
+        }
+
         // Get current content
         const currentContent = await getCurrentCardContent(card);
         if (currentContent === null) {
@@ -3309,7 +3352,7 @@ function extractMarkdownBody(content) {
 }
 
 // Get current content of a card from its file
-async function getCurrentCardContent(card) {
+async function getCurrentCardContent(card, asDataUrl = false) {
     if (!notebookDirHandle) return null;
 
     // Get filename from _source (set during filesystem loading)
@@ -3333,6 +3376,17 @@ async function getCurrentCardContent(card) {
 
         const fileHandle = await dirHandle.getFileHandle(filename);
         const file = await fileHandle.getFile();
+
+        // For binary files (images), return as data URL
+        if (asDataUrl) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsDataURL(file);
+            });
+        }
+
         return await file.text();
     } catch (err) {
         console.error('[Git] Failed to read current file:', err, { path: card._path, filename });
