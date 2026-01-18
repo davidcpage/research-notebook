@@ -556,7 +556,7 @@ function renderShortAnswer(question, attemptAnswer, isInteractive = false, quest
     if (isInteractive) {
         // Interactive mode: textarea
         html += `<textarea class="quiz-short-answer-input" data-question-index="${questionIndex}"
-                   placeholder="Type your answer here..."
+                   placeholder="Type your answer here..." spellcheck="false" autocomplete="off"
                    onchange="updateQuizAnswer(${questionIndex}, this.value)"></textarea>`;
     } else if (attemptAnswer) {
         // Review mode: show user response
@@ -576,7 +576,7 @@ function renderWorkedAnswer(question, attemptAnswer, isInteractive = false, ques
         html += `<div class="quiz-worked-input-area">
             <label class="quiz-worked-label">Show your work:</label>
             <textarea class="quiz-worked-input" data-question-index="${questionIndex}"
-                   placeholder="Enter your solution step by step..."
+                   placeholder="Enter your solution step by step..." spellcheck="false" autocomplete="off"
                    onchange="updateQuizAnswer(${questionIndex}, this.value)"></textarea>
         </div>`;
     } else if (attemptAnswer && userAnswer) {
