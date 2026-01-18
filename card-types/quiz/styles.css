@@ -529,6 +529,7 @@
     background: var(--template-preview-bg);
     border-radius: 6px;
     margin-bottom: 1rem;
+    position: relative;
 }
 
 .quiz-mode-label {
@@ -539,6 +540,97 @@
 .quiz-mode-count {
     font-size: 0.9rem;
     color: var(--template-meta-text);
+}
+
+/* Quiz Timer - lives in viewer header */
+.quiz-timer {
+    --timer-green: #7cb87c;
+    --timer-amber: #d4a574;
+
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-right: 0.5rem;
+}
+
+.quiz-timer-ring {
+    flex-shrink: 0;
+}
+
+.quiz-timer-ring-bg {
+    stroke: #e2e8f0;
+}
+
+.quiz-timer-ring-progress {
+    stroke: var(--timer-green);
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.3s ease, stroke 0.5s ease;
+}
+
+.quiz-timer-ring-progress.near-end {
+    stroke: var(--timer-amber);
+}
+
+.quiz-timer-ring.pulsing {
+    animation: gentle-pulse 2s ease-in-out infinite;
+}
+
+@keyframes gentle-pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.85;
+        transform: scale(1.05);
+    }
+}
+
+.quiz-timer-info {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+}
+
+.quiz-timer-text {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--template-title-text);
+}
+
+.quiz-timer-suggested {
+    font-size: 0.8rem;
+    color: var(--template-meta-text);
+}
+
+/* Pacing Messages */
+.quiz-pacing-message {
+    font-size: 0.8rem;
+    color: var(--timer-green);
+    font-style: italic;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    white-space: nowrap;
+}
+
+.quiz-pacing-message.visible {
+    opacity: 1;
+}
+
+/* Duration Summary in Review Mode */
+.quiz-duration-summary {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--template-meta-text);
+}
+
+.quiz-duration-summary.within-time {
+    color: var(--quiz-correct-text);
+}
+
+.quiz-duration-summary.within-time::before {
+    content: "✓ ";
 }
 
 /* Quiz Actions (Submit/Retake) */

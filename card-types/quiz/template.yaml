@@ -9,6 +9,9 @@ schema:
   topic:
     type: text
     description: Subject area for progress tracking
+  suggestedTime:
+    type: number
+    description: Suggested time to complete the quiz in minutes (enables pacing timer)
   description:
     type: markdown
     description: Quiz description shown to students
@@ -137,6 +140,9 @@ schema:
             pending_review:
               type: number
               description: Count of questions awaiting manual review
+        duration:
+          type: number
+          description: Time taken to complete the attempt in seconds
         review:
           type: markdown
           description: Claude's feedback on pending_review questions
@@ -159,6 +165,10 @@ editor:
       width: half
     - field: topic
       label: Topic
+      width: half
+    - field: suggestedTime
+      label: Suggested Time (minutes)
+      type: number
       width: half
     - field: questions
       label: Questions

@@ -24,6 +24,14 @@ import {
 // Structure: { quizId: { questionIndex: answer, ... } }
 let quizAnswers = {};
 
+// Timer state - tracks when each quiz started
+// Structure: { quizId: timestamp }
+let quizStartTimes = {};
+
+// Timer intervals for cleanup
+// Structure: { quizId: intervalId }
+let timerIntervals = {};
+
 // ========== HELPER FUNCTIONS ==========
 
 // Check if a quiz has any graded questions (vs pure survey)
@@ -52,6 +60,181 @@ function quizHasGradedQuestions(questions) {
                 return false;
         }
     });
+}
+
+// ========== TIMER FUNCTIONS ==========
+
+// Format elapsed time rounded to 30 seconds (less stressful)
+function formatElapsedTime(seconds) {
+    // Round to nearest 30 seconds
+    const rounded = Math.round(seconds / 30) * 30;
+    const mins = Math.floor(rounded / 60);
+    const halfMin = (rounded % 60) === 30;
+
+    if (mins === 0 && !halfMin) {
+        return '0 min';
+    } else if (mins === 0 && halfMin) {
+        return '½ min';
+    } else if (halfMin) {
+        return `${mins}½ min`;
+    }
+    return `${mins} min`;
+}
+
+// Get pacing message based on progress
+function getPacingMessage(elapsedPct) {
+    if (elapsedPct >= 100) {
+        return "Take your time to finish carefully";
+    } else if (elapsedPct >= 80) {
+        return "Nearly there, keep going!";
+    } else if (elapsedPct >= 45 && elapsedPct <= 55) {
+        return "Halfway - you're doing well!";
+    } else if (elapsedPct <= 25 && elapsedPct > 5) {
+        return "Good start!";
+    }
+    return null;
+}
+
+// Render timer UI (progress ring + elapsed time)
+function renderTimerUI(card) {
+    const suggestedTime = card.suggestedTime;
+    if (!suggestedTime) return '';
+
+    const suggestedSeconds = suggestedTime * 60;
+    const startTime = quizStartTimes[card.id];
+    const elapsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+    const elapsedPct = Math.min((elapsed / suggestedSeconds) * 100, 100);
+
+    // SVG progress ring
+    const radius = 18;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference * (1 - elapsedPct / 100);
+    const isOverTime = elapsed >= suggestedSeconds;
+    const isNearEnd = elapsedPct >= 80;
+
+    return `
+        <div class="quiz-timer" data-quiz-id="${card.id}" data-suggested-seconds="${suggestedSeconds}">
+            <svg class="quiz-timer-ring ${isOverTime ? 'pulsing' : ''}" width="44" height="44" viewBox="0 0 44 44">
+                <circle class="quiz-timer-ring-bg" cx="22" cy="22" r="${radius}" fill="none" stroke-width="4"/>
+                <circle class="quiz-timer-ring-progress ${isNearEnd ? 'near-end' : ''}"
+                    cx="22" cy="22" r="${radius}" fill="none" stroke-width="4"
+                    stroke-dasharray="${circumference}"
+                    stroke-dashoffset="${strokeDashoffset}"
+                    transform="rotate(-90 22 22)"/>
+            </svg>
+            <div class="quiz-timer-info">
+                <span class="quiz-timer-text">${formatElapsedTime(elapsed)}</span>
+                <span class="quiz-timer-suggested">of ${suggestedTime} min</span>
+            </div>
+        </div>
+    `;
+}
+
+// Start the quiz timer
+function startQuizTimer(quizId, suggestedTime) {
+    // Record start time if not already started
+    if (!quizStartTimes[quizId]) {
+        quizStartTimes[quizId] = Date.now();
+    }
+
+    // Clear any existing interval
+    if (timerIntervals[quizId]) {
+        clearInterval(timerIntervals[quizId]);
+    }
+
+    // Move timer to header after DOM update
+    moveTimerToHeader(quizId);
+
+    // Start update interval (every second)
+    timerIntervals[quizId] = setInterval(() => {
+        updateTimerDisplay(quizId, suggestedTime);
+    }, 1000);
+}
+
+// Stop the quiz timer
+function stopQuizTimer(quizId) {
+    if (timerIntervals[quizId]) {
+        clearInterval(timerIntervals[quizId]);
+        delete timerIntervals[quizId];
+    }
+}
+
+// Move timer to viewer header (called after render)
+function moveTimerToHeader(quizId) {
+    // Wait for DOM to be fully updated after render
+    setTimeout(() => {
+        const timer = document.querySelector(`.quiz-timer[data-quiz-id="${quizId}"]`);
+        const modalHeader = document.querySelector('.modal.viewer .modal-header');
+        const closeBtn = modalHeader?.querySelector('.modal-close');
+
+        if (timer && modalHeader && closeBtn) {
+            modalHeader.insertBefore(timer, closeBtn);
+        }
+    }, 100);
+}
+
+// Update timer display
+function updateTimerDisplay(quizId, suggestedTime) {
+    const timerEl = document.querySelector(`.quiz-timer[data-quiz-id="${quizId}"]`);
+    if (!timerEl) {
+        // Timer element not found (viewer closed), stop the interval
+        stopQuizTimer(quizId);
+        return;
+    }
+
+    const startTime = quizStartTimes[quizId];
+    if (!startTime) return;
+
+    const suggestedSeconds = suggestedTime * 60;
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const elapsedPct = Math.min((elapsed / suggestedSeconds) * 100, 100);
+    const isOverTime = elapsed >= suggestedSeconds;
+    const isNearEnd = elapsedPct >= 80;
+
+    // Update elapsed time display
+    const timeText = timerEl.querySelector('.quiz-timer-text');
+    if (timeText) {
+        timeText.textContent = formatElapsedTime(elapsed);
+    }
+
+    // Update progress ring
+    const radius = 18;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference * (1 - Math.min(elapsedPct, 100) / 100);
+
+    const progressRing = timerEl.querySelector('.quiz-timer-ring-progress');
+    if (progressRing) {
+        progressRing.style.strokeDashoffset = strokeDashoffset;
+        progressRing.classList.toggle('near-end', isNearEnd);
+    }
+
+    const ringContainer = timerEl.querySelector('.quiz-timer-ring');
+    if (ringContainer) {
+        ringContainer.classList.toggle('pulsing', isOverTime);
+    }
+
+    // Update pacing message
+    const existingMessage = timerEl.querySelector('.quiz-pacing-message');
+    const newMessage = getPacingMessage(elapsedPct);
+
+    if (newMessage) {
+        if (existingMessage) {
+            if (existingMessage.textContent !== newMessage) {
+                existingMessage.textContent = newMessage;
+                existingMessage.classList.remove('visible');
+                void existingMessage.offsetWidth; // Trigger reflow
+                existingMessage.classList.add('visible');
+            }
+        } else {
+            const messageEl = document.createElement('div');
+            messageEl.className = 'quiz-pacing-message visible';
+            messageEl.textContent = newMessage;
+            timerEl.appendChild(messageEl);
+        }
+    } else if (existingMessage) {
+        // Remove message when no longer applicable
+        existingMessage.classList.remove('visible');
+    }
 }
 
 // ========== RENDER FUNCTIONS ==========
@@ -166,6 +349,12 @@ export function renderViewer(card, template) {
             <span class="quiz-mode-count">${questions.length} question${questions.length !== 1 ? 's' : ''}</span>
         </div>`;
     } else if (isInteractive) {
+        // Start the timer if suggestedTime is set
+        if (card.suggestedTime) {
+            startQuizTimer(card.id, card.suggestedTime);
+        }
+        // Timer is rendered outside mode header for sticky positioning
+        html += renderTimerUI(card);
         html += `<div class="quiz-mode-header">
             <span class="quiz-mode-label">Take Quiz</span>
             <span class="quiz-mode-count">${questions.length} question${questions.length !== 1 ? 's' : ''}</span>
@@ -187,9 +376,31 @@ export function renderViewer(card, template) {
             const scoreDisplay = hasPointsScore
                 ? `${score.earned}/${gradedPossible} pts${gradedPossible > 0 ? ` (${Math.round((score.earned / gradedPossible) * 100)}%)` : ''}`
                 : `${score.correct || 0}/${gradedTotal} correct`;
+
+            // Duration display
+            let durationHtml = '';
+            if (lastAttempt.duration) {
+                const durationMins = Math.floor(lastAttempt.duration / 60);
+                const durationSecs = lastAttempt.duration % 60;
+                const durationStr = durationMins > 0
+                    ? `${durationMins}m ${durationSecs}s`
+                    : `${durationSecs}s`;
+
+                if (card.suggestedTime) {
+                    const suggestedSecs = card.suggestedTime * 60;
+                    const withinTime = lastAttempt.duration <= suggestedSecs;
+                    durationHtml = `<span class="quiz-duration-summary ${withinTime ? 'within-time' : ''}">
+                        Completed in ${durationStr} (suggested: ${card.suggestedTime} min)
+                    </span>`;
+                } else {
+                    durationHtml = `<span class="quiz-duration-summary">Completed in ${durationStr}</span>`;
+                }
+            }
+
             html += `<div class="quiz-summary">
                 <span class="quiz-summary-score">${scoreDisplay}</span>
                 ${pending ? `<span class="quiz-summary-pending">${pending} awaiting review</span>` : ''}
+                ${durationHtml}
             </div>`;
         } else {
             html += `<div class="quiz-summary">
@@ -966,12 +1177,16 @@ async function submitQuiz(quizId) {
         }
     }
 
+    // Stop the timer
+    stopQuizTimer(quizId);
+
     // Grade and save the attempt
     const attempt = gradeQuizAttempt(card, answers);
     await saveQuizAttempt(card, attempt);
 
     // Clear quiz state
     delete quizAnswers[quizId];
+    delete quizStartTimes[quizId];
 
     showToast('Quiz submitted!', 'success');
 }
@@ -980,6 +1195,10 @@ async function submitQuiz(quizId) {
 function retakeQuiz(quizId) {
     const card = findCardById(quizId);
     if (!card) return;
+
+    // Stop and reset timer
+    stopQuizTimer(quizId);
+    delete quizStartTimes[quizId];
 
     // Set retake mode flag and re-open viewer
     card._quizRetakeMode = true;
@@ -1002,6 +1221,10 @@ function gradeQuizAttempt(card, answers) {
     let pendingCount = 0;
     let totalEarned = 0;
     let totalPossible = 0;
+
+    // Calculate duration from timer
+    const startTime = quizStartTimes[card.id];
+    const duration = startTime ? Math.round((Date.now() - startTime) / 1000) : null;
 
     questions.forEach((q, index) => {
         const userAnswer = answers[index];
@@ -1233,7 +1456,8 @@ function gradeQuizAttempt(card, answers) {
             correct: correctCount,
             total: questions.length,
             pending_review: pendingCount
-        }
+        },
+        duration: duration
     };
 }
 
