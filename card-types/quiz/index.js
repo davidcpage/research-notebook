@@ -1179,6 +1179,30 @@ function gradeQuizAttempt(card, answers) {
                 break;
 
             case 'short_answer':
+                // Auto-grade if acceptedAnswers provided, otherwise pending review
+                if (q.acceptedAnswers && q.acceptedAnswers.length > 0 && userAnswer) {
+                    const normalizedAnswer = String(userAnswer).trim().toLowerCase();
+                    const isMatch = q.acceptedAnswers.some(accepted =>
+                        String(accepted).trim().toLowerCase() === normalizedAnswer
+                    );
+                    if (isMatch) {
+                        result.autoGrade.status = 'correct';
+                        result.autoGrade.score = maxPoints;
+                        correctCount++;
+                    } else {
+                        // Answer doesn't match - mark for teacher review (might still be correct)
+                        result.autoGrade.status = 'pending_review';
+                        result.autoGrade.score = null;
+                        pendingCount++;
+                    }
+                } else {
+                    // No acceptedAnswers defined - always needs review
+                    result.autoGrade.status = 'pending_review';
+                    result.autoGrade.score = null;
+                    pendingCount++;
+                }
+                break;
+
             case 'worked':
                 // Cannot auto-grade: mark as pending review
                 result.autoGrade.status = 'pending_review';
