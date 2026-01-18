@@ -152,6 +152,11 @@ export function renderViewer(card, template) {
         html += `<div class="quiz-viewer-topic">${escapeHtml(card.topic)}</div>`;
     }
 
+    // Description (introduction text, timing info, passage for reading quizzes)
+    if (card.description) {
+        html += `<div class="quiz-description md-content">${marked.parse(card.description)}</div>`;
+    }
+
     // Mode header: Take Quiz vs Review Results vs Template Preview
     const isTemplateMode = notebookSettings?.quiz_template_mode;
     if (isTemplateMode && !lastAttempt) {

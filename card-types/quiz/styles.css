@@ -114,6 +114,47 @@
     text-align: center;
 }
 
+.quiz-description {
+    background: var(--quiz-option-bg);
+    border: 1px solid var(--quiz-option-border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+}
+
+.quiz-description h1,
+.quiz-description h2,
+.quiz-description h3 {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    color: var(--template-title-text);
+}
+
+.quiz-description h1:first-child,
+.quiz-description h2:first-child,
+.quiz-description h3:first-child {
+    margin-top: 0;
+}
+
+.quiz-description p:last-child {
+    margin-bottom: 0;
+}
+
+.quiz-description hr {
+    border: none;
+    border-top: 1px solid var(--quiz-option-border);
+    margin: 1rem 0;
+}
+
+.quiz-description blockquote {
+    border-left: 3px solid var(--template-border);
+    padding-left: 1rem;
+    margin-left: 0;
+    color: var(--template-meta-text);
+    font-style: italic;
+}
+
 .quiz-summary {
     display: flex;
     gap: 1rem;
