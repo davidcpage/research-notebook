@@ -7,7 +7,7 @@
 
 import {
     escapeHtml,
-    marked,
+    renderMarkdown,
     findCardById,
     findSectionByItem,
     getSettings,
@@ -337,7 +337,7 @@ export function renderViewer(card, template) {
 
     // Description (introduction text, timing info, passage for reading quizzes)
     if (card.description) {
-        html += `<div class="quiz-description md-content">${marked.parse(card.description)}</div>`;
+        html += `<div class="quiz-description md-content">${renderMarkdown(card.description)}</div>`;
     }
 
     // Mode header: Take Quiz vs Review Results vs Template Preview
@@ -470,7 +470,7 @@ function renderQuizQuestion(question, index, attempt, isInteractive = false) {
     </div>`;
 
     // Question text (supports markdown)
-    html += `<div class="quiz-question-text md-content">${marked.parse(question.question || '')}</div>`;
+    html += `<div class="quiz-question-text md-content">${renderMarkdown(question.question || '')}</div>`;
 
     // Render answer area based on question type
     html += renderQuizAnswerArea(question, attemptAnswer, isInteractive, index);
@@ -481,7 +481,7 @@ function renderQuizQuestion(question, index, attempt, isInteractive = false) {
         const feedback = isCorrect ? question.whenRight : question.whenWrong;
         if (feedback) {
             html += `<div class="quiz-feedback quiz-feedback-${isCorrect ? 'correct' : 'incorrect'}">
-                <div class="md-content">${marked.parse(feedback)}</div>
+                <div class="md-content">${renderMarkdown(feedback)}</div>
             </div>`;
         }
     }
@@ -535,7 +535,7 @@ function renderReviewFeedback(review) {
     if (review.feedback) {
         html += `<div class="quiz-review-feedback-display">
             <span class="quiz-review-feedback-label">Feedback:</span>
-            <div class="md-content">${marked.parse(review.feedback)}</div>
+            <div class="md-content">${renderMarkdown(review.feedback)}</div>
         </div>`;
     }
     if (review.reviewer) {
