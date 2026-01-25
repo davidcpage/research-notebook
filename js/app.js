@@ -2016,6 +2016,7 @@ function renderCard(sectionId, card) {
     return `
         <div class="card${modifiedClass}${changesClass}"
              data-template="${template.name}"
+             data-topic="${card.topic || ''}"
              data-item-id="${card.id}"
              data-section-id="${sectionId}"
              onclick="openViewer('${sectionId}', '${card.id}')">
@@ -2422,6 +2423,7 @@ function openViewer(sectionId, itemId) {
     const modal = document.getElementById('viewerModal');
     const modalInner = modal.querySelector('.modal');
     modalInner.setAttribute('data-template', template.name);
+    modalInner.setAttribute('data-topic', card.topic || '');
 
     // Add modified indicator for templates that differ from defaults
     const isModified = isTemplateModified(card);
@@ -3632,6 +3634,7 @@ function openEditor(templateName, sectionId, card = null) {
     // Set modal data-template for CSS
     const modal = document.querySelector('#editorModal .modal');
     modal.setAttribute('data-template', templateName);
+    modal.setAttribute('data-topic', editingCard.topic || '');
 
     // Set title
     const buttonLabel = template.ui?.button_label || templateName;
