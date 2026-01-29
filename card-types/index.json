@@ -9,6 +9,7 @@
     "quiz",
     "quiz-response",
     "quiz-response-summary",
-    "lesson"
+    "lesson",
+    "file"
   ]
 }

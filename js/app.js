@@ -6488,6 +6488,39 @@ async function loadFromFilesystem(dirHandle) {
                             card.content = await resolveMarkdownImages(card.content, card._path, dirHandle);
                         }
                         items.push(card);
+                    } else {
+                        // Fallback: create a generic file card for unrecognized extensions
+                        const isBinary = content.includes('\x00') || /[\x00-\x08\x0E-\x1F]/.test(content.slice(0, 1000));
+                        const formatSize = (bytes) => {
+                            if (bytes < 1024) return bytes + ' B';
+                            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                        };
+                        const relativePath = subdirPath
+                            ? `${sectionDirName}/${subdirPath}/${filename}`
+                            : `${sectionDirName}/${filename}`;
+                        const fallbackCard = {
+                            id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                            template: 'file',
+                            type: 'file',
+                            title: filename,
+                            path: relativePath,
+                            filesize: formatSize(file.size),
+                            binary: isBinary,
+                            content: isBinary ? '[Binary file]' : content,
+                            _path: subdirPath ? `${sectionDirName}/${subdirPath}` : sectionDirName,
+                            _source: {
+                                filename,
+                                format: isBinary ? 'binary' : 'text',
+                                section: sectionDirName,
+                                subdir: subdirPath,
+                                extension: filename.match(/\.[^.]+$/)?.[0]?.toLowerCase() || ''
+                            },
+                            _fileModified: file.lastModified,
+                            modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
+                        };
+                        items.push(fallbackCard);
+                        console.log(`[Filesystem] Loaded as fallback file: ${subdirPath ? subdirPath + '/' : ''}${filename}`);
                     }
                 } catch (e) {
                     console.error(`[Filesystem] Error reading ${filename}:`, e);

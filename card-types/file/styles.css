@@ -1,0 +1,29 @@
+/* File card type - fallback for unrecognized files */
+
+.card[data-template="file"],
+.modal.viewer[data-template="file"] {
+    --template-border: #555;
+    --template-bg: #2d2d2d;
+    --template-preview-bg: #363636;
+    --template-title-text: #ccc;
+}
+
+/* Muted appearance to indicate it's a fallback/unknown type */
+.card[data-template="file"] .card-title {
+    color: #999;
+    font-style: italic;
+}
+
+.card[data-template="file"] .card-title::before {
+    content: "📎 ";
+}
+
+/* Binary file indicator */
+.card[data-template="file"][data-binary="true"] .preview-content {
+    color: #666;
+    font-style: italic;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+}

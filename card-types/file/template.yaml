@@ -1,0 +1,51 @@
+name: file
+description: Generic file (fallback for unrecognized file types)
+schema:
+  title:
+    type: text
+    required: true
+  path:
+    type: text
+  filesize:
+    type: text
+  content:
+    type: text
+    description: Raw file content (text files only)
+  binary:
+    type: boolean
+    description: Whether file appears to be binary
+card:
+  layout: document
+  preview_field: content
+  placeholder: "📎"
+viewer:
+  layout: document
+  content_field: content
+editor:
+  fields:
+    - field: title
+      label: Filename
+      readonly: true
+    - field: path
+      label: Path
+      readonly: true
+    - field: filesize
+      label: Size
+      readonly: true
+    - field: content
+      label: Content
+      multiline: true
+      rows: 20
+      monospace: true
+      readonly: true
+style:
+  variables:
+    --template-bg: "#2d2d2d"
+    --template-preview-bg: "#363636"
+    --template-border: "#555"
+    --template-title-text: "#ccc"
+ui:
+  button_label: null
+  icon: "📎"
+  show_create_button: false
+  sort_order: 99
