@@ -2711,11 +2711,13 @@ function renderViewerActions(card, template, isSystemNote) {
     // Common actions
     // Hide edit/delete for source cards unless source_cards_editable is enabled
     // Hide edit/delete for note cards unless notes_editable is enabled (default true)
+    // Always hide edit/delete for read-only card types (notebook, file)
     const isSourceCard = templateName === 'source';
     const isNoteCard = templateName === 'note';
+    const isReadOnlyCard = templateName === 'notebook' || templateName === 'file';
     const canEditSource = !isSourceCard || notebookSettings.source_cards_editable;
     const canEditNote = !isNoteCard || notebookSettings.notes_editable !== false;
-    const canEdit = canEditSource && canEditNote;
+    const canEdit = canEditSource && canEditNote && !isReadOnlyCard;
     if (canEdit) {
         actions += `<button class="btn btn-secondary btn-small" onclick="editViewerCard()">✎ Edit</button>`;
         actions += `<button class="btn btn-secondary btn-small" onclick="deleteViewerCard()">× Delete</button>`;

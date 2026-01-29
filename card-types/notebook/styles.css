@@ -1,0 +1,324 @@
+/* Jupyter Notebook card type styles */
+
+/* Card and viewer template variables */
+.card[data-template="notebook"],
+.modal.viewer[data-template="notebook"] {
+    --template-border: #e0e0e0;
+    --template-bg: #ffffff;
+    --template-preview-bg: #f7f7f7;
+    --template-title-text: #333;
+}
+
+/* ========== Card Preview ========== */
+
+.notebook-preview {
+    background: var(--template-preview-bg);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.nb-preview-cells {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    overflow: hidden;
+}
+
+.nb-preview-cell {
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 6px 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Markdown preview - render simple formatting */
+.nb-preview-md {
+    background: #fff;
+    border-left: 3px solid #4a90d9;
+    color: #333;
+}
+
+.nb-preview-md .nb-md-h1,
+.nb-preview-md .nb-md-h2,
+.nb-preview-md .nb-md-h3 {
+    font-weight: 600;
+    color: #222;
+}
+
+.nb-preview-md .nb-md-h1 { font-size: 13px; }
+.nb-preview-md .nb-md-h2 { font-size: 12px; }
+.nb-preview-md .nb-md-h3 { font-size: 11px; }
+
+/* Code preview - light background like Jupyter */
+.nb-preview-code {
+    background: #f8f8f8;
+    border-left: 3px solid #4caf50;
+    border: 1px solid #e0e0e0;
+    border-left: 3px solid #4caf50;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+}
+
+.nb-preview-code code {
+    color: #333;
+    white-space: pre;
+}
+
+/* Syntax highlighting colors for preview (light theme) */
+.nb-preview-code .hljs-keyword { color: #008000; font-weight: 600; }
+.nb-preview-code .hljs-built_in { color: #008000; }
+.nb-preview-code .hljs-string { color: #ba2121; }
+.nb-preview-code .hljs-number { color: #666; }
+.nb-preview-code .hljs-comment { color: #408080; font-style: italic; }
+.nb-preview-code .hljs-function { color: #00f; }
+.nb-preview-code .hljs-title { color: #00f; }
+.nb-preview-code .hljs-params { color: #333; }
+
+.nb-preview-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #888;
+    padding-top: 4px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.nb-cell-count,
+.nb-language {
+    background: #eee;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.notebook-empty {
+    color: #999;
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+}
+
+/* ========== Viewer Content ========== */
+
+/* notebook.js output container */
+.nb-notebook {
+    padding: 20px;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+/* notebook.js worksheet */
+.nb-notebook .nb-worksheet {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* notebook.js cell container */
+.nb-notebook .nb-cell {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+/* Markdown cells */
+.nb-notebook .nb-markdown-cell {
+    padding: 16px 20px;
+    background: #fff;
+    border-left: 4px solid #4a90d9;
+}
+
+.nb-notebook .nb-markdown-cell h1,
+.nb-notebook .nb-markdown-cell h2,
+.nb-notebook .nb-markdown-cell h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: #333;
+}
+
+.nb-notebook .nb-markdown-cell h1 { font-size: 1.8em; }
+.nb-notebook .nb-markdown-cell h2 { font-size: 1.5em; }
+.nb-notebook .nb-markdown-cell h3 { font-size: 1.25em; }
+
+.nb-notebook .nb-markdown-cell p {
+    margin: 0 0 12px 0;
+    line-height: 1.6;
+}
+
+.nb-notebook .nb-markdown-cell p:last-child {
+    margin-bottom: 0;
+}
+
+.nb-notebook .nb-markdown-cell ul,
+.nb-notebook .nb-markdown-cell ol {
+    margin: 0 0 12px 0;
+    padding-left: 24px;
+}
+
+.nb-notebook .nb-markdown-cell code {
+    background: #f4f4f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.9em;
+}
+
+.nb-notebook .nb-markdown-cell pre code {
+    display: block;
+    padding: 12px;
+    overflow-x: auto;
+}
+
+/* Code cells - light background like Jupyter */
+.nb-notebook .nb-code-cell {
+    background: #f8f8f8;
+    border-left: 4px solid #4caf50;
+}
+
+/* Input area (code) */
+.nb-notebook .nb-input {
+    position: relative;
+}
+
+.nb-notebook .nb-input pre {
+    margin: 0;
+    padding: 12px 16px;
+    background: #f8f8f8;
+    overflow-x: auto;
+}
+
+.nb-notebook .nb-input code {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+}
+
+/* Override highlight.js dark theme for notebook code cells */
+.nb-notebook .nb-input .hljs,
+.nb-notebook .nb-input code.hljs {
+    background: transparent;
+    color: #333;
+}
+
+/* Syntax highlighting for code cells (Jupyter-like light theme) */
+.nb-notebook .nb-input .hljs-keyword { color: #008000; font-weight: 600; }
+.nb-notebook .nb-input .hljs-built_in { color: #008000; }
+.nb-notebook .nb-input .hljs-string { color: #ba2121; }
+.nb-notebook .nb-input .hljs-number { color: #666; }
+.nb-notebook .nb-input .hljs-comment { color: #408080; font-style: italic; }
+.nb-notebook .nb-input .hljs-function { color: #00f; }
+.nb-notebook .nb-input .hljs-title { color: #00f; }
+.nb-notebook .nb-input .hljs-params { color: #333; }
+.nb-notebook .nb-input .hljs-literal { color: #008000; }
+.nb-notebook .nb-input .hljs-attr { color: #687822; }
+.nb-notebook .nb-input .hljs-variable { color: #333; }
+
+/* Execution count badge */
+.nb-notebook .nb-input::before {
+    content: attr(data-prompt-number);
+    position: absolute;
+    left: -40px;
+    top: 12px;
+    color: #888;
+    font-size: 11px;
+    font-family: monospace;
+}
+
+/* Output area */
+.nb-notebook .nb-output {
+    background: #fff;
+    border-top: 1px solid #e0e0e0;
+}
+
+.nb-notebook .nb-output pre {
+    margin: 0;
+    padding: 12px 16px;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre-wrap;
+}
+
+/* Stream output (stdout/stderr) */
+.nb-notebook .nb-output .nb-stdout {
+    color: #333;
+}
+
+.nb-notebook .nb-output .nb-stderr {
+    color: #c75450;
+    background: #fff5f5;
+}
+
+/* Error output */
+.nb-notebook .nb-output .nb-error {
+    color: #c75450;
+    background: #fff5f5;
+    padding: 12px 16px;
+}
+
+.nb-notebook .nb-output .nb-error pre {
+    background: transparent;
+    color: inherit;
+}
+
+/* Image output */
+.nb-notebook .nb-output img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 12px auto;
+}
+
+/* HTML output */
+.nb-notebook .nb-output .rendered_html {
+    padding: 12px 16px;
+}
+
+.nb-notebook .nb-output .rendered_html table {
+    border-collapse: collapse;
+    margin: 8px 0;
+}
+
+.nb-notebook .nb-output .rendered_html th,
+.nb-notebook .nb-output .rendered_html td {
+    border: 1px solid #ddd;
+    padding: 6px 10px;
+    text-align: left;
+}
+
+.nb-notebook .nb-output .rendered_html th {
+    background: #f5f5f5;
+    font-weight: 600;
+}
+
+/* Raw cells */
+.nb-notebook .nb-raw-cell {
+    padding: 12px 16px;
+    background: #f9f9f9;
+    border-left: 4px solid #999;
+    font-family: monospace;
+    white-space: pre-wrap;
+}
+
+/* Error message for render failures */
+.notebook-error {
+    padding: 20px;
+    color: #c75450;
+    background: #fff5f5;
+    border: 1px solid #f5c6c6;
+    border-radius: 6px;
+    text-align: center;
+}
+
+/* ========== Print styles ========== */
+@media print {
+    .nb-notebook .nb-cell {
+        break-inside: avoid;
+    }
+}

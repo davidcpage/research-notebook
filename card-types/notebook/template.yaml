@@ -1,0 +1,51 @@
+name: notebook
+description: Jupyter notebook (.ipynb) with code cells, markdown, and outputs
+schema:
+  title:
+    type: text
+    required: true
+  path:
+    type: text
+  filesize:
+    type: text
+  # Notebook-specific fields (populated from parsed JSON)
+  cells:
+    type: array
+    description: Array of notebook cells
+  metadata:
+    type: object
+    description: Notebook metadata (kernelspec, language_info, etc.)
+  nbformat:
+    type: number
+  nbformat_minor:
+    type: number
+card:
+  layout: custom
+  placeholder: "📓"
+viewer:
+  layout: custom
+editor:
+  fields:
+    - field: title
+      label: Filename
+      readonly: true
+    - field: path
+      label: Path
+      readonly: true
+    - field: filesize
+      label: Size
+      readonly: true
+style:
+  variables:
+    --template-bg: "#ffffff"
+    --template-preview-bg: "#f7f7f7"
+    --template-border: "#e0e0e0"
+    --template-title-text: "#333"
+ui:
+  button_label: null
+  icon: "📓"
+  show_create_button: false
+  sort_order: 96
+extensions:
+  ".ipynb":
+    parser: json
