@@ -346,6 +346,22 @@ extensions:
     parser: source-code
     bodyField: code
     language: ini
+  ".yaml":
+    parser: source-code
+    bodyField: code
+    language: yaml
+  ".yml":
+    parser: source-code
+    bodyField: code
+    language: yaml
+  ".json":
+    parser: source-code
+    bodyField: code
+    language: json
+  ".jsonl":
+    parser: source-code
+    bodyField: code
+    language: json
   # Dockerfiles and makefiles (no extension, but common names)
   "Dockerfile":
     parser: source-code
