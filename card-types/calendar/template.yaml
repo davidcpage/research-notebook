@@ -1,0 +1,76 @@
+name: calendar
+description: Visual calendar with events and date ranges
+schema:
+  title:
+    type: text
+    required: true
+  subtitle:
+    type: text
+  legend:
+    type: object
+    description: "Event types mapping: {type: {emoji, label}}"
+  events:
+    type: array
+    description: "List of events: [{date, type, label?}]"
+    items:
+      type: object
+      properties:
+        date:
+          type: text
+          required: true
+          description: "Date in YYYY-MM-DD format"
+        type:
+          type: text
+          description: "Event type key (matches legend)"
+        label:
+          type: text
+          description: "Optional label for special events"
+  highlights:
+    type: array
+    description: "Date range highlights: [{start, end, label?}]"
+    items:
+      type: object
+      properties:
+        start:
+          type: text
+          description: "Start date in YYYY-MM-DD format"
+        end:
+          type: text
+          description: "End date in YYYY-MM-DD format"
+        label:
+          type: text
+          description: "Label for the highlight range"
+  view:
+    type: object
+    description: "View configuration"
+    properties:
+      start:
+        type: text
+        description: "First month to display (YYYY-MM)"
+      end:
+        type: text
+        description: "Last month to display (YYYY-MM)"
+  created:
+    type: datetime
+  modified:
+    type: datetime
+card:
+  layout: calendar
+  placeholder: "Calendar"
+viewer:
+  layout: calendar
+editor:
+  layout: yaml
+style:
+  variables:
+    --template-border: "#d4c5a9"
+    --template-bg: "#faf6f0"
+    --template-preview-bg: "#f5f0e6"
+    --template-title-text: "#5a4a3a"
+ui:
+  button_label: Calendar
+  icon: "Calendar"
+  sort_order: 8
+extensions:
+  ".calendar.yaml":
+    parser: yaml
