@@ -37,6 +37,9 @@ schema:
   enabled_templates:
     type: array
     description: Card types available in this notebook
+  hidden_templates:
+    type: array
+    description: Card types to hide from create buttons (even if in use)
   quiz_template_mode:
     type: boolean
     default: false
@@ -96,6 +99,9 @@ editor:
       label: Base Theme
     - field: enabled_templates
       label: Available Card Types
+      type: templates
+    - field: hidden_templates
+      label: Hidden Card Types
       type: templates
     - field: quiz_template_mode
       label: Quiz Template Mode
