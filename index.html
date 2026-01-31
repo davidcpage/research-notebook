@@ -7,6 +7,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Research Notebook</title>
+    <!-- Dynamic base URL for GitHub Pages compatibility -->
+    <script>
+        // Ensure base URL ends with / for correct relative path resolution
+        const path = window.location.pathname;
+        const base = path.endsWith('/') ? path : path + '/';
+        document.write('<base href="' + base + '">');
+    </script>
     <!-- CodeMirror 6 import map for editor syntax highlighting -->
     <script type="importmap">
     {
