@@ -54,9 +54,9 @@ function speakAudio(text, lang = 'en-GB') {
         const langFamily = lang.split('-')[0];
         const langVoices = voices.filter(v => v.lang === lang || v.lang.startsWith(langFamily));
 
-        // Prefer high-quality voices in order: macOS Daniel, Google UK Male, then any match
+        // Prefer high-quality voices in order: macOS Arthur, Google UK Male, then any match
         const preferredVoices = [
-            'Daniel',              // macOS British male - natural sounding
+            'Arthur',              // macOS British male - natural sounding
             'Google UK English Male',
             'Google UK English Female',
         ];
