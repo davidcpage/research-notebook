@@ -18,7 +18,7 @@ import {
     render,
     saveCardFile,
     formatDate
-} from '/js/framework.js';
+} from '../../js/framework.js';
 
 // ========== HELPER FUNCTIONS ==========
 

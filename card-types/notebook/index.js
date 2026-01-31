@@ -8,7 +8,7 @@
  * The card will have: cells, metadata, nbformat, nbformat_minor, etc.
  */
 
-import { escapeHtml, hljs, renderMarkdown } from '/js/framework.js';
+import { escapeHtml, hljs, renderMarkdown } from '../../js/framework.js';
 
 // Configure notebook.js to use our libraries
 function configureNotebookJs() {

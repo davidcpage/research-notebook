@@ -20,7 +20,7 @@ import {
     render,
     openViewer,
     saveCardFile
-} from '/js/framework.js';
+} from '../../js/framework.js';
 
 // ========== HELPER FUNCTIONS ==========
 

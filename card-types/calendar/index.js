@@ -4,7 +4,7 @@
  * Provides visual month grid view with events, highlights, and navigation.
  */
 
-import { escapeHtml } from '/js/framework.js';
+import { escapeHtml } from '../../js/framework.js';
 
 // ========== SVG HELPERS ==========
 

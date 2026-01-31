@@ -16,7 +16,7 @@ import {
     render,
     saveData,
     saveCardFile
-} from '/js/framework.js';
+} from '../../js/framework.js';
 
 // ========== MODULE STATE ==========
 
