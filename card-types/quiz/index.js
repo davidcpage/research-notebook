@@ -48,13 +48,27 @@ function speakAudio(text, lang = 'en-GB') {
     utterance.lang = lang;
     utterance.rate = 0.9; // Slightly slower for clarity
 
-    // Try to find a voice matching the language
+    // Try to find a good voice matching the language
     const voices = window.speechSynthesis.getVoices();
     if (voices.length > 0) {
-        // Prefer exact match, then language family match
-        const exactMatch = voices.find(v => v.lang === lang);
-        const familyMatch = voices.find(v => v.lang.startsWith(lang.split('-')[0]));
-        utterance.voice = exactMatch || familyMatch || null;
+        const langFamily = lang.split('-')[0];
+        const langVoices = voices.filter(v => v.lang === lang || v.lang.startsWith(langFamily));
+
+        // Prefer high-quality voices in order: macOS Daniel, Google UK Male, then any match
+        const preferredVoices = [
+            'Daniel',              // macOS British male - natural sounding
+            'Google UK English Male',
+            'Google UK English Female',
+        ];
+
+        let selectedVoice = null;
+        for (const preferred of preferredVoices) {
+            selectedVoice = langVoices.find(v => v.name.includes(preferred));
+            if (selectedVoice) break;
+        }
+
+        // Fall back to any voice matching the language
+        utterance.voice = selectedVoice || langVoices[0] || null;
     }
 
     window.speechSynthesis.speak(utterance);
