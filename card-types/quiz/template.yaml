@@ -101,6 +101,13 @@ schema:
         acceptedAnswers:
           type: array
           description: Acceptable text answers for short_answer type (case-insensitive match)
+        # Audio fields (for spelling tests, dictation, aural exams)
+        audio:
+          type: text
+          description: Text to speak aloud (for spelling, dictation, listening comprehension)
+        audioLang:
+          type: text
+          description: Language code for speech synthesis (e.g., 'en-GB', 'fr-FR', 'es-ES')
         # AI grading fields (not in Google Forms - our extension)
         modelAnswer:
           type: markdown

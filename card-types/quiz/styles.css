@@ -253,6 +253,42 @@
     margin-bottom: 0;
 }
 
+/* Audio button for spelling/dictation/aural questions */
+.quiz-audio-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 24px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.quiz-audio-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.quiz-audio-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+}
+
+.quiz-audio-icon {
+    font-size: 1.1rem;
+}
+
+.quiz-audio-label {
+    letter-spacing: 0.02em;
+}
+
 /* Multiple choice options */
 .quiz-options {
     display: flex;

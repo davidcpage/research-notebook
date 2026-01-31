@@ -32,6 +32,58 @@ let quizStartTimes = {};
 // Structure: { quizId: intervalId }
 let timerIntervals = {};
 
+// ========== AUDIO FUNCTIONS ==========
+
+// Speak text using Web Speech API
+function speakAudio(text, lang = 'en-GB') {
+    if (!window.speechSynthesis) {
+        console.warn('[Quiz] Speech synthesis not supported in this browser');
+        return;
+    }
+
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
+    utterance.rate = 0.9; // Slightly slower for clarity
+
+    // Try to find a voice matching the language
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+        // Prefer exact match, then language family match
+        const exactMatch = voices.find(v => v.lang === lang);
+        const familyMatch = voices.find(v => v.lang.startsWith(lang.split('-')[0]));
+        utterance.voice = exactMatch || familyMatch || null;
+    }
+
+    window.speechSynthesis.speak(utterance);
+}
+
+// Preload voices (some browsers load them asynchronously)
+if (window.speechSynthesis) {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+    };
+}
+
+// Render audio button for a question
+function renderAudioButton(question, questionIndex) {
+    if (!question.audio) return '';
+
+    const lang = question.audioLang || 'en-GB';
+    const escapedText = question.audio.replace(/'/g, "\\'").replace(/\n/g, ' ');
+
+    return `<button class="quiz-audio-btn"
+                onclick="speakQuizAudio('${escapedText}', '${lang}')"
+                title="Listen to the word/phrase"
+                aria-label="Play audio">
+        <span class="quiz-audio-icon">🔊</span>
+        <span class="quiz-audio-label">Listen</span>
+    </button>`;
+}
+
 // ========== HELPER FUNCTIONS ==========
 
 // Check if a quiz has any graded questions (vs pure survey)
@@ -471,6 +523,11 @@ function renderQuizQuestion(question, index, attempt, isInteractive = false) {
 
     // Question text (supports markdown)
     html += `<div class="quiz-question-text md-content">${renderMarkdown(question.question || '')}</div>`;
+
+    // Audio button (for spelling, dictation, aural exams)
+    if (question.audio) {
+        html += renderAudioButton(question, index);
+    }
 
     // Render answer area based on question type
     html += renderQuizAnswerArea(question, attemptAnswer, isInteractive, index);
@@ -1561,6 +1618,7 @@ async function submitQuizReview(questionIndex, status) {
 // ========== REGISTER GLOBAL HANDLERS ==========
 // These are needed for onclick attributes in rendered HTML
 
+window.speakQuizAudio = speakAudio;
 window.selectQuizOption = selectQuizOption;
 window.toggleQuizCheckbox = toggleQuizCheckbox;
 window.updateQuizAnswer = updateQuizAnswer;
