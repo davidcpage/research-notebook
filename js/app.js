@@ -485,7 +485,7 @@ async function fetchDefaultTemplates(enabledTypes = null) {
 
     try {
         // 1. Load legacy templates from /defaults/templates/
-        const indexResponse = await fetch('/defaults/templates/index.json');
+        const indexResponse = await fetch('defaults/templates/index.json');
         if (!indexResponse.ok) {
             throw new Error(`Failed to fetch template index: ${indexResponse.status}`);
         }
@@ -493,7 +493,7 @@ async function fetchDefaultTemplates(enabledTypes = null) {
 
         for (const templateName of index.templates) {
             try {
-                const response = await fetch(`/defaults/templates/${templateName}.yaml`);
+                const response = await fetch(`defaults/templates/${templateName}.yaml`);
                 if (response.ok) {
                     const yamlContent = await response.text();
                     const template = jsyaml.load(yamlContent);
@@ -563,7 +563,7 @@ async function loadCardTypeModules(enabledTypes = null) {
 
     try {
         // Fetch the manifest
-        const response = await fetch('/card-types/index.json');
+        const response = await fetch('card-types/index.json');
         if (!response.ok) {
             console.log('[CardTypes] No card-types manifest found, skipping');
             return {};
@@ -586,7 +586,7 @@ async function loadCardTypeModules(enabledTypes = null) {
             // Phase 1: Always load template.yaml (required for extensions/schema)
             let template = null;
             try {
-                const templateResponse = await fetch(`/card-types/${moduleName}/template.yaml`);
+                const templateResponse = await fetch(`card-types/${moduleName}/template.yaml`);
                 if (templateResponse.ok) {
                     const yamlContent = await templateResponse.text();
                     template = jsyaml.load(yamlContent);
@@ -625,7 +625,7 @@ async function loadCardTypeModules(enabledTypes = null) {
             if (shouldLoadAssets && templateName && !fullyLoadedCardTypes.has(templateName)) {
                 // Load styles.css (optional)
                 try {
-                    const cssResponse = await fetch(`/card-types/${moduleName}/styles.css`);
+                    const cssResponse = await fetch(`card-types/${moduleName}/styles.css`);
                     if (cssResponse.ok) {
                         const css = await cssResponse.text();
                         cssBlocks.push(`/* ${moduleName} */\n${css}`);
@@ -703,7 +703,7 @@ async function loadCardTypeAssets(typeNames) {
 
         // Load CSS
         try {
-            const cssResponse = await fetch(`/card-types/${moduleName}/styles.css`);
+            const cssResponse = await fetch(`card-types/${moduleName}/styles.css`);
             if (cssResponse.ok) {
                 cssBlocks.push(`/* ${moduleName} */\n${await cssResponse.text()}`);
             }
@@ -946,7 +946,7 @@ async function fetchDefaultThemeContent() {
     }
 
     try {
-        const response = await fetch('/defaults/theme.css');
+        const response = await fetch('defaults/theme.css');
         if (response.ok) {
             defaultThemeContentCache = await response.text();
             console.log('[Theme] Loaded default theme.css content');
@@ -968,7 +968,7 @@ async function fetchThemeRegistry() {
     }
 
     try {
-        const response = await fetch('/themes/index.json');
+        const response = await fetch('themes/index.json');
         if (response.ok) {
             const data = await response.json();
             themeRegistryCache = data.themes || [];
@@ -986,7 +986,7 @@ async function fetchThemeRegistry() {
 // Fetch a theme's CSS from /themes/{id}.css
 async function fetchThemeCSS(themeId) {
     try {
-        const response = await fetch(`/themes/${themeId}.css`);
+        const response = await fetch(`themes/${themeId}.css`);
         if (response.ok) {
             return await response.text();
         }
@@ -2939,7 +2939,7 @@ function formatCommitTime(dateStr) {
 // Fetch recent commits for the notebook
 async function fetchRecentCommits() {
     try {
-        const response = await fetch('/api/git-log?limit=20');
+        const response = await fetch('api/git-log?limit=20');
         if (!response.ok) {
             const error = await response.json();
             return { error: error.error };
@@ -2954,7 +2954,7 @@ async function fetchRecentCommits() {
 // Fetch diff stats between a commit and working tree
 async function fetchDiffStats(commit) {
     try {
-        const response = await fetch(`/api/git-diff-stat?commit=${encodeURIComponent(commit)}`);
+        const response = await fetch(`api/git-diff-stat?commit=${encodeURIComponent(commit)}`);
         if (!response.ok) {
             return null;
         }
@@ -3111,7 +3111,7 @@ async function checkGitAvailability() {
     if (!btn) return;
 
     try {
-        const response = await fetch('/api/git-log?limit=1');
+        const response = await fetch('api/git-log?limit=1');
         const result = await response.json();
 
         // Show button if git is available (not an error response)
@@ -3149,7 +3149,7 @@ async function getCardDiff(card) {
 
     try {
         // Fetch historical content
-        const response = await fetch(`/api/git-show?path=${encodeURIComponent(filePath)}&commit=${encodeURIComponent(diffMode.commit)}`);
+        const response = await fetch(`api/git-show?path=${encodeURIComponent(filePath)}&commit=${encodeURIComponent(diffMode.commit)}`);
         const result = await response.json();
 
         let historicalContent = '';

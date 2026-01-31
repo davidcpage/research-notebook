@@ -2,6 +2,8 @@
 
 A browser-based research management tool that combines bookmarks, markdown notes, and executable Python code with file-based storage. Designed for use alongside Claude Code.
 
+**[Try it online](https://davidcpage.github.io/research-notebook/)** — no installation required (Chrome/Edge only)
+
 ## Features
 
 - **Bookmarks** with auto-generated thumbnails (via microlink API or PDF.js)
@@ -15,27 +17,25 @@ A browser-based research management tool that combines bookmarks, markdown notes
 
 ## Getting Started
 
-### Installation
+### Quick Start (Online)
+
+1. Open the [online app](https://davidcpage.github.io/research-notebook/) (Chrome/Edge required)
+2. Click **Link Folder** and select a directory for your notebook
+3. Grant file access when prompted
+4. Start adding notes, bookmarks, and code cells
+
+Your files stay on your local machine — the browser reads/writes directly via the File System Access API.
+
+### Local Installation (Optional)
+
+For git diff features and the `nb` CLI tool:
 
 ```bash
-# Clone the repo
-git clone https://github.com/anthropics/research-notebook.git
+git clone https://github.com/davidcpage/research-notebook.git
 cd research-notebook
-
-# Install the CLI (one-time)
 npm link
-
-# Start the notebook
 notebook
 ```
-
-This starts a local server and opens the app in your browser.
-
-### Creating a New Notebook
-
-1. Click "Select Folder" and choose an empty directory
-2. The app creates the notebook structure automatically
-3. Start adding notes, bookmarks, and code cells
 
 ### Using an Example Template
 
