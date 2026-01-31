@@ -1576,6 +1576,69 @@
     opacity: 0.7;
 }
 
+/* Audio fields for spelling/dictation questions */
+.quiz-audio-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.quiz-audio-field {
+    flex: 1;
+}
+
+.quiz-audio-field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.quiz-audio-text {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 14px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.quiz-audio-text:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.quiz-audio-lang-field {
+    width: 140px;
+    flex-shrink: 0;
+}
+
+.quiz-audio-lang-field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.quiz-audio-lang {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 14px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.quiz-audio-lang:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
 /* Grid question editor */
 .quiz-grid-items-list {
     display: flex;

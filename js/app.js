@@ -4588,6 +4588,53 @@ function createQuestionEditor(question, index, total) {
     questionField.appendChild(questionTextarea);
     content.appendChild(questionField);
 
+    // Audio fields (for spelling tests, dictation, aural exams)
+    const audioRow = document.createElement('div');
+    audioRow.className = 'quiz-field quiz-audio-row';
+
+    // Audio text field
+    const audioField = document.createElement('div');
+    audioField.className = 'quiz-audio-field';
+    audioField.innerHTML = `<label>Audio text <span class="quiz-field-hint">(spoken aloud for spelling/dictation)</span></label>`;
+    const audioInput = document.createElement('input');
+    audioInput.type = 'text';
+    audioInput.className = 'quiz-audio-text';
+    audioInput.value = question.audio || '';
+    audioInput.placeholder = 'Text to speak aloud (leave empty for visual-only)';
+    audioField.appendChild(audioInput);
+    audioRow.appendChild(audioField);
+
+    // Language selector
+    const langField = document.createElement('div');
+    langField.className = 'quiz-audio-lang-field';
+    langField.innerHTML = `<label>Language</label>`;
+    const langSelect = document.createElement('select');
+    langSelect.className = 'quiz-audio-lang';
+    const languages = [
+        { code: '', label: 'Default' },
+        { code: 'en-GB', label: 'English (UK)' },
+        { code: 'en-US', label: 'English (US)' },
+        { code: 'fr-FR', label: 'French' },
+        { code: 'de-DE', label: 'German' },
+        { code: 'es-ES', label: 'Spanish' },
+        { code: 'it-IT', label: 'Italian' },
+        { code: 'pt-PT', label: 'Portuguese' },
+        { code: 'nl-NL', label: 'Dutch' },
+        { code: 'ja-JP', label: 'Japanese' },
+        { code: 'zh-CN', label: 'Chinese' }
+    ];
+    languages.forEach(lang => {
+        const opt = document.createElement('option');
+        opt.value = lang.code;
+        opt.textContent = lang.label;
+        opt.selected = (question.audioLang || '') === lang.code;
+        langSelect.appendChild(opt);
+    });
+    langField.appendChild(langSelect);
+    audioRow.appendChild(langField);
+
+    content.appendChild(audioRow);
+
     // Type-specific fields
     const typeFields = document.createElement('div');
     typeFields.className = 'quiz-type-fields';
@@ -5461,6 +5508,13 @@ function getQuestionsEditorValue() {
 
         const rubric = questionEl.querySelector('.quiz-rubric');
         if (rubric && rubric.value.trim()) question.rubric = rubric.value.trim();
+
+        // Get audio fields
+        const audioText = questionEl.querySelector('.quiz-audio-text');
+        if (audioText && audioText.value.trim()) question.audio = audioText.value.trim();
+
+        const audioLang = questionEl.querySelector('.quiz-audio-lang');
+        if (audioLang && audioLang.value) question.audioLang = audioLang.value;
 
         questions.push(question);
     });
