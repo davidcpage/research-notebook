@@ -401,6 +401,10 @@ let notebookDirHandle = null;  // FileSystemDirectoryHandle for linked folder
 let filesystemLinked = false;   // Whether filesystem mode is active
 const IDB_DIR_HANDLE_KEY = 'notebookDirHandle';  // IndexedDB key for persisting handle
 
+// View mode state (for URL-based notebook loading)
+let viewMode = 'filesystem';    // 'filesystem' | 'remote'
+let remoteSource = null;        // { type: 'github'|'url', path?: string, url?: string }
+
 // FileSystemObserver state (Phase 2: Change Detection)
 let filesystemObserver = null;  // FileSystemObserver instance for watching changes
 let isReloadingFromFilesystem = false;  // Flag to prevent observer triggering during reload
@@ -798,6 +802,9 @@ function getInUseCardTypes() {
 async function detectInUseCardTypes(dirHandle) {
     const detected = new Set();
     const extensions = getExtensionRegistry();
+    // Sort extensions by length (longer first) for correct matching
+    // e.g., '.response.json' must match before '.json'
+    const sortedExtensions = Object.keys(extensions).sort((a, b) => b.length - a.length);
 
     async function scanDir(handle) {
         try {
@@ -812,10 +819,10 @@ async function detectInUseCardTypes(dirHandle) {
                         await scanDir(subHandle);
                     } catch (e) { /* skip inaccessible */ }
                 } else if (entry.kind === 'file') {
-                    // Check if file matches any known extension
-                    for (const [ext, config] of Object.entries(extensions)) {
-                        if (entry.name.endsWith(ext) && config.defaultTemplate) {
-                            detected.add(config.defaultTemplate);
+                    // Check if file matches any known extension (sorted by length)
+                    for (const ext of sortedExtensions) {
+                        if (entry.name.endsWith(ext) && extensions[ext].defaultTemplate) {
+                            detected.add(extensions[ext].defaultTemplate);
                             break;
                         }
                     }
@@ -1838,13 +1845,34 @@ function serializeCard(card) {
     let format, bodyField, extension;
 
     if (card._source) {
-        const extConfig = extensionRegistry[card._source.extension];
+        const extConfig = extensionRegistry?.[card._source.extension];
         format = card._source.format;
         bodyField = extConfig?.bodyField;
         extension = card._source.extension;
+
+        // Fallback: if extension registry lookup failed, derive bodyField from format
+        if (!bodyField) {
+            if (format === 'yaml-frontmatter') {
+                bodyField = 'content';
+            } else if (format === 'comment-frontmatter') {
+                bodyField = 'code';
+            }
+        }
     } else {
         // New card - determine format from template/type
-        if (card.type === 'note' || card.template === 'note') {
+        // First try to look up extension from templateRegistry
+        const templateName = card.template || card.type;
+        const template = templateRegistry?.[templateName];
+
+        if (template?.extensions) {
+            // Get first (primary) extension from template
+            const primaryExt = Object.keys(template.extensions)[0];
+            const extConfig = template.extensions[primaryExt];
+            extension = primaryExt;
+            format = extConfig.parser;
+            // Get bodyField from extensionRegistry (which has full config)
+            bodyField = extensionRegistry?.[primaryExt]?.bodyField || null;
+        } else if (card.type === 'note' || card.template === 'note') {
             format = 'yaml-frontmatter';
             bodyField = 'content';
             extension = '.md';
@@ -2724,8 +2752,8 @@ function renderViewerActions(card, template, isSystemNote) {
     const isSourceCard = templateName === 'source';
     const isNoteCard = templateName === 'note';
     const isReadOnlyCard = templateName === 'notebook' || templateName === 'file';
-    const canEditSource = !isSourceCard || notebookSettings.source_cards_editable;
-    const canEditNote = !isNoteCard || notebookSettings.notes_editable !== false;
+    const canEditSource = !isSourceCard || notebookSettings?.source_cards_editable;
+    const canEditNote = !isNoteCard || notebookSettings?.notes_editable !== false;
     const canEdit = canEditSource && canEditNote && !isReadOnlyCard;
     if (canEdit) {
         actions += `<button class="btn btn-secondary btn-small" onclick="editViewerCard()">✎ Edit</button>`;
@@ -3626,7 +3654,7 @@ function destroyCodeMirrorInstances() {
 }
 
 // Open the generic editor modal
-function openEditor(templateName, sectionId, card = null) {
+async function openEditor(templateName, sectionId, card = null) {
     const template = templateRegistry[templateName];
     if (!template) {
         showToast(`Unknown template: ${templateName}`);
@@ -5815,6 +5843,13 @@ function closeEditor() {
 async function saveEditor() {
     if (!editingCard) return;
 
+    // Check if we're in remote/read-only mode - prompt to save to folder first
+    if (isRemoteMode()) {
+        const shouldSave = await promptSaveToFolder();
+        if (!shouldSave) return;
+        // After saving to folder, continue with the edit save (now in filesystem mode)
+    }
+
     const { templateName, sectionId, card, isNew } = editingCard;
     const template = templateRegistry[templateName];
     if (!template) return;
@@ -5992,19 +6027,25 @@ async function loadData() {
 const IDB_NAME = 'ResearchNotebookDB';
 const IDB_STORE = 'notebook';
 const IDB_KEY = 'data';
+const IDB_HANDLES_STORE = 'notebook-handles';  // Named handle registry for multi-notebook support
 
 // IndexedDB helper functions
 function openDB() {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open(IDB_NAME, 1);
+        const request = indexedDB.open(IDB_NAME, 2);  // Version 2: added notebook-handles store
 
         request.onerror = () => reject(request.error);
         request.onsuccess = () => resolve(request.result);
 
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
+            // Version 1: notebook store for data and legacy handle
             if (!db.objectStoreNames.contains(IDB_STORE)) {
                 db.createObjectStore(IDB_STORE);
+            }
+            // Version 2: separate store for named handles (multi-notebook support)
+            if (!db.objectStoreNames.contains(IDB_HANDLES_STORE)) {
+                db.createObjectStore(IDB_HANDLES_STORE);
             }
         };
     });
@@ -6093,6 +6134,120 @@ async function loadDirHandle() {
         console.error('[Filesystem] Error loading directory handle:', error);
         return null;
     }
+}
+
+// Save a named handle to IndexedDB (for multi-notebook support)
+async function saveNamedHandle(name, handle) {
+    try {
+        const db = await openDB();
+        const tx = db.transaction(IDB_HANDLES_STORE, 'readwrite');
+        const store = tx.objectStore(IDB_HANDLES_STORE);
+        await new Promise((resolve, reject) => {
+            const request = store.put(handle, name);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+        db.close();
+        console.log(`[Filesystem] Saved handle for "${name}"`);
+    } catch (error) {
+        console.error('[Filesystem] Failed to save named handle:', error);
+    }
+}
+
+// Get a named handle from IndexedDB
+async function getNamedHandle(name) {
+    try {
+        const db = await openDB();
+        const tx = db.transaction(IDB_HANDLES_STORE, 'readonly');
+        const store = tx.objectStore(IDB_HANDLES_STORE);
+        const handle = await new Promise((resolve, reject) => {
+            const request = store.get(name);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+        db.close();
+        return handle || null;
+    } catch (error) {
+        console.error('[Filesystem] Failed to get named handle:', error);
+        return null;
+    }
+}
+
+// List all named handles
+async function listNamedHandles() {
+    try {
+        const db = await openDB();
+        const tx = db.transaction(IDB_HANDLES_STORE, 'readonly');
+        const store = tx.objectStore(IDB_HANDLES_STORE);
+        const keys = await new Promise((resolve, reject) => {
+            const request = store.getAllKeys();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+        db.close();
+        return keys || [];
+    } catch (error) {
+        console.error('[Filesystem] Failed to list handles:', error);
+        return [];
+    }
+}
+
+// Delete a named handle from IndexedDB
+async function deleteNamedHandle(name) {
+    try {
+        const db = await openDB();
+        const tx = db.transaction(IDB_HANDLES_STORE, 'readwrite');
+        const store = tx.objectStore(IDB_HANDLES_STORE);
+        await new Promise((resolve, reject) => {
+            const request = store.delete(name);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+        db.close();
+        console.log(`[Filesystem] Deleted handle for "${name}"`);
+    } catch (error) {
+        console.error('[Filesystem] Failed to delete handle:', error);
+    }
+}
+
+// Migrate legacy single handle to named registry (one-time migration)
+async function migrateLegacyHandle() {
+    try {
+        const db = await openDB();
+
+        // Check for legacy handle in the old location
+        const tx1 = db.transaction(IDB_STORE, 'readonly');
+        const store1 = tx1.objectStore(IDB_STORE);
+        const legacyHandle = await new Promise((resolve, reject) => {
+            const request = store1.get(IDB_DIR_HANDLE_KEY);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+
+        if (legacyHandle) {
+            // Migrate to named registry using folder name
+            const name = legacyHandle.name;
+            await saveNamedHandle(name, legacyHandle);
+
+            // Remove legacy entry
+            const tx2 = db.transaction(IDB_STORE, 'readwrite');
+            const store2 = tx2.objectStore(IDB_STORE);
+            await new Promise((resolve, reject) => {
+                const request = store2.delete(IDB_DIR_HANDLE_KEY);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+
+            console.log(`[Filesystem] Migrated legacy handle to "${name}"`);
+            db.close();
+            return { name, handle: legacyHandle };
+        }
+
+        db.close();
+    } catch (error) {
+        console.error('[Filesystem] Migration failed:', error);
+    }
+    return null;
 }
 
 // Request permission for directory handle (needed after page reload)
@@ -6326,7 +6481,25 @@ async function loadFromFilesystem(dirHandle) {
                 const file = await fileHandle.getFile();
                 const content = await file.text();
 
-                // User files at root (README.md, CLAUDE.md, etc.)
+                // System files that need special handling (README.md, CLAUDE.md)
+                const systemFiles = ['README.md', 'CLAUDE.md'];
+                const isSystemFile = systemFiles.includes(filename);
+
+                // Use loadCard for files with extension registry support
+                const extConfig = getExtensionConfig(filename);
+                if (extConfig && !isSystemFile) {
+                    // Use generic loadCard for proper frontmatter parsing
+                    const card = loadCard(filename, content, '.', {});
+                    if (card) {
+                        card._path = '.';
+                        card.system = false;  // User files, not system files
+                        rootItems.push(card);
+                        console.log(`[Filesystem] Loaded root file: ${filename} (via loadCard)`);
+                        continue;
+                    }
+                }
+
+                // Fallback for system files or unsupported formats
                 const isMarkdown = filename.endsWith('.md');
                 const isYaml = filename.endsWith('.yaml');
                 let titleFromFilename = filename;
@@ -6339,8 +6512,8 @@ async function loadFromFilesystem(dirHandle) {
 
                 rootItems.push({
                     type: 'note',
-                    system: true,
-                    id: 'system-' + filename,
+                    system: isSystemFile,
+                    id: isSystemFile ? 'system-' + filename : `root-${filename}-${Date.now()}`,
                     filename: filename,
                     _path: '.',
                     title: titleFromFilename,
@@ -7263,6 +7436,12 @@ async function createSubfolder(sectionId) {
 // Delete an empty subfolder within a section
 // fullPath is the full path from notebook root (e.g., 'section/subdir/nested')
 async function deleteSubfolder(fullPath) {
+    // Check if we're in remote/read-only mode
+    if (isRemoteMode()) {
+        const shouldSave = await promptSaveToFolder();
+        if (!shouldSave) return;
+    }
+
     if (!filesystemLinked || !notebookDirHandle) {
         showToast('Filesystem not linked');
         return;
@@ -7414,17 +7593,26 @@ async function linkNotebookFolder() {
             startIn: 'documents'
         });
 
-        // Save handle for persistence
+        // Save as named handle using folder name
+        const name = handle.name;
+        await saveNamedHandle(name, handle);
+        // Also save as legacy handle for backwards compatibility
         await saveDirHandle(handle);
+
         notebookDirHandle = handle;
         filesystemLinked = true;
+        viewMode = 'filesystem';
+        remoteSource = null;
+
+        // Update URL to include notebook name
+        history.replaceState(null, '', `?notebook=${encodeURIComponent(name)}`);
 
         // Check if directory has existing content (sections or .notebook/settings.yaml)
         let hasContent = false;
-        for await (const [name, entry] of handle.entries()) {
+        for await (const [entryName, entry] of handle.entries()) {
             if (entry.kind === 'directory' &&
-                !name.startsWith('.') &&
-                !RESERVED_DIRECTORIES.has(name)) {
+                !entryName.startsWith('.') &&
+                !RESERVED_DIRECTORIES.has(entryName)) {
                 hasContent = true;
                 break;
             }
@@ -7448,7 +7636,7 @@ async function linkNotebookFolder() {
             restoreExpandedSubdirs();
             restoreFocus();
             render();
-            showToast(`📁 Linked to folder (loaded ${data.sections.length} sections)`);
+            showToast(`📁 Opened ${name}`);
         } else {
             // New notebook: start empty, user adds sections via Add Section button
             data.sections = [];
@@ -7461,7 +7649,7 @@ async function linkNotebookFolder() {
             restoreExpandedSubdirs();
             restoreFocus();
             render();
-            showToast('📁 Linked to folder (new notebook created)');
+            showToast(`📁 Created new notebook: ${name}`);
         }
 
         // Start watching for external changes
@@ -7534,6 +7722,645 @@ async function initFilesystem() {
             console.log('[Filesystem] Permission denied for saved folder');
         }
     }
+}
+
+// ========== SECTION: REMOTE_LOADING ==========
+// Functions for loading notebooks from GitHub repos or URLs
+// Functions: parseGitHubPath, isNotebookFile, flattenJsDelivrFiles, loadNotebookFromGitHub,
+//            loadNotebookFromUrl, parseFilesToNotebook
+
+// Parse GitHub path: "user/repo", "user/repo@branch", "user/repo@branch/path"
+function parseGitHubPath(githubPath) {
+    const atIndex = githubPath.indexOf('@');
+    let userRepo, branchAndPath;
+
+    if (atIndex === -1) {
+        userRepo = githubPath;
+        branchAndPath = 'main';
+    } else {
+        userRepo = githubPath.substring(0, atIndex);
+        branchAndPath = githubPath.substring(atIndex + 1);
+    }
+
+    const [user, repo] = userRepo.split('/');
+
+    // Split branch from path
+    const slashIndex = branchAndPath.indexOf('/');
+    let branch, path;
+
+    if (slashIndex === -1) {
+        branch = branchAndPath;
+        path = '';
+    } else {
+        branch = branchAndPath.substring(0, slashIndex);
+        path = branchAndPath.substring(slashIndex + 1);
+    }
+
+    // Ensure path ends with / if not empty
+    if (path && !path.endsWith('/')) {
+        path = path + '/';
+    }
+
+    return { user, repo, branch, path };
+}
+
+// Check if a file should be included in notebook loading
+function isNotebookFile(filePath) {
+    // Exclude common non-notebook directories
+    if (filePath.includes('node_modules/')) return false;
+    if (filePath.includes('.git/')) return false;
+    if (filePath.startsWith('.github/')) return false;
+
+    // Exclude output files (loaded as companion data, not separate cards)
+    if (filePath.endsWith('.output.html')) return false;
+
+    // Get just the filename for extension checking
+    const filename = filePath.split('/').pop();
+
+    // Skip hidden files
+    if (filename.startsWith('.') || filename.startsWith('_')) return false;
+
+    // Use extension registry if loaded, otherwise use fallback list
+    if (extensionRegistry && Object.keys(extensionRegistry).length > 0) {
+        const extensions = Object.keys(extensionRegistry).sort((a, b) => b.length - a.length);
+        for (const ext of extensions) {
+            if (filename.endsWith(ext)) return true;
+        }
+    }
+
+    // Fallback: common notebook file extensions
+    const validExtensions = [
+        '.md', '.yaml', '.yml', '.json', '.css',
+        '.code.py', '.code.js', '.code.r',
+        '.bookmark.json', '.quiz.json', '.lesson.yaml',
+        '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'
+    ];
+
+    return validExtensions.some(ext => filePath.endsWith(ext));
+}
+
+// Flatten jsDelivr's nested file structure to array of paths
+function flattenJsDelivrFiles(files, prefix) {
+    const result = [];
+
+    for (const file of files) {
+        const fullPath = prefix + file.name;
+
+        if (file.type === 'file') {
+            result.push(fullPath);
+        } else if (file.type === 'directory' && file.files) {
+            result.push(...flattenJsDelivrFiles(file.files, fullPath + '/'));
+        }
+    }
+
+    return result;
+}
+
+// Load notebook from GitHub via jsDelivr CDN
+async function loadNotebookFromGitHub(githubPath) {
+    const { user, repo, branch, path } = parseGitHubPath(githubPath);
+
+    console.log(`[Remote] Loading from GitHub: ${user}/${repo}@${branch}/${path}`);
+
+    // Get file listing from jsDelivr API
+    const listUrl = `https://data.jsdelivr.com/v1/package/gh/${user}/${repo}@${branch}`;
+    const response = await fetch(listUrl);
+
+    if (!response.ok) {
+        // Try to get error message from response
+        let errorMsg = `Failed to load GitHub repo: ${response.status}`;
+        try {
+            const errorData = await response.json();
+            if (errorData.message) {
+                // jsDelivr returns helpful messages like "Couldn't find version main for user/repo"
+                errorMsg = errorData.message;
+                // Make the message more user-friendly
+                if (response.status === 404) {
+                    errorMsg = `Repository not found: ${user}/${repo}@${branch}. ` +
+                        'Make sure the repository is public and the branch exists.';
+                }
+            }
+        } catch (e) {
+            // Ignore JSON parse errors
+        }
+        throw new Error(errorMsg);
+    }
+
+    const packageData = await response.json();
+
+    // jsDelivr returns nested structure, flatten it
+    const allFiles = flattenJsDelivrFiles(packageData.files, '');
+
+    // Filter to notebook path and relevant files
+    const notebookFiles = allFiles
+        .filter(f => path === '' || f.startsWith(path))
+        .filter(f => isNotebookFile(f))
+        .map(f => path ? f.substring(path.length) : f);
+
+    console.log(`[Remote] Found ${notebookFiles.length} notebook files`);
+
+    // Fetch content from jsDelivr CDN
+    const baseUrl = `https://cdn.jsdelivr.net/gh/${user}/${repo}@${branch}/${path}`;
+
+    const fileContents = await Promise.all(
+        notebookFiles.map(async (filePath) => {
+            const url = baseUrl + filePath;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    console.warn(`[Remote] Failed to fetch ${filePath}: ${response.status}`);
+                    return null;
+                }
+                const content = await response.text();
+                return { path: filePath, content };
+            } catch (err) {
+                console.warn(`[Remote] Error fetching ${filePath}:`, err);
+                return null;
+            }
+        })
+    );
+
+    // Filter out failed fetches
+    const validFiles = fileContents.filter(f => f !== null);
+
+    const notebook = parseFilesToNotebook(validFiles);
+
+    // Default title to repo name (or repo/path for subdirectories)
+    if (notebook.title === 'Untitled Notebook') {
+        notebook.title = path ? `${repo}/${path.replace(/\/$/, '')}` : repo;
+    }
+
+    return notebook;
+}
+
+// Load notebook from URL with manifest.json
+async function loadNotebookFromUrl(baseUrl) {
+    // Normalize URL
+    const url = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+
+    console.log(`[Remote] Loading from URL: ${url}`);
+
+    // Fetch manifest
+    const manifestUrl = `${url}.notebook/manifest.json`;
+    const manifestResponse = await fetch(manifestUrl);
+
+    if (!manifestResponse.ok) {
+        throw new Error(`Failed to fetch manifest: ${manifestResponse.status}. ` +
+            `Make sure ${manifestUrl} exists and CORS is enabled.`);
+    }
+
+    const manifest = await manifestResponse.json();
+
+    if (!manifest.files || !Array.isArray(manifest.files)) {
+        throw new Error('Invalid manifest: expected { files: [...] }');
+    }
+
+    console.log(`[Remote] Manifest lists ${manifest.files.length} files`);
+
+    // Fetch all files
+    const fileContents = await Promise.all(
+        manifest.files.map(async (filePath) => {
+            const fileUrl = url + filePath;
+            try {
+                const response = await fetch(fileUrl);
+                if (!response.ok) {
+                    console.warn(`[Remote] Failed to fetch ${filePath}: ${response.status}`);
+                    return null;
+                }
+                const content = await response.text();
+                return { path: filePath, content };
+            } catch (err) {
+                console.warn(`[Remote] Error fetching ${filePath}:`, err);
+                return null;
+            }
+        })
+    );
+
+    const validFiles = fileContents.filter(f => f !== null);
+
+    return parseFilesToNotebook(validFiles);
+}
+
+// Parse array of {path, content} into notebook data structure
+function parseFilesToNotebook(files) {
+    const notebook = {
+        title: 'Untitled Notebook',
+        subtitle: '',
+        sections: []
+    };
+
+    // Separate companion files (e.g., .output.html) from main files
+    const mainFiles = [];
+    const companionData = {};
+
+    for (const file of files) {
+        const { path, content } = file;
+        const filename = path.split('/').pop();
+
+        // Check if this is a companion file
+        let isCompanion = false;
+        if (extensionRegistry) {
+            for (const ext of Object.keys(extensionRegistry)) {
+                const config = extensionRegistry[ext];
+                if (config.companionFiles) {
+                    for (const companion of config.companionFiles) {
+                        if (filename.endsWith(companion.suffix)) {
+                            // Store by base path (without the companion suffix, with main extension)
+                            const basePath = path.slice(0, -companion.suffix.length) + ext;
+                            if (!companionData[basePath]) companionData[basePath] = {};
+                            companionData[basePath][companion.field] = content;
+                            isCompanion = true;
+                            break;
+                        }
+                    }
+                }
+                if (isCompanion) break;
+            }
+        }
+
+        if (!isCompanion) {
+            mainFiles.push(file);
+        }
+    }
+
+    // Parse settings first if present
+    const settingsFile = mainFiles.find(f => f.path === '.notebook/settings.yaml');
+    let settings = {};
+    if (settingsFile) {
+        try {
+            settings = jsyaml.load(settingsFile.content) || {};
+            notebook.title = settings.notebook_title || notebook.title;
+            notebook.subtitle = settings.notebook_subtitle || '';
+        } catch (err) {
+            console.warn('[Remote] Failed to parse settings.yaml:', err);
+        }
+    }
+
+    // Group files by section (first directory component)
+    const sectionMap = new Map();
+
+    for (const file of mainFiles) {
+        const { path } = file;
+
+        // Determine section from path
+        const parts = path.split('/');
+        let sectionSlug, relativePath;
+
+        if (parts[0] === '.notebook') {
+            sectionSlug = '.notebook';
+            relativePath = parts.slice(1).join('/');
+        } else if (parts.length === 1) {
+            // Root file
+            sectionSlug = '.';
+            relativePath = parts[0];
+        } else {
+            sectionSlug = parts[0];
+            relativePath = parts.slice(1).join('/');
+        }
+
+        if (!sectionMap.has(sectionSlug)) {
+            sectionMap.set(sectionSlug, []);
+        }
+        sectionMap.get(sectionSlug).push({ path, relativePath, content: file.content });
+    }
+
+    // Build sections
+    for (const [sectionSlug, sectionFiles] of sectionMap) {
+        const sectionId = `section-${sectionSlug}`;
+
+        // Get section name from settings or derive from slug
+        let sectionName = sectionSlug;
+        if (settings.sections) {
+            const sectionConfig = settings.sections.find(s =>
+                (typeof s === 'object' && (s.dir === sectionSlug || s.name === sectionSlug)) ||
+                (typeof s === 'string' && s === sectionSlug)
+            );
+            if (sectionConfig && typeof sectionConfig === 'object') {
+                sectionName = sectionConfig.name || sectionSlug;
+            }
+        }
+
+        const section = {
+            id: sectionId,
+            name: sectionName,
+            visible: !sectionSlug.startsWith('.'),
+            items: [],
+            _dirName: sectionSlug
+        };
+
+        // Parse each file into a card
+        for (const file of sectionFiles) {
+            const filename = file.relativePath.split('/').pop();
+            const fileCompanionData = companionData[file.path] || {};
+
+            // Handle special system files
+            if (file.path === '.notebook/settings.yaml') {
+                section.items.push({
+                    template: 'settings',
+                    type: 'settings',
+                    system: true,
+                    id: 'system-settings.yaml',
+                    filename: 'settings.yaml',
+                    _path: '.notebook',
+                    title: 'Settings',
+                    ...settings
+                });
+                continue;
+            }
+
+            if (file.path === '.notebook/theme.css') {
+                section.items.push({
+                    template: 'theme',
+                    type: 'theme',
+                    system: true,
+                    id: 'system-theme.css',
+                    filename: 'theme.css',
+                    _path: '.notebook',
+                    title: 'Theme',
+                    content: file.content
+                });
+                continue;
+            }
+
+            // Use loadCard for regular files
+            const card = loadCard(filename, file.content, sectionName, fileCompanionData);
+            if (card) {
+                // Add path info for subdirectory support
+                const subdirPath = file.relativePath.includes('/')
+                    ? file.relativePath.substring(0, file.relativePath.lastIndexOf('/'))
+                    : null;
+                if (subdirPath) {
+                    card._path = sectionSlug + '/' + subdirPath;
+                } else {
+                    card._path = sectionSlug;
+                }
+                section.items.push(card);
+            }
+        }
+
+        // Sort items (reuse existing function)
+        sortSectionItems(section);
+
+        notebook.sections.push(section);
+    }
+
+    return notebook;
+}
+
+// Apply settings and theme from remote notebook data
+// This handles what loadSettings() and loadThemeCss() do for filesystem notebooks
+async function applyRemoteNotebookSettings(notebookData) {
+    // Find settings card in .notebook section
+    const notebookSection = notebookData.sections.find(s => s.id === 'section-.notebook');
+    const settingsCard = notebookSection?.items.find(i => i.type === 'settings');
+
+    if (settingsCard) {
+        // Build notebookSettings from card fields
+        notebookSettings = {};
+        for (const key of Object.keys(settingsCard)) {
+            if (!key.startsWith('_') && !['type', 'id', 'template', 'system', 'filename', 'title'].includes(key)) {
+                notebookSettings[key] = settingsCard[key];
+            }
+        }
+        console.log('[Remote] Applied settings:', Object.keys(notebookSettings).join(', '));
+    }
+
+    // Inject template CSS variables
+    injectTemplateStyles();
+
+    // Load base theme if specified in settings
+    if (notebookSettings?.theme) {
+        try {
+            const themeCSS = await fetchThemeCSS(notebookSettings.theme);
+            if (themeCSS) {
+                // Remove existing theme styles
+                document.getElementById('theme-base-css')?.remove();
+                document.getElementById('theme-custom-css')?.remove();
+
+                // Inject base theme
+                const baseStyle = document.createElement('style');
+                baseStyle.id = 'theme-base-css';
+                baseStyle.textContent = `@layer theme {\n${themeCSS}\n}`;
+                document.head.appendChild(baseStyle);
+                console.log(`[Remote] Loaded base theme: ${notebookSettings.theme}`);
+            }
+        } catch (e) {
+            console.warn('[Remote] Failed to load theme:', e);
+        }
+    }
+
+    // Load notebook theme.css if present
+    const themeCard = notebookSection?.items.find(i => i.type === 'theme');
+    if (themeCard?.content) {
+        const customStyle = document.createElement('style');
+        customStyle.id = 'theme-custom-css';
+        customStyle.textContent = `@layer theme {\n${themeCard.content}\n}`;
+        document.head.appendChild(customStyle);
+        console.log('[Remote] Loaded notebook theme.css customizations');
+    }
+}
+
+// Check if notebook is in remote/read-only mode
+function isRemoteMode() {
+    return viewMode === 'remote';
+}
+
+// Prompt user to save remote notebook to local folder before editing
+// Returns true if saved successfully or false if cancelled
+async function promptSaveToFolder() {
+    return new Promise((resolve) => {
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.id = 'saveToFolderModal';
+        modal.innerHTML = `
+            <div class="modal" style="max-width: 480px;">
+                <div class="modal-header">
+                    <h2>Save to Folder</h2>
+                    <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+                </div>
+                <div class="modal-body" style="padding: 1.5rem;">
+                    <p style="margin-bottom: 1rem;">This notebook is read-only. To make changes, save a copy to your computer first.</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Your edits will be saved to the local folder. You can continue editing after saving.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="saveToFolderCancel">Cancel</button>
+                    <button class="btn btn-primary" id="saveToFolderConfirm">Choose Folder...</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Handle cancel
+        document.getElementById('saveToFolderCancel').onclick = () => {
+            modal.remove();
+            resolve(false);
+        };
+
+        // Handle close button
+        modal.querySelector('.modal-close').onclick = () => {
+            modal.remove();
+            resolve(false);
+        };
+
+        // Handle confirm
+        document.getElementById('saveToFolderConfirm').onclick = async () => {
+            modal.remove();
+            const saved = await saveRemoteToFolder();
+            resolve(saved);
+        };
+
+        // Handle click outside
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.remove();
+                resolve(false);
+            }
+        };
+
+        // Handle Escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                modal.remove();
+                resolve(false);
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+    });
+}
+
+// Save current (remote) notebook to local folder (Phase 5)
+// Stub implementation - will be completed in Phase 5
+async function saveRemoteToFolder() {
+    try {
+        // Prompt for folder
+        const dirHandle = await window.showDirectoryPicker({
+            mode: 'readwrite',
+            startIn: 'documents'
+        });
+
+        showLoadingIndicator('Saving to folder...');
+
+        // Create .notebook directory
+        const notebookDir = await dirHandle.getDirectoryHandle('.notebook', { create: true });
+
+        // Get settings from section if present
+        const notebookSection = data.sections.find(s => s.id === 'section-.notebook');
+        const settingsCard = notebookSection?.items.find(i => i.type === 'settings');
+        if (settingsCard) {
+            // Build settings object from card fields
+            const settingsObj = {};
+            for (const key of Object.keys(settingsCard)) {
+                if (!key.startsWith('_') && !['type', 'id', 'template', 'system'].includes(key)) {
+                    settingsObj[key] = settingsCard[key];
+                }
+            }
+            await writeFileToHandle(notebookDir, 'settings.yaml', jsyaml.dump(settingsObj));
+        }
+
+        // Save theme if present
+        const themeCard = notebookSection?.items.find(i => i.type === 'theme');
+        if (themeCard?.content) {
+            await writeFileToHandle(notebookDir, 'theme.css', themeCard.content);
+        }
+
+        // Save all content cards
+        for (const section of data.sections) {
+            // Skip system sections for directory creation
+            if (section.id === 'section-.' || section.id === 'section-.notebook') {
+                continue;
+            }
+
+            // Create section directory
+            const sectionSlug = section._dirName || section.id.replace('section-', '');
+            const sectionDir = await dirHandle.getDirectoryHandle(sectionSlug, { create: true });
+
+            // Save each card (handling subdirectories)
+            for (const card of section.items) {
+                // Determine target directory based on card._path
+                let targetDir = sectionDir;
+                if (card._path && card._path !== sectionSlug) {
+                    // Card is in a subdirectory - create nested directories
+                    const subPath = card._path.startsWith(sectionSlug + '/')
+                        ? card._path.substring(sectionSlug.length + 1)
+                        : card._path.replace(sectionSlug, '').replace(/^\//, '');
+                    if (subPath) {
+                        const subDirs = subPath.split('/');
+                        for (const subDir of subDirs) {
+                            if (subDir) {
+                                targetDir = await targetDir.getDirectoryHandle(subDir, { create: true });
+                            }
+                        }
+                    }
+                }
+                await saveCardToHandle(targetDir, card);
+            }
+        }
+
+        // Save root files (README, CLAUDE.md)
+        const rootSection = data.sections.find(s => s.id === 'section-.');
+        if (rootSection) {
+            for (const card of rootSection.items) {
+                await saveCardToHandle(dirHandle, card);
+            }
+        }
+
+        // Register named handle
+        const name = dirHandle.name;
+        await saveNamedHandle(name, dirHandle);
+
+        // Switch to filesystem mode
+        notebookDirHandle = dirHandle;
+        filesystemLinked = true;
+        viewMode = 'filesystem';
+        remoteSource = null;
+
+        // Update URL
+        history.replaceState(null, '', `?notebook=${encodeURIComponent(name)}`);
+
+        hideLoadingIndicator();
+        showToast(`Saved to ${name}`);
+        render();
+
+        return true;
+
+    } catch (err) {
+        hideLoadingIndicator();
+
+        if (err.name === 'AbortError') {
+            // User cancelled picker
+            return false;
+        }
+
+        console.error('[Remote] Failed to save to folder:', err);
+        showToast('Failed to save: ' + err.message, 'error');
+        return false;
+    }
+}
+
+// Helper: write file to a directory handle
+async function writeFileToHandle(dirHandle, filename, content) {
+    const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+}
+
+// Helper: save a card to a directory handle
+async function saveCardToHandle(dirHandle, card) {
+    // Use the generic serializeCard function
+    const { content, extension } = serializeCard(card);
+
+    // Preserve original filename if available, otherwise generate from title
+    let filename;
+    if (card._source?.filename) {
+        filename = card._source.filename;
+    } else {
+        filename = slugify(card.title || 'untitled') + extension;
+    }
+
+    await writeFileToHandle(dirHandle, filename, content);
 }
 
 // ========== SECTION: FILESYSTEM_OBSERVER ==========
@@ -7670,6 +8497,105 @@ function showToast(message) {
     setTimeout(() => toast.classList.remove('active'), 3000);
 }
 
+// Show loading indicator overlay
+function showLoadingIndicator(message) {
+    let overlay = document.getElementById('loading-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'loading-overlay';
+        overlay.className = 'loading-overlay';
+        overlay.innerHTML = `
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <div class="loading-message"></div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+    overlay.querySelector('.loading-message').textContent = message;
+    overlay.classList.add('visible');
+}
+
+// Hide loading indicator overlay
+function hideLoadingIndicator() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+        overlay.classList.remove('visible');
+    }
+}
+
+// Show error when named notebook not found
+function showNotebookNotFoundError(name) {
+    const modal = document.getElementById('onboardingModal');
+    const content = modal.querySelector('.modal-content');
+    content.innerHTML = `
+        <h2>Notebook Not Found</h2>
+        <p>No notebook named "<strong>${escapeHtml(name)}</strong>" was found.</p>
+        <p>It may have been removed or renamed.</p>
+        <div class="onboarding-actions">
+            <button class="primary-btn" onclick="linkNotebookFolder()">Open Folder...</button>
+            <button class="secondary-btn" onclick="closeOnboarding(); history.replaceState(null, '', location.pathname);">Cancel</button>
+        </div>
+    `;
+    modal.classList.add('active');
+}
+
+// Show permission required modal for named notebook
+function showPermissionRequiredModal(name, handle) {
+    const modal = document.getElementById('onboardingModal');
+    const content = modal.querySelector('.modal-content');
+    content.innerHTML = `
+        <h2>Permission Required</h2>
+        <p>Please grant permission to access "<strong>${escapeHtml(name)}</strong>".</p>
+        <div class="onboarding-actions">
+            <button class="primary-btn" onclick="requestNamedHandlePermission('${escapeHtml(name)}')">Grant Access</button>
+            <button class="secondary-btn" onclick="closeOnboarding(); history.replaceState(null, '', location.pathname);">Cancel</button>
+        </div>
+    `;
+    modal.classList.add('active');
+}
+
+// Request permission for a named handle and reload
+async function requestNamedHandlePermission(name) {
+    const handle = await getNamedHandle(name);
+    if (handle) {
+        const permission = await handle.requestPermission({ mode: 'readwrite' });
+        if (permission === 'granted') {
+            location.reload();
+        }
+    }
+}
+
+// Show error when remote notebook fails to load
+function showLoadError(message) {
+    const modal = document.getElementById('onboardingModal');
+    if (!modal) {
+        // Fallback: show alert if modal doesn't exist
+        alert('Failed to load notebook: ' + message);
+        return;
+    }
+
+    // Update the modal body content
+    const header = modal.querySelector('.modal-header h2');
+    const body = modal.querySelector('.modal-body');
+
+    if (header) header.textContent = 'Failed to Load Notebook';
+    if (body) {
+        body.innerHTML = `
+            <div style="font-size: 3rem; margin-bottom: 20px;">⚠️</div>
+            <p style="color: var(--text-primary); font-size: 1rem; margin-bottom: 20px; line-height: 1.6;">
+                ${escapeHtml(message)}
+            </p>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button class="btn btn-primary" onclick="location.reload()">Try Again</button>
+                <button class="btn btn-secondary" onclick="linkNotebookFolder()">Open Folder...</button>
+            </div>
+        `;
+    }
+
+    modal.classList.add('active');
+}
+
 // ========== SECTION: SECTION_MODAL ==========
 // Section creation modal: open, close, create
 
@@ -7685,6 +8611,12 @@ function closeSectionModal() {
 }
 
 async function createSection() {
+    // Check if we're in remote/read-only mode
+    if (isRemoteMode()) {
+        const shouldSave = await promptSaveToFolder();
+        if (!shouldSave) return;
+    }
+
     const name = document.getElementById('sectionName').value.trim();
     if (!name) {
         showToast('Please enter a section name');
@@ -8547,7 +9479,13 @@ async function toggleCodeOutput(sectionId, codeId) {
 }
 
 // Confirm before deleting item
-function confirmDeleteItem(sectionId, itemId, itemType) {
+async function confirmDeleteItem(sectionId, itemId, itemType) {
+    // Check if we're in remote/read-only mode
+    if (isRemoteMode()) {
+        const shouldSave = await promptSaveToFolder();
+        if (!shouldSave) return;
+    }
+
     if (confirm(`Delete this ${itemType}?`)) {
         deleteItem(sectionId, itemId);
     }
@@ -8555,6 +9493,12 @@ function confirmDeleteItem(sectionId, itemId, itemType) {
 
 // Delete section
 async function deleteSection(sectionId) {
+    // Check if we're in remote/read-only mode
+    if (isRemoteMode()) {
+        const shouldSave = await promptSaveToFolder();
+        if (!shouldSave) return;
+    }
+
     if (!confirm('Delete this section?')) return;
     const section = data.sections.find(s => s.id === sectionId);
     const sectionName = section?.name;
@@ -8580,6 +9524,12 @@ async function deleteItem(sectionId, itemId) {
 
 // Update section name (renames folder on disk)
 async function updateSectionName(sectionId, newDisplayName) {
+    // Check if we're in remote/read-only mode
+    if (isRemoteMode()) {
+        const shouldSave = await promptSaveToFolder();
+        if (!shouldSave) return;
+    }
+
     const section = data.sections.find(s => s.id === sectionId);
     if (!section || !newDisplayName.trim()) return;
 
@@ -8958,6 +9908,42 @@ function render() {
     document.querySelectorAll('pre code:not([data-highlighted])').forEach(block => {
         hljs.highlightElement(block);
     });
+
+    // Add remote mode banner if viewing remote notebook
+    renderRemoteBanner();
+}
+
+// Render banner when viewing remote notebook
+function renderRemoteBanner() {
+    let banner = document.getElementById('remote-banner');
+
+    if (isRemoteMode() && remoteSource) {
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'remote-banner';
+            banner.className = 'remote-banner';
+            // Insert after header, before content
+            const header = document.querySelector('header');
+            if (header) {
+                header.after(banner);
+            } else {
+                document.body.prepend(banner);
+            }
+        }
+
+        const sourceLabel = remoteSource.type === 'github'
+            ? `GitHub: ${remoteSource.path}`
+            : remoteSource.url;
+
+        banner.innerHTML = `
+            <span class="remote-icon">📡</span>
+            <span class="remote-label">Viewing: ${escapeHtml(sourceLabel)}</span>
+            <button class="btn btn-small btn-primary" onclick="saveRemoteToFolder()">Save to Folder...</button>
+            <span class="remote-hint">Read-only mode</span>
+        `;
+    } else if (banner) {
+        banner.remove();
+    }
 }
 
 function findNote(sectionId, noteId) {
@@ -9153,6 +10139,62 @@ window.notebook = {
     getCardTypeRenderer,
 };
 
+// Default initialization flow (no URL params)
+async function initDefaultFlow() {
+    // First, migrate any legacy handle to named registry
+    const migrated = await migrateLegacyHandle();
+
+    // Try to restore last used notebook from named handles
+    const handles = await listNamedHandles();
+
+    if (handles.length > 0) {
+        // Try the migrated handle first, or first in list
+        const name = migrated?.name || handles[0];
+        const handle = await getNamedHandle(name);
+
+        if (handle) {
+            const hasPermission = await verifyDirPermission(handle);
+            if (hasPermission) {
+                notebookDirHandle = handle;
+                filesystemLinked = true;
+                viewMode = 'filesystem';
+
+                // Update URL to include notebook name
+                history.replaceState(null, '', `?notebook=${encodeURIComponent(name)}`);
+
+                // Load data from filesystem
+                try {
+                    data = await loadFromFilesystem(handle);
+                    await startWatchingFilesystem(handle);
+
+                    // Restore UI state
+                    restoreCollapsedSections();
+                    restoreExpandedSubdirs();
+                    restoreFocus();
+                    render();
+                    return;
+                } catch (error) {
+                    console.error('[Filesystem] Error loading from saved folder:', error);
+                    showToast('⚠️ Error loading from linked folder');
+                }
+            }
+        }
+    }
+
+    // Fall back to legacy initFilesystem for backwards compatibility
+    await initFilesystem();
+
+    if (filesystemLinked) {
+        restoreCollapsedSections();
+        restoreExpandedSubdirs();
+        restoreFocus();
+        render();
+    } else {
+        // No restorable notebook - show onboarding
+        showOnboarding();
+    }
+}
+
 // Initialize
 async function init() {
     // Check for file:// protocol - app requires server
@@ -9160,6 +10202,12 @@ async function init() {
         showFileProtocolError();
         return;
     }
+
+    // Parse URL parameters
+    const params = new URLSearchParams(window.location.search);
+    const githubPath = params.get('github');
+    const remoteUrl = params.get('url');
+    const notebookName = params.get('notebook');
 
     // Fetch default assets from server (templates, theme content, theme registry)
     // These are needed before rendering for modified indicators and theme picker
@@ -9169,19 +10217,82 @@ async function init() {
     ]);
     // Note: fetchDefaultTemplates() is called by loadTemplates() during filesystem load
 
-    // Try to restore filesystem link first
-    await initFilesystem();
+    try {
+        if (githubPath) {
+            // Load from GitHub via jsDelivr
+            console.log(`[Init] Loading GitHub notebook: ${githubPath}`);
+            showLoadingIndicator('Loading from GitHub...');
 
-    if (filesystemLinked) {
-        // Restore collapsed sections/subdirs/focus now that we know the notebook name
-        restoreCollapsedSections();
-        restoreExpandedSubdirs();
-        restoreFocus();
-        // Filesystem data already loaded in initFilesystem, just render
-        render();
-    } else {
-        // No folder linked - show onboarding
-        showOnboarding();
+            // Load all templates (system templates from defaults/ + card types from card-types/)
+            templateRegistry = await fetchDefaultTemplates();
+            await loadExtensionRegistry();
+
+            data = await loadNotebookFromGitHub(githubPath);
+            viewMode = 'remote';
+            remoteSource = { type: 'github', path: githubPath };
+
+            // Apply settings and theme from remote notebook
+            await applyRemoteNotebookSettings(data);
+
+            hideLoadingIndicator();
+            render();
+
+        } else if (remoteUrl) {
+            // Load from URL with manifest
+            console.log(`[Init] Loading remote notebook: ${remoteUrl}`);
+            showLoadingIndicator('Loading notebook...');
+
+            // Load all templates (system templates from defaults/ + card types from card-types/)
+            templateRegistry = await fetchDefaultTemplates();
+            await loadExtensionRegistry();
+
+            data = await loadNotebookFromUrl(remoteUrl);
+            viewMode = 'remote';
+            remoteSource = { type: 'url', url: remoteUrl };
+
+            // Apply settings and theme from remote notebook
+            await applyRemoteNotebookSettings(data);
+
+            hideLoadingIndicator();
+            render();
+
+        } else if (notebookName) {
+            // Load local notebook by name
+            console.log(`[Init] Loading local notebook: ${notebookName}`);
+
+            const handle = await getNamedHandle(notebookName);
+            if (!handle) {
+                showNotebookNotFoundError(notebookName);
+                return;
+            }
+
+            const hasPermission = await verifyDirPermission(handle);
+            if (!hasPermission) {
+                showPermissionRequiredModal(notebookName, handle);
+                return;
+            }
+
+            notebookDirHandle = handle;
+            filesystemLinked = true;
+            viewMode = 'filesystem';
+
+            data = await loadFromFilesystem(handle);
+            await startWatchingFilesystem(handle);
+
+            restoreCollapsedSections();
+            restoreExpandedSubdirs();
+            restoreFocus();
+            render();
+
+        } else {
+            // No URL params - try to restore or show onboarding
+            await initDefaultFlow();
+        }
+
+    } catch (err) {
+        console.error('[Init] Failed to load notebook:', err);
+        hideLoadingIndicator();
+        showLoadError(err.message);
     }
 
     // Check if git features are available (non-blocking)
