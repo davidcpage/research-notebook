@@ -3722,7 +3722,14 @@ async function openEditor(templateName, sectionId, card = null) {
             }
         }
         const fieldDef = template.schema[fieldConfig.field];
-        const value = card ? card[fieldConfig.field] : (fieldDef?.default || '');
+        // For markdown fields, prefer original (pre-image-resolution) content for editing
+        let value = fieldDef?.default || '';
+        if (card) {
+            const fieldName = fieldConfig.field;
+            value = (fieldDef?.type === 'markdown' && card._originalMarkdown?.[fieldName])
+                ? card._originalMarkdown[fieldName]
+                : card[fieldName];
+        }
         const fieldEl = renderEditorField(fieldConfig, fieldDef, value);
         bodyEl.appendChild(fieldEl);
     }
@@ -6269,25 +6276,35 @@ async function verifyDirPermission(handle) {
 }
 
 // Resolve relative image paths in all markdown fields of a card based on its template schema
+// Stores original values in card._originalMarkdown for editor use
 async function resolveCardMarkdownImages(card, basePath, rootHandle) {
     if (!card || !basePath || !rootHandle) return card;
 
     const template = templateRegistry[card.template || card.type];
     if (!template?.schema) return card;
 
-    // Helper to resolve a single field value
-    async function resolveField(value, fieldSchema) {
+    // Store original markdown content for editor (so users see paths, not data URLs)
+    card._originalMarkdown = {};
+
+    // Helper to resolve a single field value, storing original
+    async function resolveField(value, fieldSchema, storeKey) {
         if (!value || typeof value !== 'string') return value;
         if (fieldSchema?.type !== 'markdown') return value;
-        return await resolveMarkdownImages(value, basePath, rootHandle);
+        const resolved = await resolveMarkdownImages(value, basePath, rootHandle);
+        // Only store original if resolution changed something
+        if (resolved !== value && storeKey) {
+            card._originalMarkdown[storeKey] = value;
+        }
+        return resolved;
     }
 
     // Helper to resolve markdown fields in an object based on schema properties
-    async function resolveObjectFields(obj, properties) {
+    async function resolveObjectFields(obj, properties, arrayField, index) {
         if (!obj || !properties) return obj;
         for (const [fieldName, fieldSchema] of Object.entries(properties)) {
-            if (obj[fieldName] !== undefined) {
-                obj[fieldName] = await resolveField(obj[fieldName], fieldSchema);
+            if (obj[fieldName] !== undefined && fieldSchema.type === 'markdown') {
+                const storeKey = `${arrayField}[${index}].${fieldName}`;
+                obj[fieldName] = await resolveField(obj[fieldName], fieldSchema, storeKey);
             }
         }
         return obj;
@@ -6299,7 +6316,7 @@ async function resolveCardMarkdownImages(card, basePath, rootHandle) {
 
         if (fieldSchema.type === 'markdown') {
             // Direct markdown field
-            card[fieldName] = await resolveField(card[fieldName], fieldSchema);
+            card[fieldName] = await resolveField(card[fieldName], fieldSchema, fieldName);
         } else if (fieldSchema.type === 'array' && Array.isArray(card[fieldName])) {
             // Array field - check if items have markdown properties
             const itemSchema = fieldSchema.items;
@@ -6310,9 +6327,10 @@ async function resolveCardMarkdownImages(card, basePath, rootHandle) {
 
                 if (markdownProps.length > 0) {
                     // Resolve markdown fields in each array item
-                    for (const item of card[fieldName]) {
+                    for (let i = 0; i < card[fieldName].length; i++) {
+                        const item = card[fieldName][i];
                         if (item && typeof item === 'object') {
-                            await resolveObjectFields(item, itemSchema.properties);
+                            await resolveObjectFields(item, itemSchema.properties, fieldName, i);
                         }
                     }
                 }
