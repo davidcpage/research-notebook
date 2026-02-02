@@ -226,7 +226,6 @@ export function renderPreview(card, template) {
             const stars = dayEvents
                 .map(e => legend[e.type]?.color)
                 .filter(Boolean)
-                .slice(0, 3)
                 .map(color => starSvg(color, 12));
             if (stars.length > 0) {
                 content += `<span class="event-dots">${stars.join('')}</span>`;

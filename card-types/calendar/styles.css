@@ -77,6 +77,7 @@
     grid-template-columns: repeat(7, 1fr);
     gap: 1px;
     flex: 1;
+    overflow: visible;
 }
 
 .calendar-preview-day {
@@ -89,6 +90,7 @@
     border-radius: 2px;
     padding: 1px;
     min-height: 16px;
+    overflow: visible;
 }
 
 .calendar-preview-day .day-num {
@@ -113,10 +115,12 @@
 
 .calendar-preview-day .event-dots {
     display: flex;
+    flex-wrap: wrap;
     gap: 1px;
     justify-content: center;
     margin-top: 1px;
     filter: drop-shadow(0.5px 1px 0.5px rgba(0,0,0,0.2));
+    max-width: 40px; /* Wrap after ~3 stars (12px each + 1px gap) */
 }
 
 .calendar-preview-summary {
@@ -318,6 +322,8 @@
     gap: 3px;
     flex: 1;
     align-content: flex-start;
+    justify-content: center;
+    max-width: 72px; /* Wrap after ~3 stars (22px each + 3px gap) */
 }
 
 /* Sticker-style stars */
