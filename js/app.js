@@ -6268,6 +6268,61 @@ async function verifyDirPermission(handle) {
     }
 }
 
+// Resolve relative image paths in all markdown fields of a card based on its template schema
+async function resolveCardMarkdownImages(card, basePath, rootHandle) {
+    if (!card || !basePath || !rootHandle) return card;
+
+    const template = templateRegistry[card.template || card.type];
+    if (!template?.schema) return card;
+
+    // Helper to resolve a single field value
+    async function resolveField(value, fieldSchema) {
+        if (!value || typeof value !== 'string') return value;
+        if (fieldSchema?.type !== 'markdown') return value;
+        return await resolveMarkdownImages(value, basePath, rootHandle);
+    }
+
+    // Helper to resolve markdown fields in an object based on schema properties
+    async function resolveObjectFields(obj, properties) {
+        if (!obj || !properties) return obj;
+        for (const [fieldName, fieldSchema] of Object.entries(properties)) {
+            if (obj[fieldName] !== undefined) {
+                obj[fieldName] = await resolveField(obj[fieldName], fieldSchema);
+            }
+        }
+        return obj;
+    }
+
+    // Walk through schema fields
+    for (const [fieldName, fieldSchema] of Object.entries(template.schema)) {
+        if (card[fieldName] === undefined) continue;
+
+        if (fieldSchema.type === 'markdown') {
+            // Direct markdown field
+            card[fieldName] = await resolveField(card[fieldName], fieldSchema);
+        } else if (fieldSchema.type === 'array' && Array.isArray(card[fieldName])) {
+            // Array field - check if items have markdown properties
+            const itemSchema = fieldSchema.items;
+            if (itemSchema?.type === 'object' && itemSchema.properties) {
+                // Find markdown properties in item schema
+                const markdownProps = Object.entries(itemSchema.properties)
+                    .filter(([_, propSchema]) => propSchema.type === 'markdown');
+
+                if (markdownProps.length > 0) {
+                    // Resolve markdown fields in each array item
+                    for (const item of card[fieldName]) {
+                        if (item && typeof item === 'object') {
+                            await resolveObjectFields(item, itemSchema.properties);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return card;
+}
+
 // Resolve relative image paths in markdown content to data URLs
 // basePath: the card's directory path (e.g., 'decisions' or 'decisions/subdir')
 async function resolveMarkdownImages(content, basePath, rootHandle) {
@@ -6278,6 +6333,27 @@ async function resolveMarkdownImages(content, basePath, rootHandle) {
     const matches = [...content.matchAll(imagePattern)];
 
     if (matches.length === 0) return content;
+
+    // Helper to try loading an image from a given path
+    async function tryLoadImage(fullPath) {
+        const pathParts = fullPath.split('/');
+        const filename = pathParts.pop();
+
+        let currentHandle = rootHandle;
+        for (const dir of pathParts) {
+            currentHandle = await currentHandle.getDirectoryHandle(dir);
+        }
+
+        const fileHandle = await currentHandle.getFileHandle(filename);
+        const file = await fileHandle.getFile();
+
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
 
     let result = content;
     for (const match of matches) {
@@ -6290,36 +6366,26 @@ async function resolveMarkdownImages(content, basePath, rootHandle) {
         }
 
         try {
-            // Navigate to the image file from root
+            let dataUrl;
+
+            // Try 1: Resolve relative to card's directory
             // basePath is 'decisions', src is 'diagrams/foo.png'
             // Full path: 'decisions/diagrams/foo.png'
-            const fullPath = basePath + '/' + src;
-            const pathParts = fullPath.split('/');
-            const filename = pathParts.pop();
-
-            // Navigate through directories
-            let currentHandle = rootHandle;
-            for (const dir of pathParts) {
-                currentHandle = await currentHandle.getDirectoryHandle(dir);
+            try {
+                const relativePath = basePath + '/' + src;
+                dataUrl = await tryLoadImage(relativePath);
+                console.log(`[Filesystem] Resolved image (relative): ${src}`);
+            } catch {
+                // Try 2: Resolve from notebook root
+                // src is 'assets/emperor-penguins.png', try as-is from root
+                dataUrl = await tryLoadImage(src);
+                console.log(`[Filesystem] Resolved image (from root): ${src}`);
             }
-
-            // Get the file
-            const fileHandle = await currentHandle.getFileHandle(filename);
-            const file = await fileHandle.getFile();
-
-            // Convert to data URL
-            const dataUrl = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
 
             // Replace the markdown image with data URL version
             result = result.replace(fullMatch, `![${alt}](${dataUrl})`);
-            console.log(`[Filesystem] Resolved image: ${src}`);
         } catch (e) {
-            // Image not found or couldn't be loaded - leave original reference
+            // Image not found in either location
             console.warn(`[Filesystem] Could not resolve image: ${src}`, e.message);
         }
     }
@@ -6721,9 +6787,9 @@ async function loadFromFilesystem(dirHandle) {
                         if (card.code) {
                             card.lineCount = card.code.split('\n').length;
                         }
-                        // Resolve relative image paths in markdown content to data URLs
-                        if (card.content && card._path) {
-                            card.content = await resolveMarkdownImages(card.content, card._path, dirHandle);
+                        // Resolve relative image paths in all markdown fields to data URLs
+                        if (card._path) {
+                            await resolveCardMarkdownImages(card, card._path, dirHandle);
                         }
                         items.push(card);
                     } else {
