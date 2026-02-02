@@ -7859,6 +7859,12 @@ async function loadNotebookFromGitHub(githubPath) {
 
     console.log(`[Remote] Found ${notebookFiles.length} notebook files`);
 
+    // Check if any files were found at the specified path
+    if (notebookFiles.length === 0) {
+        const pathDisplay = path ? path.replace(/\/$/, '') : 'root';
+        throw new Error(`No notebook found at "${pathDisplay}". Make sure the path exists in ${user}/${repo}.`);
+    }
+
     // Fetch content from jsDelivr CDN
     const baseUrl = `https://cdn.jsdelivr.net/gh/${user}/${repo}@${branch}/${path}`;
 

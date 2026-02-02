@@ -4,6 +4,13 @@ A browser-based research management tool that combines bookmarks, markdown notes
 
 **[Try it online](https://davidcpage.github.io/research-notebook/)** — no installation required (Chrome/Edge only)
 
+### Example Notebooks
+
+- [Demo Notebook](https://davidcpage.github.io/research-notebook/?github=davidcpage/research-notebook@main/examples/demo-notebook) — showcases all card types and features
+- [Research Notebook](https://davidcpage.github.io/research-notebook/?github=davidcpage/research-notebook@main/examples/research-notebook) — manuscript theme, research-focused
+- [Dev Notebook](https://davidcpage.github.io/research-notebook/?github=davidcpage/research-notebook@main/examples/dev-notebook) — terminal theme, code-focused
+- [Tutor Notebook](https://davidcpage.github.io/research-notebook/?github=davidcpage/research-notebook@main/examples/tutor-notebook) — friendly theme with quizzes for learning
+
 ## Features
 
 - **Bookmarks** with auto-generated thumbnails (via microlink API or PDF.js)
@@ -39,15 +46,13 @@ notebook
 
 ### Using an Example Template
 
+Preview the examples online (see links above), then copy one as your starting point:
+
 ```bash
-# Copy an example as your starting point
 cp -r examples/research-notebook ~/my-project
 ```
 
-Available templates:
-- `research-notebook` - Manuscript theme, research-focused
-- `dev-notebook` - Terminal theme, code-focused
-- `tutor-notebook` - Friendly theme, learning-focused
+Or save directly from the online preview using the "Save to Folder" button.
 
 ## Card CLI (`nb`)
 
