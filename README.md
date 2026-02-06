@@ -54,6 +54,30 @@ cp -r examples/research-notebook ~/my-project
 
 Or save directly from the online preview using the "Save to Folder" button.
 
+### Collaborative Editing with Google Drive
+
+You can share a notebook folder with collaborators using Google Drive while preserving local file access for Claude Code:
+
+**Owner setup:**
+1. Install [Google Drive for Desktop](https://www.google.com/drive/download/)
+2. Create your notebook folder inside `~/Google Drive/My Drive/`
+3. Right-click the folder in Google Drive web → Share → Add collaborators as "Editor"
+
+**Collaborator setup:**
+1. Install Google Drive for Desktop
+2. Open the shared folder in [Google Drive web](https://drive.google.com)
+3. Right-click → Organize → **Add shortcut to Drive** (required for local sync)
+4. The folder now syncs to your local `~/Google Drive/My Drive/`
+5. Open the local folder in the notebook app and Claude Code as usual
+
+**Notes:**
+- Only the owner's storage quota is used
+- Free tier: 15GB (plenty for text-based notebooks)
+- Changes sync automatically between collaborators
+- Simultaneous edits to the same file can conflict — works best with turn-taking or editing different files
+
+**Alternatives:** [Dropbox](https://www.dropbox.com) (2GB free) or [Syncthing](https://syncthing.net) (peer-to-peer, no cloud storage) offer similar local-folder sync workflows.
+
 ## Card CLI (`nb`)
 
 The `nb` command helps create cards with correct frontmatter:
