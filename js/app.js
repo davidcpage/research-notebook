@@ -440,6 +440,16 @@ async function getNotebookTemplatesDir(dirHandle, create = false) {
     }
 }
 
+// Simple debounce utility — returns a function that delays invoking fn until after
+// `delay` ms have elapsed since the last invocation
+function debounce(fn, delay) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delay);
+    };
+}
+
 // Author registry (loaded from settings.yaml authors field)
 // Maps author names (lowercase) to icon SVG content
 let authorRegistry = {};
@@ -3813,7 +3823,11 @@ async function openEditor(templateName, sectionId, card = null) {
     }
 
     // Set submit button text
-    document.getElementById('editorSubmitBtn').textContent = isNew ? `Save ${buttonLabel}` : 'Save Changes';
+    if (templateName === 'settings') {
+        document.getElementById('editorSubmitBtn').textContent = 'Save to Disk';
+    } else {
+        document.getElementById('editorSubmitBtn').textContent = isNew ? `Save ${buttonLabel}` : 'Save Changes';
+    }
 
     // Show modal
     document.getElementById('editorModal').classList.add('active');
@@ -3826,6 +3840,11 @@ async function openEditor(templateName, sectionId, card = null) {
 
     // Initialize thumbnail upload if present
     initEditorThumbnailUpload();
+
+    // Settings auto-apply: attach listeners so changes take effect immediately
+    if (templateName === 'settings') {
+        attachSettingsAutoApply(template);
+    }
 }
 
 // Render a single editor field based on its configuration
@@ -4134,6 +4153,7 @@ function renderEditorField(fieldConfig, fieldDef, value) {
                 }
                 const newRow = createRecordsEditorItem(field, schema, defaultRecord, newIdx, canDelete);
                 tbody.appendChild(newRow);
+                tbody.dispatchEvent(new Event('records-add', { bubbles: true }));
             };
             div.appendChild(addBtn);
         }
@@ -4339,8 +4359,10 @@ function createListEditorItem(field, value, index, allowDelete = true) {
         delBtn.textContent = '×';
         delBtn.title = 'Remove';
         delBtn.onclick = () => {
+            const container = row.parentNode;
             row.remove();
             updateListEditorIndices(field);
+            if (container) container.dispatchEvent(new Event('list-delete', { bubbles: true }));
         };
         buttons.appendChild(delBtn);
     }
@@ -4364,6 +4386,7 @@ function moveListItem(field, row, direction) {
         container.insertBefore(items[newIndex], row);
     }
     updateListEditorIndices(field);
+    container.dispatchEvent(new Event('list-reorder', { bubbles: true }));
 }
 
 // Update data-index attributes after reordering
@@ -4448,6 +4471,7 @@ function createRecordsEditorItem(field, schema, record, index, allowDelete) {
             row.parentNode.insertBefore(draggingRow, row);
         }
         updateRecordsEditorIndices(field);
+        tbody.dispatchEvent(new Event('records-reorder', { bubbles: true }));
     });
 
     // Create cells for each schema field
@@ -4484,6 +4508,7 @@ function createRecordsEditorItem(field, schema, record, index, allowDelete) {
                 if (key === 'visible') {
                     row.classList.toggle('is-hidden', !newVal);
                 }
+                toggle.dispatchEvent(new Event('records-toggle', { bubbles: true }));
             };
             td.appendChild(toggle);
         } else {
@@ -5978,7 +6003,11 @@ async function saveEditor() {
 
         closeEditor();
         render();
-        showToast(isNew ? `${template.ui?.button_label || 'Card'} created` : 'Changes saved');
+        if (templateName === 'settings') {
+            showToast('Settings saved to disk');
+        } else {
+            showToast(isNew ? `${template.ui?.button_label || 'Card'} created` : 'Changes saved');
+        }
 
     } catch (error) {
         console.error('Save error:', error);
@@ -8770,6 +8799,156 @@ function openSettingsEditor() {
 
     // Open the generic editor with the settings card
     openEditor('settings', 'section-.notebook', settingsCard);
+}
+
+// Apply settings from editor fields to app state + IndexedDB (no filesystem write)
+// Extracts current editor values, updates notebookSettings/data, triggers side effects,
+// saves to IndexedDB, and re-renders. Called on every field change for instant feedback.
+let _applyingSettings = false;
+async function applySettingsFromEditor() {
+    if (_applyingSettings) return; // prevent re-entrant calls
+    if (!editingCard || editingCard.templateName !== 'settings') return;
+
+    _applyingSettings = true;
+    try {
+        const template = templateRegistry['settings'];
+        if (!template) return;
+
+        const fields = template.editor?.fields || [];
+        const card = { ...editingCard.card, template: 'settings' };
+
+        // Collect current field values from editor DOM
+        for (const fieldConfig of fields) {
+            // Skip fields hidden by showIf conditions
+            if (fieldConfig.showIf) {
+                const checkValue = card[fieldConfig.showIf.field] || [];
+                const arr = Array.isArray(checkValue) ? checkValue : [checkValue];
+                if (fieldConfig.showIf.includes && !arr.includes(fieldConfig.showIf.includes)) {
+                    continue;
+                }
+            }
+            const fieldDef = template.schema[fieldConfig.field];
+            const value = getEditorFieldValue(fieldConfig.field, fieldDef, fieldConfig);
+            if (value !== null) {
+                card[fieldConfig.field] = value;
+            }
+        }
+
+        // Sync collected values back to the card object in data model
+        // so re-opening the editor shows current state
+        Object.assign(editingCard.card, card);
+
+        // Update notebookSettings from card fields (mirrors saveCardFile logic)
+        const updatedSettings = { ...notebookSettings };
+        for (const key of Object.keys(SETTINGS_SCHEMA)) {
+            if (card[key] !== undefined) {
+                updatedSettings[key] = card[key];
+            }
+        }
+        notebookSettings = buildSettingsObject(updatedSettings);
+
+        // Update data.title/subtitle
+        data.title = notebookSettings.notebook_title;
+        data.subtitle = notebookSettings.notebook_subtitle;
+
+        // Reload author registry
+        await loadAuthors(notebookDirHandle);
+
+        // Lazy-load CSS/JS for newly enabled card types
+        if (notebookSettings.enabled_templates) {
+            const newlyEnabled = notebookSettings.enabled_templates.filter(t => !fullyLoadedCardTypes.has(t));
+            if (newlyEnabled.length > 0) {
+                await loadCardTypeAssets(newlyEnabled);
+            }
+        }
+
+        // Reorder data.sections from editor (skip directory creation — that's for Save)
+        if (card.sections && Array.isArray(card.sections)) {
+            const newOrder = [];
+            for (const sectionRecord of card.sections) {
+                let dirName;
+                if (typeof sectionRecord === 'object') {
+                    dirName = sectionRecord.dir || sectionRecord.path || (sectionRecord.name ? slugify(sectionRecord.name) : null);
+                } else if (typeof sectionRecord === 'string') {
+                    dirName = slugify(sectionRecord);
+                }
+                if (!dirName) continue;
+
+                let section = data.sections.find(s => s._dirName === dirName);
+                if (section) {
+                    if (typeof sectionRecord === 'object') {
+                        section.visible = sectionRecord.visible !== false;
+                    }
+                    newOrder.push(section);
+                }
+                // Skip new-section directory creation — deferred to explicit Save
+            }
+            // Append any sections not in the editor list
+            for (const section of data.sections) {
+                if (!newOrder.includes(section)) {
+                    newOrder.push(section);
+                }
+            }
+            data.sections = newOrder;
+        }
+
+        // Reload theme in case base theme changed
+        await loadThemeCss(notebookDirHandle);
+
+        // Persist to IndexedDB (not filesystem)
+        await saveData();
+        render();
+    } finally {
+        _applyingSettings = false;
+    }
+}
+
+// Attach auto-apply listeners to settings editor fields
+// Called once after openEditor renders the settings form
+function attachSettingsAutoApply(template) {
+    const bodyEl = document.getElementById('editorBody');
+    if (!bodyEl) return;
+
+    const debouncedApply = debounce(() => applySettingsFromEditor(), 300);
+
+    const fields = template.editor?.fields || [];
+    for (const fieldConfig of fields) {
+        const fieldDef = template.schema[fieldConfig.field];
+        const type = fieldConfig.type || fieldDef?.type || 'text';
+        const el = document.getElementById(`editor-${fieldConfig.field}`);
+
+        if (type === 'boolean') {
+            // Checkbox — apply on click
+            if (el) el.addEventListener('change', () => applySettingsFromEditor());
+        } else if (type === 'theme' || type === 'select' || type === 'enum') {
+            // Dropdown — apply on change
+            if (el) el.addEventListener('change', () => applySettingsFromEditor());
+        } else if (type === 'templates') {
+            // Checkbox grid — apply on any checkbox change
+            if (el) el.addEventListener('change', () => applySettingsFromEditor());
+        } else if (type === 'records') {
+            // Records table — listen for custom events from drag-drop, toggle, add
+            if (el) {
+                el.addEventListener('records-reorder', () => debouncedApply());
+                el.addEventListener('records-toggle', () => applySettingsFromEditor());
+                el.addEventListener('records-add', () => debouncedApply());
+            }
+        } else if (type === 'list') {
+            // List editor — listen for reorder and delete events, plus blur on inputs
+            if (el) {
+                el.addEventListener('list-reorder', () => debouncedApply());
+                el.addEventListener('list-delete', () => debouncedApply());
+                el.addEventListener('blur', (e) => {
+                    if (e.target.classList.contains('list-editor-input')) {
+                        debouncedApply();
+                    }
+                }, true); // capture phase to catch blur on child inputs
+            }
+        } else {
+            // Text inputs — apply on blur (focus loss)
+            if (el) el.addEventListener('blur', () => debouncedApply());
+        }
+    }
 }
 
 // Change to a different notebook folder
