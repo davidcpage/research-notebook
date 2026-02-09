@@ -3754,16 +3754,28 @@ async function openEditor(templateName, sectionId, card = null) {
 
     // Settings-specific: add storage info and system notes toggle
     if (templateName === 'settings') {
-        const folderName = notebookDirHandle ? notebookDirHandle.name : 'Not linked';
-        actionsHtml += `
-            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                <span style="font-size: 12px; color: var(--text-muted);">
-                    📁 <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 3px;">${escapeHtml(folderName)}</code>
-                </span>
-                <button class="btn btn-secondary btn-small" onclick="refreshFromFilesystem()" title="Reload from filesystem">🔄 Refresh</button>
-                <button class="btn btn-secondary btn-small" onclick="changeNotebookFolder()" title="Switch notebook folder">📁 Change</button>
-            </div>
-        `;
+        if (storageBackend?.type === 'github') {
+            const repoName = storageBackend.name;
+            actionsHtml += `
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <span style="font-size: 12px; color: var(--text-muted);">
+                        🐙 <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 3px;">${escapeHtml(repoName)}</code>
+                    </span>
+                    <button class="btn btn-secondary btn-small" onclick="refreshGitHubNotebook()" title="Re-fetch from GitHub">🔄 Refresh</button>
+                </div>
+            `;
+        } else {
+            const folderName = notebookDirHandle ? notebookDirHandle.name : 'Not linked';
+            actionsHtml += `
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <span style="font-size: 12px; color: var(--text-muted);">
+                        📁 <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 3px;">${escapeHtml(folderName)}</code>
+                    </span>
+                    <button class="btn btn-secondary btn-small" onclick="refreshFromFilesystem()" title="Reload from filesystem">🔄 Refresh</button>
+                    <button class="btn btn-secondary btn-small" onclick="changeNotebookFolder()" title="Switch notebook folder">📁 Change</button>
+                </div>
+            `;
+        }
     }
 
     actionsEl.innerHTML = actionsHtml;
@@ -6015,11 +6027,12 @@ const IDB_NAME = 'ResearchNotebookDB';
 const IDB_STORE = 'notebook';
 const IDB_KEY = 'data';
 const IDB_HANDLES_STORE = 'notebook-handles';  // Named handle registry for multi-notebook support
+const IDB_GITHUB_CACHE_STORE = 'github-cache';  // SHA-indexed file cache for GitHub backend
 
 // IndexedDB helper functions
 function openDB() {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open(IDB_NAME, 2);  // Version 2: added notebook-handles store
+        const request = indexedDB.open(IDB_NAME, 3);  // Version 3: added github-cache store
 
         request.onerror = () => reject(request.error);
         request.onsuccess = () => resolve(request.result);
@@ -6033,6 +6046,10 @@ function openDB() {
             // Version 2: separate store for named handles (multi-notebook support)
             if (!db.objectStoreNames.contains(IDB_HANDLES_STORE)) {
                 db.createObjectStore(IDB_HANDLES_STORE);
+            }
+            // Version 3: file content cache for GitHub backend
+            if (!db.objectStoreNames.contains(IDB_GITHUB_CACHE_STORE)) {
+                db.createObjectStore(IDB_GITHUB_CACHE_STORE);
             }
         };
     });
@@ -6207,6 +6224,96 @@ class GitHubBackend {
         return `${this.owner}/${this.repo}`;
     }
 
+    // Cache key prefix scoped to this repo/branch
+    get _cachePrefix() {
+        return `${this.owner}/${this.repo}/${this.branch}:`;
+    }
+
+    // Read a cached entry from IndexedDB. Returns {content, sha, type} or null
+    async _cacheGet(path) {
+        try {
+            const db = await openDB();
+            const tx = db.transaction(IDB_GITHUB_CACHE_STORE, 'readonly');
+            const store = tx.objectStore(IDB_GITHUB_CACHE_STORE);
+            const result = await new Promise((resolve, reject) => {
+                const req = store.get(this._cachePrefix + path);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => reject(req.error);
+            });
+            db.close();
+            return result;
+        } catch (e) {
+            console.warn('[GitHub] Cache read failed:', e);
+            return null;
+        }
+    }
+
+    // Write a cache entry to IndexedDB
+    async _cachePut(path, sha, content, type) {
+        try {
+            const db = await openDB();
+            const tx = db.transaction(IDB_GITHUB_CACHE_STORE, 'readwrite');
+            const store = tx.objectStore(IDB_GITHUB_CACHE_STORE);
+            store.put({ sha, content, type }, this._cachePrefix + path);
+            await new Promise((resolve, reject) => {
+                tx.oncomplete = resolve;
+                tx.onerror = () => reject(tx.error);
+            });
+            db.close();
+        } catch (e) {
+            console.warn('[GitHub] Cache write failed:', e);
+        }
+    }
+
+    // Remove a single cache entry from IndexedDB
+    async _cacheDelete(path) {
+        try {
+            const db = await openDB();
+            const tx = db.transaction(IDB_GITHUB_CACHE_STORE, 'readwrite');
+            const store = tx.objectStore(IDB_GITHUB_CACHE_STORE);
+            store.delete(this._cachePrefix + path);
+            await new Promise((resolve, reject) => {
+                tx.oncomplete = resolve;
+                tx.onerror = () => reject(tx.error);
+            });
+            db.close();
+        } catch (e) {
+            console.warn('[GitHub] Cache delete failed:', e);
+        }
+    }
+
+    // Remove cache entries for files no longer in the tree (handles external deletes)
+    async _cacheCleanup() {
+        try {
+            const db = await openDB();
+            const tx = db.transaction(IDB_GITHUB_CACHE_STORE, 'readwrite');
+            const store = tx.objectStore(IDB_GITHUB_CACHE_STORE);
+            const allKeys = await new Promise((resolve, reject) => {
+                const req = store.getAllKeys();
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+            const prefix = this._cachePrefix;
+            let removed = 0;
+            for (const key of allKeys) {
+                if (typeof key !== 'string' || !key.startsWith(prefix)) continue;
+                const path = key.slice(prefix.length);
+                if (!this._tree.has(path)) {
+                    store.delete(key);
+                    removed++;
+                }
+            }
+            await new Promise((resolve, reject) => {
+                tx.oncomplete = resolve;
+                tx.onerror = () => reject(tx.error);
+            });
+            db.close();
+            if (removed > 0) console.log(`[GitHub] Cache cleanup: removed ${removed} stale entries`);
+        } catch (e) {
+            console.warn('[GitHub] Cache cleanup failed:', e);
+        }
+    }
+
     // Encode a file path for use in GitHub API URLs (encode each segment, preserve slashes)
     _encodePath(path) {
         return path.split('/').map(s => encodeURIComponent(s)).join('/');
@@ -6226,7 +6333,7 @@ class GitHubBackend {
             if (response.status === 401) throw new Error(`GitHub auth failed: ${msg}`);
             if (response.status === 403) throw new Error(`GitHub forbidden: ${msg}`);
             if (response.status === 404) throw new Error(`GitHub not found: ${msg}`);
-            if (response.status === 409) throw new Error(`GitHub conflict: ${msg}`);
+            if (response.status === 409) throw new Error(`Conflict: this file was modified on GitHub since you last loaded it. Use 🔄 Refresh to reload, then try again.`);
             if (response.status === 422) throw new Error(`GitHub validation error: ${msg}`);
             throw new Error(`GitHub API error ${response.status}: ${msg}`);
         }
@@ -6246,6 +6353,8 @@ class GitHubBackend {
                 type: entry.type  // 'blob' or 'tree'
             });
         }
+        // Remove cache entries for files no longer in tree (handles external deletes)
+        await this._cacheCleanup();
         console.log(`[GitHub] Tree loaded: ${this._tree.size} entries`);
     }
 
@@ -6279,16 +6388,37 @@ class GitHubBackend {
 
     // Read a text file via the Contents API. Returns {content, lastModified, size}
     async readFile(path) {
+        // Check IDB cache — serve from cache if SHA matches tree
+        const treeEntry = this._tree.get(path);
+        if (treeEntry) {
+            const cached = await this._cacheGet(path);
+            if (cached && cached.sha === treeEntry.sha && cached.type === 'text') {
+                this._shaCache.set(path, cached.sha);
+                return { content: cached.content, lastModified: null, size: treeEntry.size };
+            }
+        }
+        // Cache miss or SHA mismatch — fetch from API
         const url = `${this._baseUrl}/contents/${this._encodePath(path)}?ref=${this.branch}`;
         const response = await this._fetch(url);
         const data = await response.json();
         this._shaCache.set(path, data.sha);
         const content = decodeBase64UTF8(data.content);
+        await this._cachePut(path, data.sha, content, 'text');
         return { content, lastModified: null, size: data.size };
     }
 
     // Read a file as a data URL (for binary files like images). Returns {dataUrl, lastModified, size}
     async readFileAsDataUrl(path) {
+        // Check IDB cache — serve from cache if SHA matches tree
+        const treeEntry = this._tree.get(path);
+        if (treeEntry) {
+            const cached = await this._cacheGet(path);
+            if (cached && cached.sha === treeEntry.sha && cached.type === 'dataUrl') {
+                this._shaCache.set(path, cached.sha);
+                return { dataUrl: cached.content, lastModified: null, size: treeEntry.size };
+            }
+        }
+        // Cache miss or SHA mismatch — fetch from API
         const url = `${this._baseUrl}/contents/${this._encodePath(path)}?ref=${this.branch}`;
         const response = await this._fetch(url);
         const data = await response.json();
@@ -6298,6 +6428,7 @@ class GitHubBackend {
         // Contents API returns base64 with newlines — strip them for data URL
         const cleanBase64 = data.content.replace(/\n/g, '');
         const dataUrl = `data:${mimeType};base64,${cleanBase64}`;
+        await this._cachePut(path, data.sha, dataUrl, 'dataUrl');
         return { dataUrl, lastModified: null, size: data.size };
     }
 
@@ -6321,15 +6452,29 @@ class GitHubBackend {
         };
         if (sha) body.sha = sha;
 
-        const response = await this._fetch(url, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
+        let response;
+        try {
+            response = await this._fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+        } catch (error) {
+            if (error.message.startsWith('Conflict:')) {
+                // Invalidate stale SHA so next attempt after refresh uses fresh SHA
+                this._shaCache.delete(path);
+            }
+            throw error;
+        }
         const data = await response.json();
         const newSha = data.content.sha;
         this._shaCache.set(path, newSha);
         this._tree.set(path, { sha: newSha, size: data.content.size, type: 'blob' });
+        // Cache text writes (binary writes cached on next readFileAsDataUrl)
+        const isText = !(content instanceof ArrayBuffer || (typeof content === 'object' && content.byteLength !== undefined));
+        if (isText) {
+            await this._cachePut(path, newSha, content, 'text');
+        }
     }
 
     // Delete a file or directory. For directories with recursive, deletes all contained files.
@@ -6348,6 +6493,7 @@ class GitHubBackend {
             // Delete each file (sequential to avoid conflicts)
             for (const blobPath of blobs) {
                 await this._deleteSingleFile(blobPath);
+                await this._cacheDelete(blobPath);
             }
             // Clean up tree entries for the directory and its contents
             for (const [p] of this._tree) {
@@ -6360,6 +6506,7 @@ class GitHubBackend {
             await this._deleteSingleFile(path);
             this._tree.delete(path);
             this._shaCache.delete(path);
+            await this._cacheDelete(path);
         }
     }
 
@@ -6369,15 +6516,22 @@ class GitHubBackend {
         if (!sha) throw new Error(`Cannot delete ${path}: unknown SHA`);
         const filename = path.split('/').pop();
         const url = `${this._baseUrl}/contents/${this._encodePath(path)}`;
-        await this._fetch(url, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message: `Delete ${filename}`,
-                sha: sha,
-                branch: this.branch
-            })
-        });
+        try {
+            await this._fetch(url, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: `Delete ${filename}`,
+                    sha: sha,
+                    branch: this.branch
+                })
+            });
+        } catch (error) {
+            if (error.message.startsWith('Conflict:')) {
+                this._shaCache.delete(path);
+            }
+            throw error;
+        }
     }
 
     // No-op: GitHub creates directories implicitly when files are written
@@ -6440,8 +6594,8 @@ function arrayBufferToBase64(bytes) {
 // ========== SECTION: GITHUB_CONNECTION ==========
 // GitHub storage backend connection UI and localStorage credential management
 // Functions: saveGitHubConnection, getGitHubConnections, deleteGitHubConnection,
-//            getLastGitHubConnection, connectToGitHub, showGitHubConnectModal,
-//            closeGitHubConnectModal, handleGitHubConnect
+//            getLastGitHubConnection, connectToGitHub, refreshGitHubNotebook,
+//            showGitHubConnectModal, closeGitHubConnectModal, handleGitHubConnect
 
 const GITHUB_CONNECTIONS_KEY = 'github_connections';
 
@@ -6507,6 +6661,20 @@ async function connectToGitHub({ owner, repo, branch, token }) {
     render();
 
     showToast(`Connected to ${owner}/${repo}`);
+}
+
+// Re-fetch tree and reload all notebook data from GitHub (picks up remote changes)
+async function refreshGitHubNotebook() {
+    if (!storageBackend || storageBackend.type !== 'github') return;
+    try {
+        showToast('🔄 Refreshing from GitHub...');
+        await storageBackend.loadTree();       // Re-fetch tree (picks up new SHAs)
+        await reloadFromFilesystem(false);     // Reload all data using updated tree
+        showToast(`✅ Refreshed from GitHub (${data.sections.length} sections)`);
+    } catch (error) {
+        console.error('[GitHub] Refresh error:', error);
+        showToast('❌ Error refreshing: ' + error.message);
+    }
 }
 
 // Show the GitHub connect modal
