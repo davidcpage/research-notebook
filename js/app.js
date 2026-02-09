@@ -6682,9 +6682,10 @@ async function loadFromFilesystem(dirHandle) {
             const subdirs = {};
             const companionFiles = {};
             for await (const [name, handle] of sectionHandle.entries()) {
-                if (name.startsWith('_') || name.startsWith('.')) continue;  // Skip metadata/hidden files
+                if (name.startsWith('.')) continue;  // Skip hidden files
 
                 if (handle.kind === 'directory') {
+                    if (name.startsWith('_')) continue;  // Skip _prefixed dirs (__pycache__ etc)
                     // Skip excluded directories (e.g., node_modules)
                     const excludedPaths = notebookSettings?.excluded_paths ?? ['node_modules'];
                     if (excludedPaths.includes(name)) {
@@ -6696,6 +6697,7 @@ async function loadFromFilesystem(dirHandle) {
                 }
 
                 if (handle.kind !== 'file') continue;
+                if (name.startsWith('_') && !name.startsWith('__')) continue;  // Skip _metadata files but allow dunder files (__init__.py etc)
 
                 // Check if this is a companion file (e.g., .output.html)
                 let isCompanion = false;
@@ -7890,8 +7892,9 @@ function isNotebookFile(filePath) {
     // Get just the filename for extension checking
     const filename = filePath.split('/').pop();
 
-    // Skip hidden files
-    if (filename.startsWith('.') || filename.startsWith('_')) return false;
+    // Skip hidden files and metadata files (but allow dunder files like __init__.py)
+    if (filename.startsWith('.')) return false;
+    if (filename.startsWith('_') && !filename.startsWith('__')) return false;
 
     // Use extension registry if loaded, otherwise use fallback list
     if (extensionRegistry && Object.keys(extensionRegistry).length > 0) {
