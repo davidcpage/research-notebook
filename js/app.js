@@ -6063,8 +6063,8 @@ async function saveData() {
 
 // ========== SECTION: STORAGE_BACKEND ==========
 // Abstraction layer for file I/O. All paths are relative to notebook root with forward slashes.
-// FileSystemBackend wraps the File System Access API; future backends (e.g., GitHub API) implement
-// the same interface.
+// FileSystemBackend wraps the File System Access API. GitHubBackend uses the GitHub REST API
+// (works on iPad Safari and other browsers without File System Access API).
 
 // Active storage backend (FileSystemBackend or future alternatives)
 let storageBackend = null;
@@ -6186,6 +6186,255 @@ class FileSystemBackend {
             return false;
         }
     }
+}
+
+// Storage backend using the GitHub REST API (works on all browsers including iPad Safari)
+class GitHubBackend {
+    type = 'github';
+    readonly = false;
+
+    constructor({ owner, repo, branch, token }) {
+        this.owner = owner;
+        this.repo = repo;
+        this.branch = branch;
+        this._token = token;
+        this._tree = new Map();    // path → {sha, size, type: 'blob'|'tree'}
+        this._shaCache = new Map(); // path → sha (updated on read/write)
+        this._baseUrl = `https://api.github.com/repos/${owner}/${repo}`;
+    }
+
+    get name() {
+        return `${this.owner}/${this.repo}`;
+    }
+
+    // Encode a file path for use in GitHub API URLs (encode each segment, preserve slashes)
+    _encodePath(path) {
+        return path.split('/').map(s => encodeURIComponent(s)).join('/');
+    }
+
+    // Centralized fetch helper — adds auth header and checks response status
+    async _fetch(url, options = {}) {
+        const headers = {
+            'Authorization': `Bearer ${this._token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            ...options.headers
+        };
+        const response = await fetch(url, { ...options, headers });
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            const msg = body.message || response.statusText;
+            if (response.status === 401) throw new Error(`GitHub auth failed: ${msg}`);
+            if (response.status === 403) throw new Error(`GitHub forbidden: ${msg}`);
+            if (response.status === 404) throw new Error(`GitHub not found: ${msg}`);
+            if (response.status === 409) throw new Error(`GitHub conflict: ${msg}`);
+            if (response.status === 422) throw new Error(`GitHub validation error: ${msg}`);
+            throw new Error(`GitHub API error ${response.status}: ${msg}`);
+        }
+        return response;
+    }
+
+    // Load the full repo tree in one API call. Called once during connection.
+    async loadTree() {
+        const url = `${this._baseUrl}/git/trees/${this.branch}?recursive=1`;
+        const response = await this._fetch(url);
+        const data = await response.json();
+        this._tree.clear();
+        for (const entry of data.tree) {
+            this._tree.set(entry.path, {
+                sha: entry.sha,
+                size: entry.size || 0,
+                type: entry.type  // 'blob' or 'tree'
+            });
+        }
+        console.log(`[GitHub] Tree loaded: ${this._tree.size} entries`);
+    }
+
+    // List contents of a directory from the in-memory tree (no API call)
+    async listDirectory(path) {
+        const prefix = path ? path.replace(/\/$/, '') + '/' : '';
+        const entries = [];
+        const seen = new Set();
+        for (const [entryPath, info] of this._tree) {
+            if (!entryPath.startsWith(prefix)) continue;
+            const rest = entryPath.slice(prefix.length);
+            // Skip the directory itself and nested entries
+            if (!rest || rest.includes('/')) {
+                // Check if a direct child directory
+                if (rest.includes('/')) {
+                    const dirName = rest.split('/')[0];
+                    if (!seen.has(dirName)) {
+                        seen.add(dirName);
+                        entries.push({ name: dirName, kind: 'directory' });
+                    }
+                }
+                continue;
+            }
+            entries.push({
+                name: rest,
+                kind: info.type === 'tree' ? 'directory' : 'file'
+            });
+        }
+        return entries;
+    }
+
+    // Read a text file via the Contents API. Returns {content, lastModified, size}
+    async readFile(path) {
+        const url = `${this._baseUrl}/contents/${this._encodePath(path)}?ref=${this.branch}`;
+        const response = await this._fetch(url);
+        const data = await response.json();
+        this._shaCache.set(path, data.sha);
+        const content = decodeBase64UTF8(data.content);
+        return { content, lastModified: null, size: data.size };
+    }
+
+    // Read a file as a data URL (for binary files like images). Returns {dataUrl, lastModified, size}
+    async readFileAsDataUrl(path) {
+        const url = `${this._baseUrl}/contents/${this._encodePath(path)}?ref=${this.branch}`;
+        const response = await this._fetch(url);
+        const data = await response.json();
+        this._shaCache.set(path, data.sha);
+        const ext = path.split('.').pop().toLowerCase();
+        const mimeType = GitHubBackend._mimeTypes[ext] || 'application/octet-stream';
+        // Contents API returns base64 with newlines — strip them for data URL
+        const cleanBase64 = data.content.replace(/\n/g, '');
+        const dataUrl = `data:${mimeType};base64,${cleanBase64}`;
+        return { dataUrl, lastModified: null, size: data.size };
+    }
+
+    // Write a text or binary file, creating or updating via the Contents API
+    async writeFile(path, content) {
+        const url = `${this._baseUrl}/contents/${this._encodePath(path)}`;
+        const sha = this._shaCache.get(path) || this._tree.get(path)?.sha;
+        const filename = path.split('/').pop();
+
+        let base64Content;
+        if (content instanceof ArrayBuffer || (typeof content === 'object' && content.byteLength !== undefined)) {
+            base64Content = arrayBufferToBase64(new Uint8Array(content));
+        } else {
+            base64Content = encodeBase64UTF8(content);
+        }
+
+        const body = {
+            message: sha ? `Update ${filename}` : `Create ${filename}`,
+            content: base64Content,
+            branch: this.branch
+        };
+        if (sha) body.sha = sha;
+
+        const response = await this._fetch(url, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await response.json();
+        const newSha = data.content.sha;
+        this._shaCache.set(path, newSha);
+        this._tree.set(path, { sha: newSha, size: data.content.size, type: 'blob' });
+    }
+
+    // Delete a file or directory. For directories with recursive, deletes all contained files.
+    async deleteEntry(path, options = {}) {
+        const entry = this._tree.get(path);
+        const isDir = entry?.type === 'tree' || (!entry && options.recursive);
+        if (isDir && options.recursive) {
+            // Collect all blobs under this directory
+            const prefix = path + '/';
+            const blobs = [];
+            for (const [p, info] of this._tree) {
+                if (p.startsWith(prefix) && info.type === 'blob') {
+                    blobs.push(p);
+                }
+            }
+            // Delete each file (sequential to avoid conflicts)
+            for (const blobPath of blobs) {
+                await this._deleteSingleFile(blobPath);
+            }
+            // Clean up tree entries for the directory and its contents
+            for (const [p] of this._tree) {
+                if (p === path || p.startsWith(prefix)) {
+                    this._tree.delete(p);
+                    this._shaCache.delete(p);
+                }
+            }
+        } else {
+            await this._deleteSingleFile(path);
+            this._tree.delete(path);
+            this._shaCache.delete(path);
+        }
+    }
+
+    // Delete a single file via the Contents API
+    async _deleteSingleFile(path) {
+        const sha = this._shaCache.get(path) || this._tree.get(path)?.sha;
+        if (!sha) throw new Error(`Cannot delete ${path}: unknown SHA`);
+        const filename = path.split('/').pop();
+        const url = `${this._baseUrl}/contents/${this._encodePath(path)}`;
+        await this._fetch(url, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: `Delete ${filename}`,
+                sha: sha,
+                branch: this.branch
+            })
+        });
+    }
+
+    // No-op: GitHub creates directories implicitly when files are written
+    async mkdir(_path) {}
+
+    // Check if a file or directory exists in the in-memory tree (no API call)
+    async exists(path) {
+        if (this._tree.has(path)) return true;
+        // Check if any entry starts with path/ (directory exists implicitly)
+        const prefix = path + '/';
+        for (const key of this._tree.keys()) {
+            if (key.startsWith(prefix)) return true;
+        }
+        return false;
+    }
+
+    // MIME types for data URL construction
+    static _mimeTypes = {
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        gif: 'image/gif',
+        webp: 'image/webp',
+        svg: 'image/svg+xml',
+        ico: 'image/x-icon',
+        pdf: 'application/pdf',
+        json: 'application/json',
+        css: 'text/css',
+        js: 'text/javascript',
+        html: 'text/html',
+        md: 'text/markdown',
+        yaml: 'text/yaml',
+        yml: 'text/yaml',
+        txt: 'text/plain',
+    };
+}
+
+// Decode base64 (with possible newlines) to UTF-8 string
+function decodeBase64UTF8(base64) {
+    const clean = base64.replace(/\n/g, '');
+    const binary = atob(clean);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+}
+
+// Encode UTF-8 string to base64
+function encodeBase64UTF8(str) {
+    const bytes = new TextEncoder().encode(str);
+    return arrayBufferToBase64(bytes);
+}
+
+// Convert Uint8Array/byte array to base64 string
+function arrayBufferToBase64(bytes) {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
 }
 
 // ========== SECTION: FILESYSTEM_STORAGE ==========
