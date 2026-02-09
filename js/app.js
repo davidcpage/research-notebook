@@ -6437,6 +6437,139 @@ function arrayBufferToBase64(bytes) {
     return btoa(binary);
 }
 
+// ========== SECTION: GITHUB_CONNECTION ==========
+// GitHub storage backend connection UI and localStorage credential management
+// Functions: saveGitHubConnection, getGitHubConnections, deleteGitHubConnection,
+//            getLastGitHubConnection, connectToGitHub, showGitHubConnectModal,
+//            closeGitHubConnectModal, handleGitHubConnect
+
+const GITHUB_CONNECTIONS_KEY = 'github_connections';
+
+// Save or update a GitHub connection in localStorage
+function saveGitHubConnection({ owner, repo, branch, token }) {
+    const connections = getGitHubConnections();
+    const idx = connections.findIndex(c => c.owner === owner && c.repo === repo);
+    const entry = { owner, repo, branch, token, lastUsed: new Date().toISOString() };
+    if (idx >= 0) {
+        connections[idx] = entry;
+    } else {
+        connections.push(entry);
+    }
+    localStorage.setItem(GITHUB_CONNECTIONS_KEY, JSON.stringify(connections));
+}
+
+// List all saved GitHub connections from localStorage
+function getGitHubConnections() {
+    try {
+        return JSON.parse(localStorage.getItem(GITHUB_CONNECTIONS_KEY)) || [];
+    } catch {
+        return [];
+    }
+}
+
+// Remove a GitHub connection from localStorage
+function deleteGitHubConnection(owner, repo) {
+    const connections = getGitHubConnections().filter(
+        c => !(c.owner === owner && c.repo === repo)
+    );
+    localStorage.setItem(GITHUB_CONNECTIONS_KEY, JSON.stringify(connections));
+}
+
+// Get the most recently used GitHub connection
+function getLastGitHubConnection() {
+    const connections = getGitHubConnections();
+    if (connections.length === 0) return null;
+    return connections.sort((a, b) => (b.lastUsed || '').localeCompare(a.lastUsed || ''))[0];
+}
+
+// Connect to a GitHub repo, load notebook, and update UI (mirrors linkNotebookFolder flow)
+async function connectToGitHub({ owner, repo, branch, token }) {
+    const backend = new GitHubBackend({ owner, repo, branch, token });
+    await backend.loadTree();
+
+    storageBackend = backend;
+    filesystemLinked = true;
+    viewMode = 'filesystem';
+    remoteSource = null;
+
+    saveGitHubConnection({ owner, repo, branch, token });
+
+    // Update URL
+    history.replaceState(null, '', `?notebook=github:${owner}/${repo}`);
+
+    // Load notebook data
+    data = await loadFromFilesystem();
+
+    // Restore UI state
+    restoreCollapsedSections();
+    restoreExpandedSubdirs();
+    restoreFocus();
+    render();
+
+    showToast(`Connected to ${owner}/${repo}`);
+}
+
+// Show the GitHub connect modal
+function showGitHubConnectModal() {
+    // Pre-fill from last connection if available
+    const last = getLastGitHubConnection();
+    if (last) {
+        document.getElementById('githubRepo').value = `${last.owner}/${last.repo}`;
+        document.getElementById('githubBranch').value = last.branch || 'main';
+        // Don't pre-fill token for security — user must re-enter
+    }
+    document.getElementById('githubConnectError').style.display = 'none';
+    document.getElementById('githubConnectBtn').disabled = false;
+    document.getElementById('githubConnectBtn').textContent = 'Connect';
+    document.getElementById('githubConnectModal').classList.add('active');
+}
+
+// Close the GitHub connect modal
+function closeGitHubConnectModal() {
+    document.getElementById('githubConnectModal').classList.remove('active');
+    // Clear token field on close for security
+    document.getElementById('githubToken').value = '';
+}
+
+// Handle the Connect button click in the GitHub modal
+async function handleGitHubConnect() {
+    const token = document.getElementById('githubToken').value.trim();
+    const repoInput = document.getElementById('githubRepo').value.trim();
+    const branch = document.getElementById('githubBranch').value.trim() || 'main';
+    const errorEl = document.getElementById('githubConnectError');
+    const btn = document.getElementById('githubConnectBtn');
+
+    // Validate inputs
+    if (!token) {
+        errorEl.textContent = 'Please enter a personal access token.';
+        errorEl.style.display = 'block';
+        return;
+    }
+    const repoParts = repoInput.split('/');
+    if (repoParts.length !== 2 || !repoParts[0] || !repoParts[1]) {
+        errorEl.textContent = 'Repository must be in owner/repo format.';
+        errorEl.style.display = 'block';
+        return;
+    }
+    const [owner, repo] = repoParts;
+
+    // Show loading state
+    errorEl.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'Connecting...';
+
+    try {
+        await connectToGitHub({ owner, repo, branch, token });
+        closeGitHubConnectModal();
+    } catch (error) {
+        console.error('[GitHub] Connection failed:', error);
+        btn.disabled = false;
+        btn.textContent = 'Connect';
+        errorEl.textContent = error.message || 'Connection failed. Check your token and repository.';
+        errorEl.style.display = 'block';
+    }
+}
+
 // ========== SECTION: FILESYSTEM_STORAGE ==========
 // File System Access API integration for direct folder read/write
 // Functions: slugify, noteToMarkdown, markdownToNote, codeToFile, fileToCode,
@@ -9158,11 +9291,16 @@ async function refreshFromFilesystem() {
 // ========== SECTION: ONBOARDING ==========
 // First-time setup flow for new notebooks
 
-// Show onboarding modal
+// Show onboarding modal with capability detection
 function showOnboarding() {
-    // Check browser support
-    if (!isFileSystemAccessSupported()) {
-        document.getElementById('onboardingUnsupported').style.display = 'block';
+    if (isFileSystemAccessSupported()) {
+        // Desktop Chrome/Edge: show both options
+        document.getElementById('onboardingFilesystemOption').style.display = '';
+        document.getElementById('onboardingGitHubOnly').style.display = 'none';
+    } else {
+        // iPad Safari, Firefox, etc: GitHub only
+        document.getElementById('onboardingFilesystemOption').style.display = 'none';
+        document.getElementById('onboardingGitHubOnly').style.display = '';
     }
     document.getElementById('onboardingModal').classList.add('active');
 }
@@ -10433,6 +10571,11 @@ document.getElementById('sectionName').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') createSection();
 });
 
+// Enter key in GitHub connect modal fields triggers connect
+document.getElementById('githubConnectModal').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleGitHubConnect();
+});
+
 // Generic editor keyboard handling (Phase 3)
 document.getElementById('editorModal').addEventListener('keydown', (e) => {
     // Tab in code editors
@@ -10479,6 +10622,8 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
                 closeDiffModal();
             } else if (overlay.id === 'onboardingModal') {
                 closeOnboarding();
+            } else if (overlay.id === 'githubConnectModal') {
+                closeGitHubConnectModal();
             } else {
                 overlay.classList.remove('active');
             }
@@ -10494,6 +10639,7 @@ document.addEventListener('keydown', (e) => {
         closeSectionModal();
         closeEditor();
         closeViewer();
+        closeGitHubConnectModal();
     }
 
     // Skip shortcuts if typing in an input/textarea
@@ -10637,10 +10783,27 @@ async function initDefaultFlow() {
         restoreExpandedSubdirs();
         restoreFocus();
         render();
-    } else {
-        // No restorable notebook - show onboarding
-        showOnboarding();
+        return;
     }
+
+    // Try restoring last GitHub connection before showing onboarding
+    const lastGH = getLastGitHubConnection();
+    if (lastGH && lastGH.token) {
+        try {
+            console.log(`[Init] Restoring GitHub connection: ${lastGH.owner}/${lastGH.repo}`);
+            showLoadingIndicator('Connecting to GitHub...');
+            await connectToGitHub(lastGH);
+            hideLoadingIndicator();
+            return;
+        } catch (error) {
+            console.error('[GitHub] Error restoring connection:', error);
+            hideLoadingIndicator();
+            // Fall through to onboarding
+        }
+    }
+
+    // No restorable notebook - show onboarding
+    showOnboarding();
 }
 
 // Initialize
@@ -10703,6 +10866,26 @@ async function init() {
 
             hideLoadingIndicator();
             render();
+
+        } else if (notebookName && notebookName.startsWith('github:')) {
+            // Restore GitHub connection from URL param
+            const ghPath = notebookName.slice('github:'.length); // "owner/repo"
+            console.log(`[Init] Restoring GitHub notebook: ${ghPath}`);
+            showLoadingIndicator('Connecting to GitHub...');
+
+            const [owner, repo] = ghPath.split('/');
+            const connections = getGitHubConnections();
+            const saved = connections.find(c => c.owner === owner && c.repo === repo);
+            if (!saved || !saved.token) {
+                hideLoadingIndicator();
+                // No saved token — prompt user to reconnect
+                showGitHubConnectModal();
+                document.getElementById('githubRepo').value = ghPath;
+                return;
+            }
+
+            await connectToGitHub({ owner, repo, branch: saved.branch || 'main', token: saved.token });
+            hideLoadingIndicator();
 
         } else if (notebookName) {
             // Load local notebook by name

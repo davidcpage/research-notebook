@@ -192,20 +192,61 @@
             <div class="modal-body" style="text-align: center; padding: 30px 20px;">
                 <div style="font-size: 4rem; margin-bottom: 20px;">📚</div>
                 <p style="color: var(--text-secondary); font-size: 1.1rem; margin-bottom: 20px; line-height: 1.6;">
-                    Your notebook is stored as files on your computer, making it easy to use with Claude Code and track changes with git.
+                    Your notebook is stored as files, making it easy to use with Claude Code and track changes with git.
                 </p>
-                <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 30px;">
-                    Choose a folder to store your notebook. You can select an empty folder to start fresh, or pick a folder with an existing notebook.
-                </p>
-                <button class="btn btn-primary" onclick="setupNotebookFolder()" style="padding: 12px 32px; font-size: 1.1rem;">
-                    📁 Choose Notebook Folder
-                </button>
-                <div id="onboardingUnsupported" style="display: none; margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 8px;">
-                    <p style="color: #856404; margin: 0; font-size: 0.9rem;">
-                        ⚠️ File System Access is not supported in this browser.<br>
-                        Please use <strong>Chrome</strong> or <strong>Edge</strong> for the full experience.
+                <div id="onboardingFilesystemOption">
+                    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px;">
+                        Choose a folder to store your notebook, or connect to a GitHub repository.
+                    </p>
+                    <button class="btn btn-primary" onclick="setupNotebookFolder()" style="padding: 12px 32px; font-size: 1.1rem;">
+                        Choose Notebook Folder
+                    </button>
+                    <div style="margin: 16px 0; color: var(--text-muted); font-size: 0.9rem;">or</div>
+                    <button class="btn btn-secondary" onclick="closeOnboarding(); showGitHubConnectModal()" style="padding: 10px 28px; font-size: 1rem;">
+                        Connect to GitHub
+                    </button>
+                </div>
+                <div id="onboardingGitHubOnly" style="display: none;">
+                    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px;">
+                        Connect to a GitHub repository to read and edit your notebook from any browser.
+                    </p>
+                    <button class="btn btn-primary" onclick="closeOnboarding(); showGitHubConnectModal()" style="padding: 12px 32px; font-size: 1.1rem;">
+                        Connect to GitHub
+                    </button>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 16px;">
+                        Local folder access requires Chrome or Edge on desktop.
                     </p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GitHub Connect Modal -->
+    <div class="modal-overlay" id="githubConnectModal">
+        <div class="modal" style="max-width: 480px;">
+            <div class="modal-header">
+                <h2>Connect to GitHub</h2>
+                <button class="modal-close" onclick="closeGitHubConnectModal()">×</button>
+            </div>
+            <div class="modal-body github-connect-body">
+                <div class="form-group">
+                    <label for="githubToken">Personal Access Token</label>
+                    <input type="password" id="githubToken" placeholder="ghp_... or github_pat_...">
+                    <p class="field-help">Create a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a> with Contents read/write access.</p>
+                </div>
+                <div class="form-group">
+                    <label for="githubRepo">Repository</label>
+                    <input type="text" id="githubRepo" placeholder="owner/repo">
+                </div>
+                <div class="form-group">
+                    <label for="githubBranch">Branch</label>
+                    <input type="text" id="githubBranch" placeholder="main" value="main">
+                </div>
+                <div id="githubConnectError" class="github-connect-message github-connect-error" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeGitHubConnectModal()">Cancel</button>
+                <button class="btn btn-primary" id="githubConnectBtn" onclick="handleGitHubConnect()">Connect</button>
             </div>
         </div>
     </div>

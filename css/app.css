@@ -2185,6 +2185,35 @@ body.diff-mode-active .section:not(:has(.card.has-changes)) {
     margin-top: 0.5rem;
 }
 
+/* GitHub connect modal */
+.github-connect-body .field-help {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.35rem;
+}
+
+.github-connect-body .field-help a {
+    color: var(--accent);
+}
+
+.github-connect-message {
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+.github-connect-error {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+
+#githubConnectBtn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
 /* List editor styles */
 .list-editor {
     display: flex;
