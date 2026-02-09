@@ -30,7 +30,7 @@ let subdirToggleTimer = null;
 
 // Get localStorage key for collapsed sections (notebook-specific)
 function getCollapsedSectionsKey() {
-    const notebookName = notebookDirHandle?.name || 'default';
+    const notebookName = storageBackend?.name || notebookDirHandle?.name || 'default';
     return `collapsedSections_${notebookName}`;
 }
 
@@ -67,7 +67,7 @@ let focusedPath = null;
 
 // Get localStorage key for expanded subdirectories (notebook-specific)
 function getExpandedSubdirsKey() {
-    const notebookName = notebookDirHandle?.name || 'default';
+    const notebookName = storageBackend?.name || notebookDirHandle?.name || 'default';
     return `expandedSubdirs_${notebookName}`;
 }
 
@@ -284,7 +284,7 @@ function toDirName(displayName) {
 
 // Get localStorage key for focus path (notebook-specific)
 function getFocusKey() {
-    const notebookName = notebookDirHandle?.name || 'default';
+    const notebookName = storageBackend?.name || notebookDirHandle?.name || 'default';
     return `focusedPath_${notebookName}`;
 }
 
@@ -809,24 +809,27 @@ function getInUseCardTypes() {
 }
 
 // Scan notebook files to detect which card types are in use
-async function detectInUseCardTypes(dirHandle) {
+async function detectInUseCardTypes() {
     const detected = new Set();
+    if (!storageBackend) return detected;
+
     const extensions = getExtensionRegistry();
     // Sort extensions by length (longer first) for correct matching
     // e.g., '.response.json' must match before '.json'
     const sortedExtensions = Object.keys(extensions).sort((a, b) => b.length - a.length);
 
-    async function scanDir(handle) {
+    async function scanDir(path) {
         try {
-            for await (const entry of handle.values()) {
+            const entries = await storageBackend.listDirectory(path);
+            for (const entry of entries) {
                 if (entry.kind === 'directory') {
                     // Skip hidden directories and excluded paths
                     if (entry.name.startsWith('.')) continue;
                     const excludedPaths = notebookSettings?.excluded_paths ?? ['node_modules'];
                     if (excludedPaths.includes(entry.name)) continue;
                     try {
-                        const subHandle = await handle.getDirectoryHandle(entry.name);
-                        await scanDir(subHandle);
+                        const subPath = path ? `${path}/${entry.name}` : entry.name;
+                        await scanDir(subPath);
                     } catch (e) { /* skip inaccessible */ }
                 } else if (entry.kind === 'file') {
                     // Check if file matches any known extension (sorted by length)
@@ -843,7 +846,7 @@ async function detectInUseCardTypes(dirHandle) {
         }
     }
 
-    await scanDir(dirHandle);
+    await scanDir('');
     inUseCardTypes = detected;
     console.log(`[CardTypes] Detected in-use types: ${[...detected].join(', ') || '(none)'}`);
     return detected;
@@ -851,15 +854,14 @@ async function detectInUseCardTypes(dirHandle) {
 
 // Load instance card type overrides from .notebook/card-types/
 // These override core card types: template.yaml is deep-merged, styles.css appended, index.js replaces
-async function loadInstanceCardTypes(dirHandle) {
-    if (!dirHandle) return;
+async function loadInstanceCardTypes() {
+    if (!storageBackend) return;
 
     try {
-        // Get .notebook/card-types/ directory
-        const notebookDir = await dirHandle.getDirectoryHandle('.notebook', { create: false });
-        let cardTypesDir;
+        // List .notebook/card-types/ directory
+        let moduleEntries;
         try {
-            cardTypesDir = await notebookDir.getDirectoryHandle('card-types', { create: false });
+            moduleEntries = await storageBackend.listDirectory('.notebook/card-types');
         } catch (e) {
             // .notebook/card-types/ doesn't exist, which is fine
             return;
@@ -868,17 +870,17 @@ async function loadInstanceCardTypes(dirHandle) {
         const cssBlocks = [];
         let loadedCount = 0;
 
-        for await (const [moduleName, moduleHandle] of cardTypesDir.entries()) {
-            if (moduleHandle.kind !== 'directory') continue;
+        for (const entry of moduleEntries) {
+            if (entry.kind !== 'directory') continue;
+            const moduleName = entry.name;
+            const modulePath = `.notebook/card-types/${moduleName}`;
 
             console.log(`[CardTypes] Loading instance override: ${moduleName}`);
             let hasContent = false;
 
             // Load template.yaml (deep merge with existing)
             try {
-                const templateHandle = await moduleHandle.getFileHandle('template.yaml');
-                const templateFile = await templateHandle.getFile();
-                const yamlContent = await templateFile.text();
+                const { content: yamlContent } = await storageBackend.readFile(`${modulePath}/template.yaml`);
                 const template = jsyaml.load(yamlContent);
 
                 if (template && template.name) {
@@ -899,9 +901,7 @@ async function loadInstanceCardTypes(dirHandle) {
 
             // Load styles.css (append after core styles)
             try {
-                const cssHandle = await moduleHandle.getFileHandle('styles.css');
-                const cssFile = await cssHandle.getFile();
-                const css = await cssFile.text();
+                const { content: css } = await storageBackend.readFile(`${modulePath}/styles.css`);
                 if (css.trim()) {
                     cssBlocks.push(`/* instance: ${moduleName} */\n${css}`);
                     console.log(`[CardTypes] ${moduleName}: loaded styles.css`);
@@ -913,9 +913,7 @@ async function loadInstanceCardTypes(dirHandle) {
 
             // Load index.js via blob URL (replaces core renderers)
             try {
-                const jsHandle = await moduleHandle.getFileHandle('index.js');
-                const jsFile = await jsHandle.getFile();
-                const jsText = await jsFile.text();
+                const { content: jsText } = await storageBackend.readFile(`${modulePath}/index.js`);
                 const blob = new Blob([jsText], { type: 'application/javascript' });
                 const blobUrl = URL.createObjectURL(blob);
 
@@ -1189,27 +1187,22 @@ let notebookSettings = null;
 let notebookRoster = null;
 
 // Load settings from .notebook/settings.yaml
-async function loadSettings(dirHandle) {
-    if (!dirHandle) {
+async function loadSettings() {
+    if (!storageBackend) {
         notebookSettings = buildSettingsObject();
         return notebookSettings;
     }
 
     // Load from .notebook/settings.yaml
-    const configDir = await getNotebookConfigDir(dirHandle, false);
-    if (configDir) {
-        try {
-            const settingsFile = await configDir.getFileHandle('settings.yaml');
-            const file = await settingsFile.getFile();
-            const content = await file.text();
-            const parsed = jsyaml.load(content);
-            notebookSettings = buildSettingsObject(parsed);
-            console.log('[Settings] Loaded .notebook/settings.yaml');
-            return notebookSettings;
-        } catch (e) {
-            // .notebook/settings.yaml doesn't exist, use defaults
-            console.log('[Settings] No .notebook/settings.yaml found, using defaults');
-        }
+    try {
+        const { content } = await storageBackend.readFile('.notebook/settings.yaml');
+        const parsed = jsyaml.load(content);
+        notebookSettings = buildSettingsObject(parsed);
+        console.log('[Settings] Loaded .notebook/settings.yaml');
+        return notebookSettings;
+    } catch (e) {
+        // .notebook/settings.yaml doesn't exist, use defaults
+        console.log('[Settings] No .notebook/settings.yaml found, using defaults');
     }
 
     // No settings found - use defaults (new notebook)
@@ -1267,33 +1260,28 @@ function getSectionDirs(sections) {
 }
 
 // Load roster from .notebook/roster.yaml (optional student name mappings)
-async function loadRoster(dirHandle) {
-    if (!dirHandle) {
+async function loadRoster() {
+    if (!storageBackend) {
         notebookRoster = null;
         return null;
     }
 
-    const configDir = await getNotebookConfigDir(dirHandle, false);
-    if (configDir) {
-        try {
-            const rosterFile = await configDir.getFileHandle('roster.yaml');
-            const file = await rosterFile.getFile();
-            const content = await file.text();
-            notebookRoster = jsyaml.load(content);
-            console.log('[Roster] Loaded .notebook/roster.yaml');
-            return notebookRoster;
-        } catch (e) {
-            // roster.yaml doesn't exist (optional)
-            console.log('[Roster] No .notebook/roster.yaml found');
-        }
+    try {
+        const { content } = await storageBackend.readFile('.notebook/roster.yaml');
+        notebookRoster = jsyaml.load(content);
+        console.log('[Roster] Loaded .notebook/roster.yaml');
+        return notebookRoster;
+    } catch (e) {
+        // roster.yaml doesn't exist (optional)
+        console.log('[Roster] No .notebook/roster.yaml found');
     }
     notebookRoster = null;
     return null;
 }
 
 // Save settings to .notebook/settings.yaml
-async function saveSettings(dirHandle) {
-    if (!dirHandle || !notebookSettings) return;
+async function saveSettings() {
+    if (!storageBackend || !notebookSettings) return;
 
     // Create clean object without internal metadata (_fromDefaults)
     const settingsToSave = {};
@@ -1310,17 +1298,13 @@ async function saveSettings(dirHandle) {
         forceQuotes: false
     });
 
-    // Save to .notebook/settings.yaml (creates .notebook dir if needed)
-    const configDir = await getNotebookConfigDir(dirHandle, true);
-    const settingsFile = await configDir.getFileHandle('settings.yaml', { create: true });
-    const writable = await settingsFile.createWritable();
-    await writable.write(content);
-    await writable.close();
+    // Save to .notebook/settings.yaml (auto-creates .notebook dir)
+    await storageBackend.writeFile('.notebook/settings.yaml', content);
     console.log('[Settings] Saved .notebook/settings.yaml');
 }
 
 // Load extension registry (uses extensions aggregated from card type modules)
-async function loadExtensionRegistry(dirHandle) {
+async function loadExtensionRegistry() {
     extensionRegistry = cardTypeExtensions;
     console.log(`[Templates] Using extension registry with ${Object.keys(extensionRegistry).length} extensions`);
     return extensionRegistry;
@@ -1330,7 +1314,7 @@ async function loadExtensionRegistry(dirHandle) {
 const DEFAULT_CLAUDE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="80 50 350 410"><path fill="#D77655" fill-rule="nonzero" d="M142.27 316.619l73.655-41.326 1.238-3.589-1.238-1.996-3.589-.001-12.31-.759-42.084-1.138-36.498-1.516-35.361-1.896-8.897-1.895-8.34-10.995.859-5.484 7.482-5.03 10.717.935 23.683 1.617 35.537 2.452 25.782 1.517 38.193 3.968h6.064l.86-2.451-2.073-1.517-1.618-1.517-36.776-24.922-39.81-26.338-20.852-15.166-11.273-7.683-5.687-7.204-2.451-15.721 10.237-11.273 13.75.935 3.513.936 13.928 10.716 29.749 23.027 38.848 28.612 5.687 4.727 2.275-1.617.278-1.138-2.553-4.271-21.13-38.193-22.546-38.848-10.035-16.101-2.654-9.655c-.935-3.968-1.617-7.304-1.617-11.374l11.652-15.823 6.445-2.073 15.545 2.073 6.547 5.687 9.655 22.092 15.646 34.78 24.265 47.291 7.103 14.028 3.791 12.992 1.416 3.968 2.449-.001v-2.275l1.997-26.641 3.69-32.707 3.589-42.084 1.239-11.854 5.863-14.206 11.652-7.683 9.099 4.348 7.482 10.716-1.036 6.926-4.449 28.915-8.72 45.294-5.687 30.331h3.313l3.792-3.791 15.342-20.372 25.782-32.227 11.374-12.789 13.27-14.129 8.517-6.724 16.1-.001 11.854 17.617-5.307 18.199-16.581 21.029-13.75 17.819-19.716 26.54-12.309 21.231 1.138 1.694 2.932-.278 44.536-9.479 24.062-4.347 28.714-4.928 12.992 6.066 1.416 6.167-5.106 12.613-30.71 7.583-36.018 7.204-53.636 12.689-.657.48.758.935 24.164 2.275 10.337.556h25.301l47.114 3.514 12.309 8.139 7.381 9.959-1.238 7.583-18.957 9.655-25.579-6.066-59.702-14.205-20.474-5.106-2.83-.001v1.694l17.061 16.682 31.266 28.233 39.152 36.397 1.997 8.999-5.03 7.102-5.307-.758-34.401-25.883-13.27-11.651-30.053-25.302-1.996-.001v2.654l6.926 10.136 36.574 54.975 1.895 16.859-2.653 5.485-9.479 3.311-10.414-1.895-21.408-30.054-22.092-33.844-17.819-30.331-2.173 1.238-10.515 113.261-4.929 5.788-11.374 4.348-9.478-7.204-5.03-11.652 5.03-23.027 6.066-30.052 4.928-23.886 4.449-29.674 2.654-9.858-.177-.657-2.173.278-22.37 30.71-34.021 45.977-26.919 28.815-6.445 2.553-11.173-5.789 1.037-10.337 6.243-9.2 37.257-47.392 22.47-29.371 14.508-16.961-.101-2.451h-.859l-98.954 64.251-17.618 2.275-7.583-7.103.936-11.652 3.589-3.791 29.749-20.474-.101.102.024.101z"/></svg>`;
 
 // Load authors from settings and their icon files from assets/author-icons/
-async function loadAuthors(dirHandle) {
+async function loadAuthors() {
     authorRegistry = {};
 
     const authors = notebookSettings?.authors;
@@ -1339,12 +1323,12 @@ async function loadAuthors(dirHandle) {
         return authorRegistry;
     }
 
-    // Try to get assets/author-icons directory
-    let iconsDir = null;
-    if (dirHandle) {
+    // Check if author-icons directory exists
+    let hasIconsDir = false;
+    if (storageBackend) {
         try {
-            const assetsDir = await dirHandle.getDirectoryHandle('assets');
-            iconsDir = await assetsDir.getDirectoryHandle('author-icons');
+            await storageBackend.listDirectory('assets/author-icons');
+            hasIconsDir = true;
         } catch (e) {
             console.log('[Authors] No assets/author-icons directory found');
         }
@@ -1358,11 +1342,10 @@ async function loadAuthors(dirHandle) {
         let iconContent = null;
 
         // Try to load icon from filesystem
-        if (iconsDir) {
+        if (hasIconsDir) {
             try {
-                const iconFile = await iconsDir.getFileHandle(author.icon);
-                const file = await iconFile.getFile();
-                iconContent = await file.text();
+                const { content } = await storageBackend.readFile('assets/author-icons/' + author.icon);
+                iconContent = content;
                 console.log(`[Authors] Loaded icon for ${author.name}`);
             } catch (e) {
                 console.log(`[Authors] Icon file not found: ${author.icon}`);
@@ -1386,20 +1369,20 @@ async function loadAuthors(dirHandle) {
 }
 
 // Load templates: core card types + instance overrides from .notebook/card-types/
-async function loadTemplates(dirHandle) {
+async function loadTemplates() {
     // Fetch default templates from server (ensures settings is always available)
     // Pass enabled_templates from settings to control which card types get fully loaded
     const enabledTypes = notebookSettings?.enabled_templates || null;
     const defaults = await fetchDefaultTemplates(enabledTypes);
     templateRegistry = { ...defaults };
 
-    if (!dirHandle) {
+    if (!storageBackend) {
         return templateRegistry;
     }
 
     // Load instance card type overrides from .notebook/card-types/
     // (template.yaml, styles.css, index.js - all optional, deep-merged with core)
-    await loadInstanceCardTypes(dirHandle);
+    await loadInstanceCardTypes();
 
     // Expose templateRegistry to framework.js for card type modules
     if (window.notebook) {
@@ -1410,8 +1393,8 @@ async function loadTemplates(dirHandle) {
 }
 
 // Load theme CSS: base theme from /themes/ + customizations from .notebook/theme.css
-async function loadThemeCss(dirHandle) {
-    if (!dirHandle) return;
+async function loadThemeCss() {
+    if (!storageBackend) return;
 
     // Remove any existing theme style elements
     const existingBase = document.getElementById('theme-base-css');
@@ -1437,25 +1420,20 @@ async function loadThemeCss(dirHandle) {
     }
 
     // 2. Load customizations from .notebook/theme.css (layered on top)
-    const configDir = await getNotebookConfigDir(dirHandle, false);
-    if (configDir) {
-        try {
-            const themeFile = await configDir.getFileHandle('theme.css');
-            const file = await themeFile.getFile();
-            const content = await file.text();
+    try {
+        const { content } = await storageBackend.readFile('.notebook/theme.css');
 
-            // Create and inject style element, wrapped in @layer theme
-            // This loads after base theme, so customizations take precedence
-            const style = document.createElement('style');
-            style.id = 'theme-custom-css';
-            style.textContent = `@layer theme {\n${content}\n}`;
-            document.head.appendChild(style);
-            console.log('[Theme] Loaded .notebook/theme.css customizations');
-        } catch (e) {
-            // File doesn't exist, that's fine (theme.css is optional)
-            if (!baseThemeId) {
-                console.log('[Theme] No theme configured');
-            }
+        // Create and inject style element, wrapped in @layer theme
+        // This loads after base theme, so customizations take precedence
+        const style = document.createElement('style');
+        style.id = 'theme-custom-css';
+        style.textContent = `@layer theme {\n${content}\n}`;
+        document.head.appendChild(style);
+        console.log('[Theme] Loaded .notebook/theme.css customizations');
+    } catch (e) {
+        // File doesn't exist, that's fine (theme.css is optional)
+        if (!baseThemeId) {
+            console.log('[Theme] No theme configured');
         }
     }
 }
@@ -1497,14 +1475,14 @@ function injectTemplateStyles() {
 }
 
 // Ensure config files exist in .notebook/ directory (creates them if missing)
-async function ensureTemplateFiles(dirHandle) {
-    if (!dirHandle) return;
+async function ensureTemplateFiles() {
+    if (!storageBackend) return;
 
     let createdFiles = [];
 
-    // Get or create .notebook directory (and .notebook/templates/ for user content)
-    const configDir = await getNotebookConfigDir(dirHandle, true);
-    await getNotebookTemplatesDir(dirHandle, true);  // Create but don't populate
+    // Ensure .notebook/ and .notebook/templates/ directories exist
+    await storageBackend.mkdir('.notebook');
+    await storageBackend.mkdir('.notebook/templates');
 
     // Files to create in .notebook/
     const configFiles = [
@@ -1514,21 +1492,14 @@ async function ensureTemplateFiles(dirHandle) {
 
     // Create config files in .notebook/
     for (const { name, getContent } of configFiles) {
+        const path = `.notebook/${name}`;
+        if (await storageBackend.exists(path)) continue;
         try {
-            await configDir.getFileHandle(name);
-            // File exists, don't overwrite
-        } catch (e) {
-            // File doesn't exist, create it
-            try {
-                const fileHandle = await configDir.getFileHandle(name, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(getContent());
-                await writable.close();
-                createdFiles.push(`.notebook/${name}`);
-                console.log(`[Templates] Created .notebook/${name}`);
-            } catch (writeError) {
-                console.error(`[Templates] Error creating .notebook/${name}:`, writeError);
-            }
+            await storageBackend.writeFile(path, getContent());
+            createdFiles.push(path);
+            console.log(`[Templates] Created ${path}`);
+        } catch (writeError) {
+            console.error(`[Templates] Error creating ${path}:`, writeError);
         }
     }
 
@@ -1537,18 +1508,12 @@ async function ensureTemplateFiles(dirHandle) {
 
     // Ensure assets/author-icons directory and default claude.svg exist
     try {
-        const assetsDir = await dirHandle.getDirectoryHandle('assets', { create: true });
-        const iconsDir = await assetsDir.getDirectoryHandle('author-icons', { create: true });
+        await storageBackend.mkdir('assets/author-icons');
 
         // Create default claude.svg if it doesn't exist
-        try {
-            await iconsDir.getFileHandle('claude.svg');
-        } catch (e) {
+        if (!await storageBackend.exists('assets/author-icons/claude.svg')) {
             try {
-                const iconFile = await iconsDir.getFileHandle('claude.svg', { create: true });
-                const writable = await iconFile.createWritable();
-                await writable.write(DEFAULT_CLAUDE_ICON);
-                await writable.close();
+                await storageBackend.writeFile('assets/author-icons/claude.svg', DEFAULT_CLAUDE_ICON);
                 createdFiles.push('assets/author-icons/claude.svg');
                 console.log('[Templates] Created default claude.svg icon');
             } catch (writeError) {
@@ -3404,7 +3369,7 @@ function extractMarkdownBody(content) {
 
 // Get current content of a card from its file
 async function getCurrentCardContent(card, asDataUrl = false) {
-    if (!notebookDirHandle) return null;
+    if (!storageBackend) return null;
 
     // Get filename from _source (set during filesystem loading)
     const filename = card._source?.filename || card.filename;
@@ -3414,31 +3379,17 @@ async function getCurrentCardContent(card, asDataUrl = false) {
     }
 
     try {
-        // Navigate to the directory containing the file
-        let dirHandle = notebookDirHandle;
-
-        // _path is the directory path (e.g., 'research' or 'research/subdir')
-        if (card._path) {
-            const pathParts = card._path.split('/').filter(p => p);
-            for (const part of pathParts) {
-                dirHandle = await dirHandle.getDirectoryHandle(part);
-            }
-        }
-
-        const fileHandle = await dirHandle.getFileHandle(filename);
-        const file = await fileHandle.getFile();
+        // Build full path from _path + filename
+        const fullPath = card._path ? `${card._path}/${filename}` : filename;
 
         // For binary files (images), return as data URL
         if (asDataUrl) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = () => reject(reader.error);
-                reader.readAsDataURL(file);
-            });
+            const { dataUrl } = await storageBackend.readFileAsDataUrl(fullPath);
+            return dataUrl;
         }
 
-        return await file.text();
+        const { content } = await storageBackend.readFile(fullPath);
+        return content;
     } catch (err) {
         console.error('[Git] Failed to read current file:', err, { path: card._path, filename });
         return null;
@@ -6110,6 +6061,133 @@ async function saveData() {
     }
 }
 
+// ========== SECTION: STORAGE_BACKEND ==========
+// Abstraction layer for file I/O. All paths are relative to notebook root with forward slashes.
+// FileSystemBackend wraps the File System Access API; future backends (e.g., GitHub API) implement
+// the same interface.
+
+// Active storage backend (FileSystemBackend or future alternatives)
+let storageBackend = null;
+
+// Storage backend using the File System Access API (Chrome/Edge)
+class FileSystemBackend {
+    type = 'filesystem';
+    readonly = false;
+
+    constructor(dirHandle) {
+        this._root = dirHandle;
+    }
+
+    get name() {
+        return this._root.name;
+    }
+
+    // Navigate from root handle through path segments, returning the final handle
+    // For a file path like 'research/my-note.md', returns the handle for 'research/' directory
+    // For a directory path like 'research/subdir', returns the handle for 'subdir/'
+    async _resolvePath(path) {
+        if (!path || path === '' || path === '.') return { dir: this._root, segments: [] };
+        const parts = path.split('/').filter(p => p && p !== '.');
+        let current = this._root;
+        for (let i = 0; i < parts.length - 1; i++) {
+            current = await current.getDirectoryHandle(parts[i]);
+        }
+        return { dir: current, name: parts[parts.length - 1], segments: parts };
+    }
+
+    // Read a text file. Returns {content, lastModified, size}
+    async readFile(path) {
+        const { dir, name } = await this._resolvePath(path);
+        const fileHandle = await dir.getFileHandle(name);
+        const file = await fileHandle.getFile();
+        const content = await file.text();
+        return { content, lastModified: file.lastModified, size: file.size };
+    }
+
+    // Read a file as a data URL (for binary files like images). Returns {dataUrl, lastModified, size}
+    async readFileAsDataUrl(path) {
+        const { dir, name } = await this._resolvePath(path);
+        const fileHandle = await dir.getFileHandle(name);
+        const file = await fileHandle.getFile();
+        const dataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        return { dataUrl, lastModified: file.lastModified, size: file.size };
+    }
+
+    // Write a text or binary file, auto-creating parent directories
+    async writeFile(path, content) {
+        const parts = path.split('/').filter(p => p && p !== '.');
+        let current = this._root;
+        // Create parent directories as needed
+        for (let i = 0; i < parts.length - 1; i++) {
+            current = await current.getDirectoryHandle(parts[i], { create: true });
+        }
+        const filename = parts[parts.length - 1];
+        const fileHandle = await current.getFileHandle(filename, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(content);
+        await writable.close();
+    }
+
+    // Delete a file or directory. options.recursive for non-empty directories.
+    async deleteEntry(path, options = {}) {
+        const { dir, name } = await this._resolvePath(path);
+        await dir.removeEntry(name, { recursive: !!options.recursive });
+    }
+
+    // List contents of a directory. Returns [{name, kind: 'file'|'directory'}]
+    async listDirectory(path) {
+        let dirHandle;
+        if (!path || path === '' || path === '.') {
+            dirHandle = this._root;
+        } else {
+            const parts = path.split('/').filter(p => p && p !== '.');
+            dirHandle = this._root;
+            for (const part of parts) {
+                dirHandle = await dirHandle.getDirectoryHandle(part);
+            }
+        }
+        const entries = [];
+        for await (const [name, handle] of dirHandle.entries()) {
+            entries.push({ name, kind: handle.kind });
+        }
+        return entries;
+    }
+
+    // Create a directory (and any missing parents)
+    async mkdir(path) {
+        const parts = path.split('/').filter(p => p && p !== '.');
+        let current = this._root;
+        for (const part of parts) {
+            current = await current.getDirectoryHandle(part, { create: true });
+        }
+    }
+
+    // Check if a file or directory exists
+    async exists(path) {
+        try {
+            const { dir, name } = await this._resolvePath(path);
+            try {
+                await dir.getFileHandle(name);
+                return true;
+            } catch {
+                try {
+                    await dir.getDirectoryHandle(name);
+                    return true;
+                } catch {
+                    return false;
+                }
+            }
+        } catch {
+            return false;
+        }
+    }
+}
+
 // ========== SECTION: FILESYSTEM_STORAGE ==========
 // File System Access API integration for direct folder read/write
 // Functions: slugify, noteToMarkdown, markdownToNote, codeToFile, fileToCode,
@@ -6306,8 +6384,8 @@ async function verifyDirPermission(handle) {
 
 // Resolve relative image paths in all markdown fields of a card based on its template schema
 // Stores original values in card._originalMarkdown for editor use
-async function resolveCardMarkdownImages(card, basePath, rootHandle) {
-    if (!card || !basePath || !rootHandle) return card;
+async function resolveCardMarkdownImages(card, basePath) {
+    if (!card || !basePath || !storageBackend) return card;
 
     const template = templateRegistry[card.template || card.type];
     if (!template?.schema) return card;
@@ -6319,7 +6397,7 @@ async function resolveCardMarkdownImages(card, basePath, rootHandle) {
     async function resolveField(value, fieldSchema, storeKey) {
         if (!value || typeof value !== 'string') return value;
         if (fieldSchema?.type !== 'markdown') return value;
-        const resolved = await resolveMarkdownImages(value, basePath, rootHandle);
+        const resolved = await resolveMarkdownImages(value, basePath);
         // Only store original if resolution changed something
         if (resolved !== value && storeKey) {
             card._originalMarkdown[storeKey] = value;
@@ -6372,35 +6450,14 @@ async function resolveCardMarkdownImages(card, basePath, rootHandle) {
 
 // Resolve relative image paths in markdown content to data URLs
 // basePath: the card's directory path (e.g., 'decisions' or 'decisions/subdir')
-async function resolveMarkdownImages(content, basePath, rootHandle) {
-    if (!content || !basePath || !rootHandle) return content;
+async function resolveMarkdownImages(content, basePath) {
+    if (!content || !basePath || !storageBackend) return content;
 
     // Find all markdown image references: ![alt](path)
     const imagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g;
     const matches = [...content.matchAll(imagePattern)];
 
     if (matches.length === 0) return content;
-
-    // Helper to try loading an image from a given path
-    async function tryLoadImage(fullPath) {
-        const pathParts = fullPath.split('/');
-        const filename = pathParts.pop();
-
-        let currentHandle = rootHandle;
-        for (const dir of pathParts) {
-            currentHandle = await currentHandle.getDirectoryHandle(dir);
-        }
-
-        const fileHandle = await currentHandle.getFileHandle(filename);
-        const file = await fileHandle.getFile();
-
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    }
 
     let result = content;
     for (const match of matches) {
@@ -6420,12 +6477,14 @@ async function resolveMarkdownImages(content, basePath, rootHandle) {
             // Full path: 'decisions/diagrams/foo.png'
             try {
                 const relativePath = basePath + '/' + src;
-                dataUrl = await tryLoadImage(relativePath);
+                const imgResult = await storageBackend.readFileAsDataUrl(relativePath);
+                dataUrl = imgResult.dataUrl;
                 console.log(`[Filesystem] Resolved image (relative): ${src}`);
             } catch {
                 // Try 2: Resolve from notebook root
                 // src is 'assets/emperor-penguins.png', try as-is from root
-                dataUrl = await tryLoadImage(src);
+                const imgResult = await storageBackend.readFileAsDataUrl(src);
+                dataUrl = imgResult.dataUrl;
                 console.log(`[Filesystem] Resolved image (from root): ${src}`);
             }
 
@@ -6441,23 +6500,23 @@ async function resolveMarkdownImages(content, basePath, rootHandle) {
 }
 
 // Load notebook data from filesystem
-async function loadFromFilesystem(dirHandle) {
+async function loadFromFilesystem() {
     console.log('[Filesystem] Loading from directory...');
 
     // Load settings first (handles migration from legacy format)
-    await loadSettings(dirHandle);
+    await loadSettings();
 
     // Load roster (optional student name mappings)
-    await loadRoster(dirHandle);
+    await loadRoster();
 
     // Load templates first (populates cardTypeExtensions via loadCardTypeModules)
     // Only loads CSS/JS for enabled_templates from settings
-    await loadTemplates(dirHandle);
+    await loadTemplates();
     // Then load extension registry (uses cardTypeExtensions)
-    await loadExtensionRegistry(dirHandle);
+    await loadExtensionRegistry();
 
     // Detect in-use card types and lazy-load their CSS/JS
-    const inUseTypes = await detectInUseCardTypes(dirHandle);
+    const inUseTypes = await detectInUseCardTypes();
     const additionalTypes = [...inUseTypes].filter(t => !fullyLoadedCardTypes.has(t));
     if (additionalTypes.length > 0) {
         console.log(`[CardTypes] Loading assets for in-use types: ${additionalTypes.join(', ')}`);
@@ -6470,11 +6529,11 @@ async function loadFromFilesystem(dirHandle) {
         console.log('[Settings] Auto-enabled preserve_dir_names (source files detected)');
     }
 
-    await loadAuthors(dirHandle);
+    await loadAuthors();
 
     // Inject template CSS variables and load user theme
     injectTemplateStyles();
-    await loadThemeCss(dirHandle);
+    await loadThemeCss();
 
     const loadedData = {
         title: notebookSettings?.notebook_title || 'Research Notebook',
@@ -6492,12 +6551,16 @@ async function loadFromFilesystem(dirHandle) {
         const notebookItems = [];
 
         // Load config files from .notebook/ directory
-        const configDir = await getNotebookConfigDir(dirHandle, false);
-        if (configDir) {
+        let hasConfigDir = false;
+        try {
+            await storageBackend.listDirectory('.notebook');
+            hasConfigDir = true;
+        } catch (e) { /* .notebook doesn't exist yet */ }
+
+        if (hasConfigDir) {
             // Load settings.yaml from .notebook/
             try {
-                const settingsHandle = await configDir.getFileHandle('settings.yaml');
-                const file = await settingsHandle.getFile();
+                const { lastModified } = await storageBackend.readFile('.notebook/settings.yaml');
                 notebookItems.push({
                     template: 'settings',
                     system: true,
@@ -6512,7 +6575,7 @@ async function loadFromFilesystem(dirHandle) {
                     default_author: notebookSettings?.default_author || null,
                     authors: notebookSettings?.authors || [],
                     enabled_templates: notebookSettings?.enabled_templates || null,
-                    modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
+                    modified: lastModified ? new Date(lastModified).toISOString() : new Date().toISOString()
                 });
                 console.log('[Filesystem] Loaded settings card');
             } catch (e) {
@@ -6521,9 +6584,7 @@ async function loadFromFilesystem(dirHandle) {
 
             // Load theme.css from .notebook/
             try {
-                const themeHandle = await configDir.getFileHandle('theme.css');
-                const file = await themeHandle.getFile();
-                const content = await file.text();
+                const { content, lastModified } = await storageBackend.readFile('.notebook/theme.css');
                 notebookItems.push({
                     template: 'theme',
                     system: true,
@@ -6532,7 +6593,7 @@ async function loadFromFilesystem(dirHandle) {
                     _path: '.notebook',
                     title: 'Theme',
                     content: content,
-                    modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
+                    modified: lastModified ? new Date(lastModified).toISOString() : new Date().toISOString()
                 });
                 console.log('[Filesystem] Loaded theme card');
             } catch (e) {
@@ -6540,20 +6601,19 @@ async function loadFromFilesystem(dirHandle) {
             }
 
             // Load templates from .notebook/templates/
-            const templatesDir = await getNotebookTemplatesDir(dirHandle, false);
-            if (templatesDir) {
-                for await (const [filename, fileHandle] of templatesDir.entries()) {
-                    if (fileHandle.kind !== 'file' || !filename.endsWith('.yaml')) continue;
+            try {
+                const templateEntries = await storageBackend.listDirectory('.notebook/templates');
+                for (const entry of templateEntries) {
+                    if (entry.kind !== 'file' || !entry.name.endsWith('.yaml')) continue;
                     try {
-                        const file = await fileHandle.getFile();
-                        const content = await file.text();
+                        const { content, lastModified } = await storageBackend.readFile(`.notebook/templates/${entry.name}`);
                         const parsed = jsyaml.load(content);
-                        const templateName = filename.replace(/\.yaml$/, '');
+                        const templateName = entry.name.replace(/\.yaml$/, '');
                         notebookItems.push({
                             template: 'template',
                             system: true,
                             id: 'system-' + templateName + '.template.yaml',
-                            filename: filename,
+                            filename: entry.name,
                             _path: '.notebook/templates',
                             title: templateName + ' (template)',
                             name: parsed.name || templateName,
@@ -6564,20 +6624,24 @@ async function loadFromFilesystem(dirHandle) {
                             editor: parsed.editor || {},
                             style: parsed.style || {},
                             ui: parsed.ui || {},
-                            modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
+                            modified: lastModified ? new Date(lastModified).toISOString() : new Date().toISOString()
                         });
                         console.log(`[Filesystem] Loaded template: ${templateName}`);
                     } catch (e) {
-                        console.error(`[Filesystem] Error parsing template ${filename}:`, e);
+                        console.error(`[Filesystem] Error parsing template ${entry.name}:`, e);
                     }
                 }
+            } catch (e) {
+                // .notebook/templates/ doesn't exist
             }
         }
 
         // Read user files from root directory (README.md, CLAUDE.md, etc.)
         // Config files (settings.yaml, theme.css, *.template.yaml) are only in .notebook/
-        for await (const [filename, fileHandle] of dirHandle.entries()) {
-            if (fileHandle.kind !== 'file') continue;
+        const rootEntries = await storageBackend.listDirectory('');
+        for (const entry of rootEntries) {
+            if (entry.kind !== 'file') continue;
+            const filename = entry.name;
 
             // Skip files with excluded extensions
             if (excludedExtensions.some(ext => filename.endsWith(ext))) continue;
@@ -6591,8 +6655,7 @@ async function loadFromFilesystem(dirHandle) {
             if (filename.endsWith('.template.yaml')) continue;
 
             try {
-                const file = await fileHandle.getFile();
-                const content = await file.text();
+                const { content, lastModified } = await storageBackend.readFile(filename);
 
                 // System files that need special handling (README.md, CLAUDE.md)
                 const systemFiles = ['README.md', 'CLAUDE.md'];
@@ -6632,7 +6695,7 @@ async function loadFromFilesystem(dirHandle) {
                     title: titleFromFilename,
                     content: content,
                     format: format,
-                    modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
+                    modified: lastModified ? new Date(lastModified).toISOString() : new Date().toISOString()
                 });
                 console.log(`[Filesystem] Loaded root file: ${filename} (${format})`);
             } catch (e) {
@@ -6674,28 +6737,27 @@ async function loadFromFilesystem(dirHandle) {
 
         // Helper function to load cards from a section directory
         // subdirPath parameter tracks full path for nested directories (e.g., 'responses/batch1')
-        async function loadSectionItems(sectionHandle, sectionDirName, subdirPath = null) {
+        // loadSectionItems: path-based — uses storageBackend instead of FS handles
+        // currentPath is the full path from notebook root (e.g., 'research' or 'research/subdir')
+        async function loadSectionItems(currentPath, sectionDirName, subdirPath = null) {
             const items = [];
 
             // First pass: collect all files, directories, and identify companion files
-            const files = {};
-            const subdirs = {};
+            const fileNames = [];
+            const subdirNames = [];
             const companionFiles = {};
-            for await (const [name, handle] of sectionHandle.entries()) {
-                if (name.startsWith('_') || name.startsWith('.')) continue;  // Skip metadata/hidden files
+            const entries = await storageBackend.listDirectory(currentPath);
+            for (const entry of entries) {
+                if (entry.name.startsWith('_') || entry.name.startsWith('.')) continue;
 
-                if (handle.kind === 'directory') {
-                    // Skip excluded directories (e.g., node_modules)
+                if (entry.kind === 'directory') {
                     const excludedPaths = notebookSettings?.excluded_paths ?? ['node_modules'];
-                    if (excludedPaths.includes(name)) {
-                        continue;
-                    }
-                    // Collect all subdirectories for recursive loading
-                    subdirs[name] = handle;
+                    if (excludedPaths.includes(entry.name)) continue;
+                    subdirNames.push(entry.name);
                     continue;
                 }
 
-                if (handle.kind !== 'file') continue;
+                if (entry.kind !== 'file') continue;
 
                 // Check if this is a companion file (e.g., .output.html)
                 let isCompanion = false;
@@ -6703,15 +6765,14 @@ async function loadFromFilesystem(dirHandle) {
                     const config = extensionRegistry[ext];
                     if (config.companionFiles) {
                         for (const companion of config.companionFiles) {
-                            if (name.endsWith(companion.suffix)) {
-                                // Store companion content by base filename
-                                const baseFilename = name.slice(0, -companion.suffix.length) + ext;
+                            if (entry.name.endsWith(companion.suffix)) {
+                                const baseFilename = entry.name.slice(0, -companion.suffix.length) + ext;
                                 if (!companionFiles[baseFilename]) companionFiles[baseFilename] = {};
                                 try {
-                                    const file = await handle.getFile();
-                                    companionFiles[baseFilename][companion.field] = await file.text();
+                                    const { content } = await storageBackend.readFile(`${currentPath}/${entry.name}`);
+                                    companionFiles[baseFilename][companion.field] = content;
                                 } catch (e) {
-                                    console.warn(`[Filesystem] Error reading companion file ${name}:`, e);
+                                    console.warn(`[Filesystem] Error reading companion file ${entry.name}:`, e);
                                 }
                                 isCompanion = true;
                                 break;
@@ -6722,38 +6783,71 @@ async function loadFromFilesystem(dirHandle) {
                 }
 
                 if (!isCompanion) {
-                    files[name] = handle;
+                    fileNames.push(entry.name);
                 }
             }
 
             // Second pass: load cards with their companion data
-            for (const [filename, fileHandle] of Object.entries(files)) {
+            for (const filename of fileNames) {
                 try {
-                    const file = await fileHandle.getFile();
-                    const content = await file.text();
+                    const filePath = `${currentPath}/${filename}`;
 
                     // Get companion data for this file
                     const companionData = companionFiles[filename] || {};
+
+                    // Check for image files (need binary reading, not text)
+                    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
+                    const isImage = imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+
+                    if (isImage) {
+                        // Read image as data URL
+                        const { dataUrl, lastModified, size } = await storageBackend.readFileAsDataUrl(filePath);
+
+                        const formatFileSize = (bytes) => {
+                            if (bytes < 1024) return bytes + ' B';
+                            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                        };
+
+                        const relativePath = subdirPath
+                            ? `${sectionDirName}/${subdirPath}/${filename}`
+                            : `${sectionDirName}/${filename}`;
+
+                        const card = {
+                            id: `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                            template: 'image',
+                            type: 'image',
+                            title: filename,
+                            path: relativePath,
+                            filesize: formatFileSize(size),
+                            src: dataUrl,
+                            _path: subdirPath ? `${sectionDirName}/${subdirPath}` : sectionDirName,
+                            _source: {
+                                filename,
+                                format: filename.toLowerCase().endsWith('.svg') ? 'text-image' : 'binary-image',
+                                section: sectionDirName,
+                                subdir: subdirPath,
+                                extension: filename.match(/\.[^.]+$/)?.[0]?.toLowerCase() || ''
+                            },
+                            _fileModified: lastModified,
+                            modified: lastModified ? new Date(lastModified).toISOString() : new Date().toISOString()
+                        };
+                        items.push(card);
+                        console.log(`[Filesystem] Loaded image: ${subdirPath ? subdirPath + '/' : ''}${filename}`);
+                        continue;
+                    }
+
+                    const { content, lastModified, size } = await storageBackend.readFile(filePath);
 
                     // Special handling for bookmarks: load thumbnail from assets
                     if (filename.endsWith('.bookmark.json')) {
                         try {
                             const bookmarkData = JSON.parse(content);
                             if (bookmarkData.thumbnail && !bookmarkData.thumbnail.startsWith('data:')) {
-                                // It's a file path, need to load the actual image
                                 try {
-                                    const assetsDir = await dirHandle.getDirectoryHandle('assets');
-                                    const thumbsDir = await assetsDir.getDirectoryHandle('thumbnails');
                                     const thumbFilename = bookmarkData.thumbnail.split('/').pop();
-                                    const thumbHandle = await thumbsDir.getFileHandle(thumbFilename);
-                                    const thumbFile = await thumbHandle.getFile();
-
-                                    const reader = new FileReader();
-                                    companionData.thumbnail = await new Promise((resolve, reject) => {
-                                        reader.onload = () => resolve(reader.result);
-                                        reader.onerror = reject;
-                                        reader.readAsDataURL(thumbFile);
-                                    });
+                                    const { dataUrl } = await storageBackend.readFileAsDataUrl(`assets/thumbnails/${thumbFilename}`);
+                                    companionData.thumbnail = dataUrl;
                                 } catch (e) {
                                     console.warn(`[Filesystem] Could not load thumbnail ${bookmarkData.thumbnail}:`, e);
                                 }
@@ -6763,80 +6857,25 @@ async function loadFromFilesystem(dirHandle) {
                         }
                     }
 
-                    // Check for image files (need binary reading, not text)
-                    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
-                    const isImage = imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
-
-                    if (isImage) {
-                        // Read image as data URL
-                        const reader = new FileReader();
-                        const dataUrl = await new Promise((resolve, reject) => {
-                            reader.onload = () => resolve(reader.result);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(file);
-                        });
-
-                        // Format filesize for display
-                        const formatFileSize = (bytes) => {
-                            if (bytes < 1024) return bytes + ' B';
-                            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-                            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-                        };
-
-                        // Build relative path: section/subdirPath/filename or section/filename
-                        const relativePath = subdirPath
-                            ? `${sectionDirName}/${subdirPath}/${filename}`
-                            : `${sectionDirName}/${filename}`;
-
-                        // Create image card directly (no frontmatter to parse)
-                        const card = {
-                            id: `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                            template: 'image',
-                            type: 'image',
-                            title: filename,  // Full filename with extension
-                            path: relativePath,  // Relative path for referencing
-                            filesize: formatFileSize(file.size),
-                            src: dataUrl,
-                            _path: subdirPath ? `${sectionDirName}/${subdirPath}` : sectionDirName,  // Full path from notebook root
-                            _source: {
-                                filename,
-                                format: filename.toLowerCase().endsWith('.svg') ? 'text-image' : 'binary-image',
-                                section: sectionDirName,
-                                subdir: subdirPath,
-                                extension: filename.match(/\.[^.]+$/)?.[0]?.toLowerCase() || ''
-                            },
-                            _fileModified: file.lastModified,
-                            modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
-                        };
-                        items.push(card);
-                        console.log(`[Filesystem] Loaded image: ${subdirPath ? subdirPath + '/' : ''}${filename}`);
-                        continue;
-                    }
-
                     // Use generic loadCard function
                     const card = loadCard(filename, content, sectionDirName, companionData);
                     if (card) {
-                        // Apply thumbnail from companion data if loaded
                         if (companionData.thumbnail) {
                             card.thumbnail = companionData.thumbnail;
                         }
-                        // Store full path from notebook root and file modified time
                         card._path = subdirPath ? `${sectionDirName}/${subdirPath}` : sectionDirName;
                         if (card._source) {
                             card._source.subdir = subdirPath;
                         }
-                        card._fileModified = file.lastModified;
-                        // Set modified date from file if not in frontmatter (for source files)
-                        if (!card.modified && file.lastModified) {
-                            card.modified = new Date(file.lastModified).toISOString();
+                        card._fileModified = lastModified;
+                        if (!card.modified && lastModified) {
+                            card.modified = new Date(lastModified).toISOString();
                         }
-                        // Compute line count for source/code files
                         if (card.code) {
                             card.lineCount = card.code.split('\n').length;
                         }
-                        // Resolve relative image paths in all markdown fields to data URLs
                         if (card._path) {
-                            await resolveCardMarkdownImages(card, card._path, dirHandle);
+                            await resolveCardMarkdownImages(card, card._path);
                         }
                         items.push(card);
                     } else {
@@ -6856,7 +6895,7 @@ async function loadFromFilesystem(dirHandle) {
                             type: 'file',
                             title: filename,
                             path: relativePath,
-                            filesize: formatSize(file.size),
+                            filesize: formatSize(size),
                             binary: isBinary,
                             content: isBinary ? '[Binary file]' : content,
                             _path: subdirPath ? `${sectionDirName}/${subdirPath}` : sectionDirName,
@@ -6867,8 +6906,8 @@ async function loadFromFilesystem(dirHandle) {
                                 subdir: subdirPath,
                                 extension: filename.match(/\.[^.]+$/)?.[0]?.toLowerCase() || ''
                             },
-                            _fileModified: file.lastModified,
-                            modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString()
+                            _fileModified: lastModified,
+                            modified: lastModified ? new Date(lastModified).toISOString() : new Date().toISOString()
                         };
                         items.push(fallbackCard);
                         console.log(`[Filesystem] Loaded as fallback file: ${subdirPath ? subdirPath + '/' : ''}${filename}`);
@@ -6879,15 +6918,13 @@ async function loadFromFilesystem(dirHandle) {
             }
 
             // Third pass: recursively load from subdirectories (arbitrary depth)
-            // Also track all subdirectory paths (even empty ones) for tree display
             const allSubdirPaths = [];
-            for (const [subdirName, subdirHandle] of Object.entries(subdirs)) {
-                // Build full path for nested subdirectories
+            for (const subdirName of subdirNames) {
                 const newSubdirPath = subdirPath ? `${subdirPath}/${subdirName}` : subdirName;
                 allSubdirPaths.push(newSubdirPath);
-                const subdirItems = await loadSectionItems(subdirHandle, sectionDirName, newSubdirPath);
+                const subdirFullPath = `${currentPath}/${subdirName}`;
+                const subdirItems = await loadSectionItems(subdirFullPath, sectionDirName, newSubdirPath);
                 items.push(...subdirItems);
-                // Collect nested subdir paths from returned items
                 if (subdirItems._subdirPaths) {
                     allSubdirPaths.push(...subdirItems._subdirPaths);
                 }
@@ -6896,20 +6933,20 @@ async function loadFromFilesystem(dirHandle) {
                 }
             }
 
-            // Attach subdir paths to the items array for upstream collection
             items._subdirPaths = allSubdirPaths;
             return items;
         }
 
         // Discover section directories at root (excluding reserved names)
-        const discoveredSections = new Map(); // dirName -> { handle }
+        const discoveredSections = new Map(); // dirName -> {}
+        const allRootEntries = await storageBackend.listDirectory('');
 
-        for await (const [name, handle] of dirHandle.entries()) {
-            if (handle.kind !== 'directory') continue;
-            if (name.startsWith('.') || name.startsWith('_')) continue;  // Skip dotfiles/dotdirs and underscore-prefixed
-            if (RESERVED_DIRECTORIES.has(name)) continue;
+        for (const entry of allRootEntries) {
+            if (entry.kind !== 'directory') continue;
+            if (entry.name.startsWith('.') || entry.name.startsWith('_')) continue;
+            if (RESERVED_DIRECTORIES.has(entry.name)) continue;
 
-            discoveredSections.set(name, { handle });
+            discoveredSections.set(entry.name, {});
         }
 
         console.log(`[Filesystem] Discovered ${discoveredSections.size} section directories`);
@@ -6944,7 +6981,7 @@ async function loadFromFilesystem(dirHandle) {
         // Track which settings entries we've matched
         const matchedSettings = new Set();
 
-        for (const [dirName, { handle }] of discoveredSections) {
+        for (const [dirName] of discoveredSections) {
             // Special defaults for known directories
             const knownDirectoryDefaults = {
                 'assets': { visible: false }
@@ -6971,7 +7008,7 @@ async function loadFromFilesystem(dirHandle) {
             }
 
             // Load items from the section
-            const loadedItems = await loadSectionItems(handle, dirName);
+            const loadedItems = await loadSectionItems(dirName, dirName);
             section.items = loadedItems;
             // Store all discovered subdirectory paths (including empty ones)
             section._subdirPaths = loadedItems._subdirPaths || [];
@@ -7045,7 +7082,7 @@ async function loadFromFilesystem(dirHandle) {
 }
 
 // Save notebook data to filesystem
-async function saveToFilesystem(dirHandle) {
+async function saveToFilesystem() {
     console.log('[Filesystem] Saving to directory...');
 
     try {
@@ -7057,14 +7094,13 @@ async function saveToFilesystem(dirHandle) {
             sections: data.sections.map(s => ({ name: s.name, visible: s.visible !== false })),
             theme: notebookSettings?.theme || null
         };
-        await saveSettings(dirHandle);
+        await saveSettings();
 
         // Note: README.md and CLAUDE.md are not auto-created
         // Users should provide these by forking from a demo notebook
 
         // Create assets/thumbnails directory
-        const assetsDir = await dirHandle.getDirectoryHandle('assets', { create: true });
-        await assetsDir.getDirectoryHandle('thumbnails', { create: true });
+        await storageBackend.mkdir('assets/thumbnails');
 
         // Note: Section directories are created by createSectionDir() after this function
         // Card files are saved incrementally by saveCardFile()
@@ -7103,7 +7139,7 @@ function wasRecentlySaved(relativePath) {
 
 // Save only settings.yaml (for settings, section order changes)
 async function saveNotebookMeta() {
-    if (!filesystemLinked || !notebookDirHandle) return;
+    if (!storageBackend) return;
 
     // Update notebookSettings with current data, preserving existing settings
     notebookSettings = buildSettingsObject({
@@ -7113,13 +7149,13 @@ async function saveNotebookMeta() {
         // Save dir name + visibility (display name is computed from dir via formatDirName)
         sections: data.sections.map(s => ({ dir: s._dirName, visible: s.visible !== false }))
     });
-    await saveSettings(notebookDirHandle);
+    await saveSettings();
     recordSave('settings.yaml');
 }
 
 // Generic card save function using template system
 async function saveCardFile(sectionId, card) {
-    if (!filesystemLinked || !notebookDirHandle) return;
+    if (!storageBackend) return;
 
     // Settings card is handled specially
     if (card.template === 'settings' || card.filename === 'settings.yaml') {
@@ -7127,7 +7163,6 @@ async function saveCardFile(sectionId, card) {
         const oldExcludedPaths = JSON.stringify(notebookSettings?.excluded_paths ?? ['node_modules']);
 
         // Update notebookSettings from card fields defined in SETTINGS_SCHEMA
-        // This avoids having to explicitly list each field (which is error-prone)
         const updatedSettings = { ...notebookSettings };
         for (const key of Object.keys(SETTINGS_SCHEMA)) {
             if (card[key] !== undefined) {
@@ -7135,11 +7170,9 @@ async function saveCardFile(sectionId, card) {
             }
         }
         notebookSettings = buildSettingsObject(updatedSettings);
-        // Also update data.title/subtitle so UI reflects changes
         data.title = notebookSettings.notebook_title;
         data.subtitle = notebookSettings.notebook_subtitle;
-        // Reload author registry with new authors
-        await loadAuthors(notebookDirHandle);
+        await loadAuthors();
 
         // Lazy-load CSS/JS for newly enabled card types
         if (notebookSettings.enabled_templates) {
@@ -7150,11 +7183,9 @@ async function saveCardFile(sectionId, card) {
         }
 
         // Reorder data.sections to match the new order from settings
-        // card.sections is array of {dir, visible} records (or legacy {name, path, visible})
         if (card.sections && Array.isArray(card.sections)) {
             const newOrder = [];
             for (const sectionRecord of card.sections) {
-                // Get dir name from new format (dir) or legacy (path, slugified name)
                 let dirName;
                 if (typeof sectionRecord === 'object') {
                     dirName = sectionRecord.dir || sectionRecord.path || (sectionRecord.name ? slugify(sectionRecord.name) : null);
@@ -7163,18 +7194,14 @@ async function saveCardFile(sectionId, card) {
                 }
                 if (!dirName) continue;
 
-                // Find section by matching _dirName
                 let section = data.sections.find(s => s._dirName === dirName);
 
                 if (section) {
-                    // Apply visibility from settings record
                     if (typeof sectionRecord === 'object') {
                         section.visible = sectionRecord.visible !== false;
                     }
                     newOrder.push(section);
                 } else if (dirName !== '.') {
-                    // New section added via settings - create it
-                    // Skip [root] section (dir === '.') - it's virtual, not a directory
                     const newSection = {
                         id: 'section-' + dirName,
                         items: [],
@@ -7182,9 +7209,8 @@ async function saveCardFile(sectionId, card) {
                         _dirName: dirName,
                         _needsDirectory: true
                     };
-                    // Create directory immediately
                     try {
-                        await notebookDirHandle.getDirectoryHandle(dirName, { create: true });
+                        await storageBackend.mkdir(dirName);
                         newSection._needsDirectory = false;
                         console.log(`[Filesystem] Created section directory: ${dirName}/`);
                     } catch (e) {
@@ -7193,7 +7219,6 @@ async function saveCardFile(sectionId, card) {
                     newOrder.push(newSection);
                 }
             }
-            // Add any sections not in the list (shouldn't happen, but safety)
             for (const section of data.sections) {
                 if (!newOrder.includes(section)) {
                     newOrder.push(section);
@@ -7202,26 +7227,23 @@ async function saveCardFile(sectionId, card) {
             data.sections = newOrder;
         }
 
-        await saveSettings(notebookDirHandle);
-        // Reload theme in case base theme changed
-        await loadThemeCss(notebookDirHandle);
+        await saveSettings();
+        await loadThemeCss();
         card.filename = '.notebook/settings.yaml';
         card.id = 'system-settings.yaml';
         recordSave('.notebook/settings.yaml');
         console.log('[Filesystem] Saved .notebook/settings.yaml');
 
-        // If excluded_paths changed, reload from filesystem to rescan directories
         const newExcludedPaths = JSON.stringify(notebookSettings?.excluded_paths ?? ['node_modules']);
         if (oldExcludedPaths !== newExcludedPaths) {
             console.log('[Settings] excluded_paths changed, reloading from filesystem');
-            await reloadFromFilesystem(false);  // false = don't show notification
+            await reloadFromFilesystem(false);
         }
         return;
     }
 
     // Template cards - save to .notebook/templates/{name}.yaml
     if (card.template === 'template') {
-        // Reconstruct the template object from card fields
         const templateObj = {
             name: card.name,
             description: card.description
@@ -7240,20 +7262,12 @@ async function saveCardFile(sectionId, card) {
             forceQuotes: false
         });
 
-        // Always save to .notebook/templates/
-        const templatesDir = await getNotebookTemplatesDir(notebookDirHandle, true);
         const templateFilename = (card.name || 'custom') + '.yaml';
-        const fileHandle = await templatesDir.getFileHandle(templateFilename, { create: true });
         const savedPath = `.notebook/templates/${templateFilename}`;
-
-        const writable = await fileHandle.createWritable();
-        await writable.write(yamlContent);
-        await writable.close();
+        await storageBackend.writeFile(savedPath, yamlContent);
 
         card.filename = savedPath;
         card.id = 'system-' + card.name + '.template.yaml';
-
-        // Reload the template into the registry
         templateRegistry[card.name] = templateObj;
 
         recordSave(savedPath);
@@ -7263,19 +7277,12 @@ async function saveCardFile(sectionId, card) {
 
     // Theme card - save to .notebook/theme.css
     if (card.template === 'theme') {
-        const configDir = await getNotebookConfigDir(notebookDirHandle, true);
-        const fileHandle = await configDir.getFileHandle('theme.css', { create: true });
         const savedPath = '.notebook/theme.css';
-
-        const writable = await fileHandle.createWritable();
-        await writable.write(card.content);
-        await writable.close();
+        await storageBackend.writeFile(savedPath, card.content);
 
         card.filename = savedPath;
         card.id = 'system-theme.css';
-
-        // Reload the theme CSS into the page
-        await loadThemeCss(notebookDirHandle);
+        await loadThemeCss();
 
         recordSave(savedPath);
         console.log('[Filesystem] Saved theme');
@@ -7283,39 +7290,26 @@ async function saveCardFile(sectionId, card) {
     }
 
     // System notes (root files like README.md, CLAUDE.md) are saved with raw content
-    // They're in section '.' and have system: true flag
     if (card.system && card.type === 'note') {
         const baseFilename = card.filename || (card.title + '.md');
-
-        // Cards in section '.' go to root, cards in section '.notebook' follow _path
-        let targetDir, savedPath;
         const section = data.sections.find(s => s.id === sectionId);
         const sectionDir = section?._dirName;
 
+        let savedPath;
         if (sectionDir === '.') {
-            // Root files (README.md, CLAUDE.md)
-            targetDir = notebookDirHandle;
             savedPath = baseFilename;
         } else if (sectionDir === '.notebook') {
-            // .notebook files - check _path for subdirs like templates/
             const subPath = card._path;
             if (subPath === '.notebook/templates') {
-                targetDir = await getNotebookTemplatesDir(notebookDirHandle, true);
                 savedPath = `.notebook/templates/${baseFilename}`;
             } else {
-                targetDir = await getNotebookConfigDir(notebookDirHandle, true);
                 savedPath = `.notebook/${baseFilename}`;
             }
         } else {
-            // Shouldn't happen, but fallback to regular save path
-            targetDir = notebookDirHandle;
             savedPath = baseFilename;
         }
 
-        const fileHandle = await targetDir.getFileHandle(baseFilename, { create: true });
-        const writable = await fileHandle.createWritable();
-        await writable.write(card.content);
-        await writable.close();
+        await storageBackend.writeFile(savedPath, card.content);
         card.filename = baseFilename;
         recordSave(savedPath);
         console.log('[Filesystem] Saved system note:', savedPath);
@@ -7325,34 +7319,26 @@ async function saveCardFile(sectionId, card) {
     const section = data.sections.find(s => s.id === sectionId);
     if (!section) return;
 
-    // Get or create section directory (new sections go to root, existing preserve location)
-    let sectionDir, sectionPath;
+    // Get or create section directory
+    let sectionPath;
     if (section._needsDirectory) {
-        // New section - create at root using _dirName
         const dirName = section._dirName;
-        sectionDir = await notebookDirHandle.getDirectoryHandle(dirName, { create: true });
+        await storageBackend.mkdir(dirName);
         sectionPath = dirName;
         delete section._needsDirectory;
         console.log(`[Filesystem] Created section directory: ${dirName}/`);
     } else {
-        // Existing section - use getSectionDirHandle to find it
-        const sectionInfo = await getSectionDirHandle(section, { create: true });
-        if (!sectionInfo) {
-            console.error('[Filesystem] Cannot get section directory for', section._dirName);
+        sectionPath = getSectionPath(section);
+        if (!sectionPath) {
+            console.error('[Filesystem] Cannot get section path for', section._dirName);
             return;
         }
-        sectionDir = sectionInfo.handle;
-        sectionPath = sectionInfo.path;
     }
 
-    // Handle subdirectory if specified (supports nested paths like 'responses/batch1')
-    // Extract subdir from _path (everything after the section name)
+    // Handle subdirectory if specified
     const subdir = getSubdirFromPath(card._path);
     if (subdir) {
-        const subdirParts = subdir.split('/');
-        for (const part of subdirParts) {
-            sectionDir = await sectionDir.getDirectoryHandle(part, { create: true });
-        }
+        await storageBackend.mkdir(`${sectionPath}/${subdir}`);
         sectionPath = `${sectionPath}/${subdir}`;
     }
 
@@ -7360,15 +7346,12 @@ async function saveCardFile(sectionId, card) {
     const { content, extension, format } = serializeCard(card);
 
     // Preserve original filename if card was loaded from filesystem
-    // Otherwise derive from title (for new cards)
     let baseFilename;
     if (card._source?.filename) {
-        // Strip extension from original filename to get base
         const origFilename = card._source.filename;
         if (origFilename.endsWith(extension)) {
             baseFilename = origFilename.slice(0, -extension.length);
         } else {
-            // Extension changed or doesn't match - use original without any known extension
             baseFilename = origFilename.replace(/\.(md|code\.py|bookmark\.json|card\.yaml)$/, '');
         }
     } else {
@@ -7377,32 +7360,23 @@ async function saveCardFile(sectionId, card) {
 
     // Special handling for bookmarks: save thumbnail to assets folder
     if ((card.type === 'bookmark' || card.template === 'bookmark') && card.thumbnail && card.thumbnail.startsWith('data:')) {
-        const assetsDir = await notebookDirHandle.getDirectoryHandle('assets', { create: true });
-        const thumbsDir = await assetsDir.getDirectoryHandle('thumbnails', { create: true });
         const thumbFilename = `${card.id || baseFilename}.png`;
-        // Relative path depends on section location
         const depth = sectionPath.split('/').length;
         const thumbnailPath = '../'.repeat(depth) + `assets/thumbnails/${thumbFilename}`;
 
         try {
             const response = await fetch(card.thumbnail);
             const blob = await response.blob();
-            const thumbHandle = await thumbsDir.getFileHandle(thumbFilename, { create: true });
-            const thumbWritable = await thumbHandle.createWritable();
-            await thumbWritable.write(blob);
-            await thumbWritable.close();
+            await storageBackend.mkdir('assets/thumbnails');
+            await storageBackend.writeFile(`assets/thumbnails/${thumbFilename}`, await blob.arrayBuffer());
             recordSave(`assets/thumbnails/${thumbFilename}`);
 
-            // Update the serialized content to use path instead of data URL
             const bookmarkJson = JSON.parse(content);
             bookmarkJson.thumbnail = thumbnailPath;
             const updatedContent = JSON.stringify(bookmarkJson, null, 2);
 
             const filename = `${baseFilename}${extension}`;
-            const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(updatedContent);
-            await writable.close();
+            await storageBackend.writeFile(`${sectionPath}/${filename}`, updatedContent);
             recordSave(`${sectionPath}/${filename}`);
             return;
         } catch (e) {
@@ -7412,10 +7386,7 @@ async function saveCardFile(sectionId, card) {
 
     // Write main card file
     const filename = `${baseFilename}${extension}`;
-    const fileHandle = await sectionDir.getFileHandle(filename, { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(content);
-    await writable.close();
+    await storageBackend.writeFile(`${sectionPath}/${filename}`, content);
     recordSave(`${sectionPath}/${filename}`);
 
     // Handle companion files based on extension registry
@@ -7425,58 +7396,41 @@ async function saveCardFile(sectionId, card) {
             const fieldValue = card[companion.field];
             if (fieldValue) {
                 const companionFilename = `${baseFilename}${companion.suffix}`;
-                const companionHandle = await sectionDir.getFileHandle(companionFilename, { create: true });
-                const companionWritable = await companionHandle.createWritable();
-                await companionWritable.write(fieldValue);
-                await companionWritable.close();
+                await storageBackend.writeFile(`${sectionPath}/${companionFilename}`, fieldValue);
                 recordSave(`${sectionPath}/${companionFilename}`);
             }
         }
     }
 }
 
-// Get section directory handle at notebook root
-// Returns { handle, path } where path is relative to notebook root
-async function getSectionDirHandle(sectionOrName, options = {}) {
-    if (!filesystemLinked || !notebookDirHandle) return null;
+// Get the path string for a section directory (relative to notebook root)
+function getSectionPath(sectionOrName) {
+    if (!storageBackend) return null;
 
     const section = typeof sectionOrName === 'string'
         ? data.sections.find(s => s.name === sectionOrName || s.id === sectionOrName)
         : sectionOrName;
 
     // Use stored _dirName if available (from filesystem load), otherwise slugify name
-    const sectionSlug = section?._dirName || slugify(section?.name || sectionOrName);
-
-    // Special handling for root and .notebook directories
-    if (sectionSlug === '.') {
-        return { handle: notebookDirHandle, path: '.' };
-    }
-    if (sectionSlug === '.notebook') {
-        const handle = await notebookDirHandle.getDirectoryHandle('.notebook', options);
-        return { handle, path: '.notebook' };
-    }
-
-    const handle = await notebookDirHandle.getDirectoryHandle(sectionSlug, options);
-    return { handle, path: sectionSlug };
+    return section?._dirName || slugify(section?.name || sectionOrName);
 }
 
 // Create a new section directory at notebook root
 async function createSectionDir(section) {
-    if (!filesystemLinked || !notebookDirHandle) return;
+    if (!storageBackend) return;
 
     const dirName = section._dirName;
-    // Create directory at root (not under sections/)
-    await notebookDirHandle.getDirectoryHandle(dirName, { create: true });
+    await storageBackend.mkdir(dirName);
     console.log(`[Filesystem] Created section directory: ${dirName}/`);
     recordSave(`${dirName}`);
 }
 
 // Delete a section directory at notebook root
 async function deleteSectionDir(dirName) {
-    if (!filesystemLinked || !notebookDirHandle) return;
+    if (!storageBackend) return;
 
     try {
-        await notebookDirHandle.removeEntry(dirName, { recursive: true });
+        await storageBackend.deleteEntry(dirName, { recursive: true });
         recordSave(dirName);
         console.log(`[Filesystem] Deleted section directory: ${dirName}/`);
     } catch (e) {
@@ -7486,7 +7440,7 @@ async function deleteSectionDir(dirName) {
 
 // Create a new subfolder within a section
 async function createSubfolder(sectionId) {
-    if (!filesystemLinked || !notebookDirHandle) {
+    if (!storageBackend) {
         showToast('Filesystem not linked');
         return;
     }
@@ -7505,29 +7459,17 @@ async function createSubfolder(sectionId) {
     }
 
     try {
-        const sectionInfo = await getSectionDirHandle(section);
-        if (!sectionInfo) {
-            showToast('Cannot find section directory');
-            return;
-        }
-
         // Get current focus subdir if any (create inside focused folder)
-        let targetDir = sectionInfo.handle;
         let targetPath = section._dirName;
         if (focusedPath && focusedPath.startsWith(section._dirName + '/')) {
             const focusSubdir = getSubdirFromPath(focusedPath);
             if (focusSubdir) {
-                // Navigate to focused subdir
-                const subparts = focusSubdir.split('/');
-                for (const part of subparts) {
-                    targetDir = await targetDir.getDirectoryHandle(part, { create: false });
-                }
                 targetPath = focusedPath;
             }
         }
 
         // Create the new subfolder
-        await targetDir.getDirectoryHandle(dirName, { create: true });
+        await storageBackend.mkdir(`${targetPath}/${dirName}`);
         console.log(`[Filesystem] Created subfolder: ${targetPath}/${dirName}/`);
 
         // Auto-expand the parent so new folder is visible
@@ -7555,7 +7497,7 @@ async function deleteSubfolder(fullPath) {
         if (!shouldSave) return;
     }
 
-    if (!filesystemLinked || !notebookDirHandle) {
+    if (!storageBackend) {
         showToast('Filesystem not linked');
         return;
     }
@@ -7565,17 +7507,7 @@ async function deleteSubfolder(fullPath) {
     if (!confirm(`Delete empty folder "${displayName}"?`)) return;
 
     try {
-        // Navigate to the parent directory and delete the target
-        const parts = fullPath.split('/');
-        const targetName = parts.pop();
-        console.log('[Filesystem] Target:', targetName, 'Parent path:', parts.join('/'));
-        let parentDir = notebookDirHandle;
-
-        for (const part of parts) {
-            parentDir = await parentDir.getDirectoryHandle(part, { create: false });
-        }
-
-        await parentDir.removeEntry(targetName, { recursive: false });
+        await storageBackend.deleteEntry(fullPath, { recursive: false });
         console.log(`[Filesystem] Deleted subfolder: ${fullPath}/`);
 
         // Reload and re-render
@@ -7593,39 +7525,37 @@ async function deleteSubfolder(fullPath) {
 
 // Delete a single item file
 async function deleteItemFile(sectionId, item) {
-    if (!filesystemLinked || !notebookDirHandle) return;
+    if (!storageBackend) return;
 
     try {
         const section = data.sections.find(s => s.id === sectionId);
         if (!section) return;
 
-        const sectionInfo = await getSectionDirHandle(section);
-        if (!sectionInfo) return;
-        const { handle: sectionDir, path: sectionPath } = sectionInfo;
+        const sectionPath = getSectionPath(section);
+        if (!sectionPath) return;
 
         // Support both legacy type field and new template field (Phase 3)
         const itemType = item.template || item.type;
 
         // Use stored _filename if available (from filesystem load), otherwise derive from title
-        // This handles cases where filename doesn't match slugify(title)
         if (itemType === 'note') {
             const filename = item._filename || `${slugify(item.title)}.md`;
-            await sectionDir.removeEntry(filename);
+            await storageBackend.deleteEntry(`${sectionPath}/${filename}`);
             recordSave(`${sectionPath}/${filename}`);
         } else if (itemType === 'code') {
             const baseFilename = item._filename || slugify(item.title);
             const filename = `${baseFilename}.code.py`;
-            await sectionDir.removeEntry(filename);
+            await storageBackend.deleteEntry(`${sectionPath}/${filename}`);
             recordSave(`${sectionPath}/${filename}`);
             try {
                 const outputFilename = `${baseFilename}.output.html`;
-                await sectionDir.removeEntry(outputFilename);
+                await storageBackend.deleteEntry(`${sectionPath}/${outputFilename}`);
                 recordSave(`${sectionPath}/${outputFilename}`);
             } catch (e) { /* output might not exist */ }
         } else if (itemType === 'bookmark') {
             const baseFilename = item._filename || slugify(item.title);
             const filename = `${baseFilename}.bookmark.json`;
-            await sectionDir.removeEntry(filename);
+            await storageBackend.deleteEntry(`${sectionPath}/${filename}`);
             recordSave(`${sectionPath}/${filename}`);
         }
     } catch (e) {
@@ -7633,20 +7563,19 @@ async function deleteItemFile(sectionId, item) {
     }
 }
 
-// Recursively copy a directory's contents to a new location
-async function copyDirectoryContents(sourceDir, destDir, pathPrefix = '') {
-    for await (const [name, handle] of sourceDir.entries()) {
-        if (handle.kind === 'file') {
-            const file = await handle.getFile();
-            const newFile = await destDir.getFileHandle(name, { create: true });
-            const writable = await newFile.createWritable();
-            await writable.write(await file.arrayBuffer());
-            await writable.close();
-            recordSave(pathPrefix ? `${pathPrefix}/${name}` : name);
-        } else if (handle.kind === 'directory') {
-            // Recursively copy subdirectory
-            const newSubDir = await destDir.getDirectoryHandle(name, { create: true });
-            await copyDirectoryContents(handle, newSubDir, pathPrefix ? `${pathPrefix}/${name}` : name);
+// Recursively copy a directory's contents to a new location using storageBackend
+async function copyDirectoryContents(sourcePath, destPath) {
+    const entries = await storageBackend.listDirectory(sourcePath);
+    for (const entry of entries) {
+        const srcEntryPath = `${sourcePath}/${entry.name}`;
+        const destEntryPath = `${destPath}/${entry.name}`;
+        if (entry.kind === 'file') {
+            const { content } = await storageBackend.readFile(srcEntryPath);
+            await storageBackend.writeFile(destEntryPath, content);
+            recordSave(destEntryPath);
+        } else if (entry.kind === 'directory') {
+            await storageBackend.mkdir(destEntryPath);
+            await copyDirectoryContents(srcEntryPath, destEntryPath);
         }
     }
 }
@@ -7654,28 +7583,21 @@ async function copyDirectoryContents(sourceDir, destDir, pathPrefix = '') {
 // Rename a section directory at notebook root
 // Takes directory names directly (not display names)
 async function renameSectionDir(oldDirName, newDirName, section) {
-    if (!filesystemLinked || !notebookDirHandle) {
+    if (!storageBackend) {
         throw new Error('Filesystem not linked');
     }
 
     if (oldDirName === newDirName) return; // No actual rename needed
 
-    // Find the old directory
-    const oldInfo = await getSectionDirHandle(section);
-    if (!oldInfo) {
-        throw new Error(`Cannot find directory: ${oldDirName}`);
-    }
-    const { handle: oldDir, path: oldPath } = oldInfo;
-
     // Create new directory
-    const newDir = await notebookDirHandle.getDirectoryHandle(newDirName, { create: true });
+    await storageBackend.mkdir(newDirName);
 
     // Recursively copy all files and subdirectories from old to new
-    await copyDirectoryContents(oldDir, newDir, newDirName);
+    await copyDirectoryContents(oldDirName, newDirName);
 
     // Delete old directory
-    await notebookDirHandle.removeEntry(oldDirName, { recursive: true });
-    recordSave(oldPath);
+    await storageBackend.deleteEntry(oldDirName, { recursive: true });
+    recordSave(oldDirName);
 
     // Update all item _path fields in this section
     for (const item of section.items) {
@@ -7688,7 +7610,7 @@ async function renameSectionDir(oldDirName, newDirName, section) {
     section._dirName = newDirName;
     section.id = `section-${newDirName}`;
 
-    console.log(`[Filesystem] Renamed section: ${oldPath}/ -> ${newDirName}/`);
+    console.log(`[Filesystem] Renamed section: ${oldDirName}/ -> ${newDirName}/`);
 }
 
 // Link a notebook folder - show picker and save handle
@@ -7713,6 +7635,7 @@ async function linkNotebookFolder() {
         await saveDirHandle(handle);
 
         notebookDirHandle = handle;
+        storageBackend = new FileSystemBackend(handle);
         filesystemLinked = true;
         viewMode = 'filesystem';
         remoteSource = null;
@@ -7743,7 +7666,7 @@ async function linkNotebookFolder() {
 
         if (hasContent) {
             // Load from filesystem
-            const fsData = await loadFromFilesystem(handle);
+            const fsData = await loadFromFilesystem();
             data = fsData;
             restoreCollapsedSections();
             restoreExpandedSubdirs();
@@ -7753,10 +7676,10 @@ async function linkNotebookFolder() {
         } else {
             // New notebook: start empty, user adds sections via Add Section button
             data.sections = [];
-            await saveToFilesystem(handle);
-            await ensureTemplateFiles(handle);  // Create template files for new notebooks
+            await saveToFilesystem();
+            await ensureTemplateFiles();  // Create template files for new notebooks
             // Reload to pick up the newly created system notes
-            const fsData = await loadFromFilesystem(handle);
+            const fsData = await loadFromFilesystem();
             data = fsData;
             restoreCollapsedSections();
             restoreExpandedSubdirs();
@@ -7798,6 +7721,7 @@ async function unlinkNotebookFolder() {
         db.close();
 
         notebookDirHandle = null;
+        storageBackend = null;
         filesystemLinked = false;
         showToast('📦 Switched to browser storage');
     } catch (error) {
@@ -7817,12 +7741,13 @@ async function initFilesystem() {
         const hasPermission = await verifyDirPermission(savedHandle);
         if (hasPermission) {
             notebookDirHandle = savedHandle;
+            storageBackend = new FileSystemBackend(savedHandle);
             filesystemLinked = true;
             console.log(`[Filesystem] Restored link to folder: ${savedHandle.name}`);
 
             // Load data from filesystem
             try {
-                const fsData = await loadFromFilesystem(savedHandle);
+                const fsData = await loadFromFilesystem();
                 data = fsData;
 
                 // Start watching for external changes
@@ -8431,6 +8356,7 @@ async function saveRemoteToFolder() {
 
         // Switch to filesystem mode
         notebookDirHandle = dirHandle;
+        storageBackend = new FileSystemBackend(dirHandle);
         filesystemLinked = true;
         viewMode = 'filesystem';
         remoteSource = null;
@@ -8574,7 +8500,7 @@ async function handleFilesystemChanges(records, observer) {
 // Reload notebook data from filesystem (called by observer or manual refresh)
 // showNotification: if true, shows toast for external sync (used by observer)
 async function reloadFromFilesystem(showNotification = true) {
-    if (!filesystemLinked || !notebookDirHandle) {
+    if (!storageBackend) {
         console.log('[Observer] Cannot reload - no folder linked');
         return;
     }
@@ -8583,7 +8509,7 @@ async function reloadFromFilesystem(showNotification = true) {
 
     try {
         console.log('[Observer] Reloading from filesystem...');
-        const fsData = await loadFromFilesystem(notebookDirHandle);
+        const fsData = await loadFromFilesystem();
         data = fsData;
         render();
 
@@ -8852,7 +8778,7 @@ async function applySettingsFromEditor() {
         data.subtitle = notebookSettings.notebook_subtitle;
 
         // Reload author registry
-        await loadAuthors(notebookDirHandle);
+        await loadAuthors();
 
         // Lazy-load CSS/JS for newly enabled card types
         if (notebookSettings.enabled_templates) {
@@ -8893,7 +8819,7 @@ async function applySettingsFromEditor() {
         }
 
         // Reload theme in case base theme changed
-        await loadThemeCss(notebookDirHandle);
+        await loadThemeCss();
 
         // Persist to IndexedDB (not filesystem)
         await saveData();
@@ -8962,7 +8888,7 @@ async function changeNotebookFolder() {
 
 // Refresh data from filesystem
 async function refreshFromFilesystem() {
-    if (!filesystemLinked || !notebookDirHandle) {
+    if (!storageBackend) {
         showToast('❌ No folder linked');
         return;
     }
@@ -10425,6 +10351,7 @@ async function initDefaultFlow() {
             const hasPermission = await verifyDirPermission(handle);
             if (hasPermission) {
                 notebookDirHandle = handle;
+                storageBackend = new FileSystemBackend(handle);
                 filesystemLinked = true;
                 viewMode = 'filesystem';
 
@@ -10433,7 +10360,7 @@ async function initDefaultFlow() {
 
                 // Load data from filesystem
                 try {
-                    data = await loadFromFilesystem(handle);
+                    data = await loadFromFilesystem();
                     await startWatchingFilesystem(handle);
 
                     // Restore UI state
@@ -10542,10 +10469,11 @@ async function init() {
             }
 
             notebookDirHandle = handle;
+            storageBackend = new FileSystemBackend(handle);
             filesystemLinked = true;
             viewMode = 'filesystem';
 
-            data = await loadFromFilesystem(handle);
+            data = await loadFromFilesystem();
             await startWatchingFilesystem(handle);
 
             restoreCollapsedSections();
