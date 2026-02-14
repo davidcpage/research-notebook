@@ -15,8 +15,7 @@ import {
     showToast,
     render,
     saveData,
-    saveCardFile,
-    setViewerCloseGuard
+    saveCardFile
 } from '../../js/framework.js';
 
 // ========== MODULE STATE ==========
@@ -496,19 +495,6 @@ export function renderViewer(card, template) {
             // Defer UI restoration to after DOM render
             setTimeout(() => restoreDraftUI(card.id, card.questions || []), 0);
         }
-    }
-
-    // Register close guard to prevent accidental loss of quiz answers
-    if (isInteractive) {
-        setTimeout(() => {
-            setViewerCloseGuard(() => {
-                const answers = quizAnswers[card.id];
-                if (answers && Object.keys(answers).length > 0) {
-                    return confirm('You have unsaved quiz answers. Close anyway?');
-                }
-                return true;
-            });
-        }, 0);
     }
 
     // Check if this is a graded quiz or pure survey
