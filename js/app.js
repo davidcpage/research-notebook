@@ -6389,6 +6389,12 @@ class GitHubBackend {
                 }
                 continue;
             }
+            // For tree entries (directories), add to seen to prevent duplicates
+            // (the same dir can appear as both a tree entry and inferred from child paths)
+            if (info.type === 'tree') {
+                if (seen.has(rest)) continue;
+                seen.add(rest);
+            }
             entries.push({
                 name: rest,
                 kind: info.type === 'tree' ? 'directory' : 'file'
