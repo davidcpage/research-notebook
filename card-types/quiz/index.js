@@ -15,7 +15,8 @@ import {
     showToast,
     render,
     saveData,
-    saveCardFile
+    saveCardFile,
+    setViewerCloseGuard
 } from '../../js/framework.js';
 
 // ========== MODULE STATE ==========
@@ -31,6 +32,103 @@ let quizStartTimes = {};
 // Timer intervals for cleanup
 // Structure: { quizId: intervalId }
 let timerIntervals = {};
+
+// ========== DRAFT PERSISTENCE ==========
+// Save/restore quiz answers to localStorage to survive accidental closes
+
+function saveDraft(quizId) {
+    if (!quizId || !quizAnswers[quizId]) return;
+    try {
+        const draft = {
+            answers: quizAnswers[quizId],
+            startTime: quizStartTimes[quizId] || null
+        };
+        localStorage.setItem(`quiz-draft-${quizId}`, JSON.stringify(draft));
+    } catch (e) {
+        // localStorage full or unavailable - silently ignore
+    }
+}
+
+function restoreDraft(quizId) {
+    try {
+        const raw = localStorage.getItem(`quiz-draft-${quizId}`);
+        if (!raw) return false;
+        const draft = JSON.parse(raw);
+        if (draft.answers && Object.keys(draft.answers).length > 0) {
+            quizAnswers[quizId] = draft.answers;
+            if (draft.startTime) {
+                quizStartTimes[quizId] = draft.startTime;
+            }
+            return true;
+        }
+    } catch (e) {
+        // Corrupted data - ignore
+    }
+    return false;
+}
+
+function clearDraft(quizId) {
+    try {
+        localStorage.removeItem(`quiz-draft-${quizId}`);
+    } catch (e) {
+        // Ignore
+    }
+}
+
+// Restore draft answer selections in the DOM after render
+function restoreDraftUI(quizId, questions) {
+    const viewer = document.querySelector(`.quiz-viewer[data-quiz-id="${quizId}"]`);
+    if (!viewer) return;
+    const answers = quizAnswers[quizId];
+    if (!answers) return;
+
+    Object.entries(answers).forEach(([indexStr, answer]) => {
+        const qIndex = parseInt(indexStr);
+        const question = questions[qIndex];
+        if (!question) return;
+        const qEl = viewer.querySelector(`.quiz-question[data-question-index="${qIndex}"]`);
+        if (!qEl) return;
+
+        const type = question.type || 'multiple_choice';
+
+        if (type === 'multiple_choice' && typeof answer === 'number') {
+            const opt = qEl.querySelector(`.quiz-option[data-option-index="${answer}"]`);
+            if (opt) opt.classList.add('selected');
+        } else if (type === 'checkbox' && Array.isArray(answer)) {
+            answer.forEach(optIdx => {
+                const opt = qEl.querySelector(`.quiz-option[data-option-index="${optIdx}"]`);
+                if (opt) opt.classList.add('selected');
+            });
+        } else if (type === 'dropdown' && typeof answer === 'number') {
+            const select = qEl.querySelector('.quiz-dropdown-select');
+            if (select) select.value = answer;
+        } else if (type === 'numeric') {
+            const input = qEl.querySelector('.quiz-numeric-input');
+            if (input && answer !== null) input.value = answer;
+        } else if (type === 'short_answer') {
+            const textarea = qEl.querySelector('.quiz-short-answer-input');
+            if (textarea) textarea.value = answer || '';
+        } else if (type === 'worked') {
+            const textarea = qEl.querySelector('.quiz-worked-input');
+            if (textarea) textarea.value = answer || '';
+        } else if (type === 'scale' && typeof answer === 'number') {
+            const opt = qEl.querySelector(`.quiz-scale-option[data-value="${answer}"]`);
+            if (opt) opt.classList.add('selected');
+        } else if (type === 'grid' && typeof answer === 'object') {
+            Object.entries(answer).forEach(([rowIdx, colIdx]) => {
+                const rows = qEl.querySelectorAll('.quiz-grid-row');
+                const row = rows[parseInt(rowIdx)];
+                if (row) {
+                    const cells = row.querySelectorAll('.quiz-grid-option');
+                    if (cells[colIdx]) cells[colIdx].classList.add('selected');
+                }
+            });
+        } else if ((type === 'date' || type === 'time' || type === 'datetime') && answer) {
+            const input = qEl.querySelector(`input[type="${type === 'datetime' ? 'datetime-local' : type}"]`);
+            if (input) input.value = answer;
+        }
+    });
+}
 
 // ========== AUDIO FUNCTIONS ==========
 
@@ -390,6 +488,28 @@ export function renderViewer(card, template) {
     // Interactive mode: no attempts yet, or user clicked "Retake"
     // BUT: if quiz_template_mode is set in settings, never allow interactive mode
     const isInteractive = !notebookSettings?.quiz_template_mode && (!lastAttempt || card._quizRetakeMode);
+
+    // Restore draft answers if available (e.g., after accidental close)
+    if (isInteractive && !card._quizRetakeMode) {
+        const restored = restoreDraft(card.id);
+        if (restored) {
+            // Defer UI restoration to after DOM render
+            setTimeout(() => restoreDraftUI(card.id, card.questions || []), 0);
+        }
+    }
+
+    // Register close guard to prevent accidental loss of quiz answers
+    if (isInteractive) {
+        setTimeout(() => {
+            setViewerCloseGuard(() => {
+                const answers = quizAnswers[card.id];
+                if (answers && Object.keys(answers).length > 0) {
+                    return confirm('You have unsaved quiz answers. Close anyway?');
+                }
+                return true;
+            });
+        }, 0);
+    }
 
     // Check if this is a graded quiz or pure survey
     const hasGradedQuestions = quizHasGradedQuestions(questions);
@@ -1145,6 +1265,7 @@ function selectQuizOption(element, questionIndex, optionIndex) {
     // Store answer
     if (!quizAnswers[quizId]) quizAnswers[quizId] = {};
     quizAnswers[quizId][questionIndex] = optionIndex;
+    saveDraft(quizId);
 }
 
 // Quiz interaction: toggle checkbox option (multiple selection)
@@ -1170,6 +1291,7 @@ function toggleQuizCheckbox(element, questionIndex, optionIndex) {
     } else {
         currentAnswers.push(optionIndex);
     }
+    saveDraft(quizId);
 }
 
 // Quiz interaction: update text/numeric answer
@@ -1188,6 +1310,7 @@ function updateQuizAnswer(questionIndex, value) {
     } else {
         quizAnswers[quizId][questionIndex] = value;
     }
+    saveDraft(quizId);
 }
 
 // Quiz interaction: select scale option
@@ -1206,6 +1329,7 @@ function selectScaleOption(element, questionIndex, value) {
     // Store answer
     if (!quizAnswers[quizId]) quizAnswers[quizId] = {};
     quizAnswers[quizId][questionIndex] = value;
+    saveDraft(quizId);
 }
 
 // Quiz interaction: select grid option
@@ -1225,6 +1349,7 @@ function selectGridOption(element, questionIndex, rowIndex, colIndex) {
     if (!quizAnswers[quizId]) quizAnswers[quizId] = {};
     if (!quizAnswers[quizId][questionIndex]) quizAnswers[quizId][questionIndex] = {};
     quizAnswers[quizId][questionIndex][rowIndex] = colIndex;
+    saveDraft(quizId);
 }
 
 // Quiz interaction: submit quiz
@@ -1255,9 +1380,10 @@ async function submitQuiz(quizId) {
     const attempt = gradeQuizAttempt(card, answers);
     await saveQuizAttempt(card, attempt);
 
-    // Clear quiz state
+    // Clear quiz state and draft
     delete quizAnswers[quizId];
     delete quizStartTimes[quizId];
+    clearDraft(quizId);
 
     showToast('Quiz submitted!', 'success');
 }
@@ -1274,6 +1400,7 @@ function retakeQuiz(quizId) {
     // Set retake mode flag and re-open viewer
     card._quizRetakeMode = true;
     quizAnswers[quizId] = {};
+    clearDraft(quizId);
 
     // Re-render the viewer content
     const viewerContent = document.getElementById('viewerContent');

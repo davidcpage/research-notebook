@@ -2292,6 +2292,10 @@ function renderCardMeta(card, template) {
 
 let currentViewingCard = null;
 
+// Guard function for viewer close - returns false to cancel close
+// Used by card type modules (e.g., quiz) to prevent accidental loss of in-progress work
+let viewerCloseGuard = null;
+
 function openViewer(sectionId, itemId) {
     // Convert itemId to string for comparison (YAML may parse numeric IDs as numbers)
     const itemIdStr = String(itemId);
@@ -2739,8 +2743,15 @@ function renderViewerActions(card, template, isSystemNote) {
 }
 
 function closeViewer() {
+    if (viewerCloseGuard && !viewerCloseGuard()) return;
     document.getElementById('viewerModal').classList.remove('active');
     currentViewingCard = null;
+    viewerCloseGuard = null;
+}
+
+// Set a guard function that runs before viewer closes (return false to cancel)
+function setViewerCloseGuard(guardFn) {
+    viewerCloseGuard = guardFn;
 }
 
 function editViewerCard() {
@@ -10886,6 +10897,7 @@ window.notebook = {
     showToast,
     openViewer,
     closeViewer,
+    setViewerCloseGuard,
     refreshOpenViewer,
 
     // Markdown rendering

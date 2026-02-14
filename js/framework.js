@@ -359,6 +359,18 @@ export function closeViewer() {
 }
 
 /**
+ * Set a guard function that runs before the viewer closes.
+ * The guard should return false to cancel the close, true to allow it.
+ * Cleared automatically when the viewer closes.
+ * @param {Function} guardFn - Guard function returning boolean
+ */
+export function setViewerCloseGuard(guardFn) {
+    if (window.notebook?.setViewerCloseGuard) {
+        window.notebook.setViewerCloseGuard(guardFn);
+    }
+}
+
+/**
  * Re-render the main UI.
  */
 export function render() {
