@@ -101,6 +101,10 @@ schema:
         acceptedAnswers:
           type: array
           description: Acceptable text answers for short_answer type (case-insensitive match)
+        exhaustive:
+          type: boolean
+          description: "If true, acceptedAnswers is the complete list — non-matches are marked incorrect (not pending_review)"
+          default: false
         # Audio fields (for spelling tests, dictation, aural exams)
         audio:
           type: text

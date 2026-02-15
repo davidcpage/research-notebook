@@ -22,6 +22,7 @@ const COMMANDS = {
     types: listTypes,
     schema: showSchema,
     create: createCard,
+    action: runAction,
     help: showHelp,
 };
 
@@ -58,6 +59,7 @@ Commands:
   nb types                        List available card types
   nb schema <type>                Show schema for a card type
   nb create <type> <title> [path] Create a new card
+  nb action <name> [args...]      Run a notebook action script
 
 Examples:
   nb types                        # List all card types
@@ -66,11 +68,13 @@ Examples:
   nb create note "My Note"        # Create note in current directory
   nb create note "My Note" research/  # Create note in research/ section
   nb create code "Analysis" analysis/data/  # Create in subdirectory
+  nb action update-stars          # Run the update-stars action
 
 Notes:
   - Card types are loaded from the notebook app's card-types/ directory
   - Custom types in .notebook/card-types/ are also included
   - The create command generates files with correct frontmatter format
+  - Actions are scripts in .notebook/actions/ (Python or Node.js)
 `);
 }
 
@@ -390,6 +394,73 @@ async function createCard(args) {
     // Output result
     const relativePath = join(targetPath, filename).replace(/^\.\//, '');
     console.log(JSON.stringify({ created: relativePath, id }));
+}
+
+// Run a notebook action script from .notebook/actions/
+async function runAction(args) {
+    if (args.length === 0) {
+        // List available actions
+        const actionsDir = join(process.cwd(), '.notebook', 'actions');
+        try {
+            const { readdir } = await import('node:fs/promises');
+            const entries = await readdir(actionsDir);
+            const scripts = entries.filter(f => f.endsWith('.py') || f.endsWith('.js'));
+            if (scripts.length === 0) {
+                console.log('No actions found in .notebook/actions/');
+                return;
+            }
+            console.log('Available actions:\n');
+            for (const script of scripts) {
+                const name = script.replace(/\.(py|js)$/, '');
+                console.log(`  ${name}`);
+            }
+            console.log('\nUsage: nb action <name> [args...]');
+        } catch {
+            console.error('No .notebook/actions/ directory found');
+            process.exit(1);
+        }
+        return;
+    }
+
+    const actionName = args[0];
+    const actionArgs = args.slice(1);
+    const actionsDir = join(process.cwd(), '.notebook', 'actions');
+
+    // Find the script file (try .py then .js)
+    let scriptPath;
+    let runner;
+    for (const [ext, cmd] of [['py', 'python3'], ['js', 'node']]) {
+        const candidate = join(actionsDir, `${actionName}.${ext}`);
+        try {
+            await access(candidate);
+            scriptPath = candidate;
+            runner = cmd;
+            break;
+        } catch {
+            // Try next extension
+        }
+    }
+
+    if (!scriptPath) {
+        console.error(`Action not found: ${actionName}`);
+        console.error('Run "nb action" to list available actions');
+        process.exit(1);
+    }
+
+    // Run the script
+    const { spawn } = await import('node:child_process');
+    const child = spawn(runner, [scriptPath, ...actionArgs], {
+        stdio: 'inherit',
+        cwd: process.cwd(),
+    });
+
+    const code = await new Promise((resolve) => {
+        child.on('close', resolve);
+    });
+
+    if (code !== 0) {
+        process.exit(code);
+    }
 }
 
 main().catch((err) => {

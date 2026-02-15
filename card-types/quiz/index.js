@@ -1596,6 +1596,10 @@ function gradeQuizAttempt(card, answers) {
                         result.autoGrade.status = 'correct';
                         result.autoGrade.score = maxPoints;
                         correctCount++;
+                    } else if (q.exhaustive) {
+                        // Exhaustive list - non-match is definitively incorrect
+                        result.autoGrade.status = 'incorrect';
+                        result.autoGrade.score = 0;
                     } else {
                         // Answer doesn't match - mark for teacher review (might still be correct)
                         result.autoGrade.status = 'pending_review';
