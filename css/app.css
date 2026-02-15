@@ -338,6 +338,17 @@ main {
     font-size: 0.8rem;
 }
 
+.github-branch-select {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+    max-width: 160px;
+}
+
 .btn-new-folder {
     opacity: 0.6;
     font-size: 0.75rem;

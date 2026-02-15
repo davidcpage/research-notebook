@@ -3767,11 +3767,15 @@ async function openEditor(templateName, sectionId, card = null) {
     if (templateName === 'settings') {
         if (storageBackend?.type === 'github') {
             const repoName = storageBackend.name;
+            const currentBranch = storageBackend.branch;
             actionsHtml += `
                 <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                     <span style="font-size: 12px; color: var(--text-muted);">
                         🐙 <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 3px;">${escapeHtml(repoName)}</code>
                     </span>
+                    <select class="github-branch-select" onchange="switchGitHubBranch(this.value)" onfocus="populateBranchSelect(this)" title="Switch branch">
+                        <option selected>${escapeHtml(currentBranch)}</option>
+                    </select>
                     <button class="btn btn-secondary btn-small" onclick="refreshGitHubNotebook()" title="Re-fetch from GitHub">🔄 Refresh</button>
                 </div>
             `;
@@ -6276,6 +6280,13 @@ class GitHubBackend {
         return `${this.owner}/${this.repo}`;
     }
 
+    // Fetch list of branches from GitHub API
+    async listBranches() {
+        const resp = await this._fetch(`${this._baseUrl}/branches?per_page=100`);
+        const branches = await resp.json();
+        return branches.map(b => b.name);
+    }
+
     // Cache key prefix scoped to this repo/branch
     get _cachePrefix() {
         return `${this.owner}/${this.repo}/${this.branch}:`;
@@ -6732,6 +6743,53 @@ async function refreshGitHubNotebook() {
     } catch (error) {
         console.error('[GitHub] Refresh error:', error);
         showToast('❌ Error refreshing: ' + error.message);
+    }
+}
+
+// Switch to a different branch on the current GitHub backend
+async function switchGitHubBranch(newBranch) {
+    if (!storageBackend || storageBackend.type !== 'github') return;
+    if (newBranch === storageBackend.branch) return;
+
+    try {
+        showToast(`Switching to branch ${newBranch}...`);
+
+        // Update backend branch and reload tree
+        storageBackend.branch = newBranch;
+        storageBackend._tree.clear();
+        storageBackend._shaCache.clear();
+        await storageBackend.loadTree();
+
+        // Update saved connection
+        saveGitHubConnection({
+            owner: storageBackend.owner,
+            repo: storageBackend.repo,
+            branch: newBranch,
+            token: storageBackend._token
+        });
+
+        // Reload notebook data
+        await reloadFromFilesystem(false);
+        showToast(`Switched to branch ${newBranch}`);
+    } catch (error) {
+        console.error('[GitHub] Branch switch error:', error);
+        showToast('❌ Error switching branch: ' + error.message);
+    }
+}
+
+// Populate branch select dropdown on first focus (lazy-loaded)
+async function populateBranchSelect(select) {
+    if (select.dataset.loaded) return;
+    try {
+        const branches = await storageBackend.listBranches();
+        const current = storageBackend.branch;
+        select.innerHTML = branches.map(b =>
+            `<option value="${escapeHtml(b)}"${b === current ? ' selected' : ''}>${escapeHtml(b)}</option>`
+        ).join('');
+        select.dataset.loaded = 'true';
+    } catch (error) {
+        console.error('[GitHub] Failed to fetch branches:', error);
+        showToast('❌ Failed to fetch branches');
     }
 }
 
