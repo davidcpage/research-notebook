@@ -4848,9 +4848,37 @@ function renderQuestionTypeFields(container, type, question) {
         const infoText = document.createElement('p');
         infoText.className = 'quiz-type-info';
         infoText.textContent = type === 'short_answer'
-            ? 'Short answer questions are graded using the model answer and rubric in the Advanced section.'
+            ? 'Short answer — auto-graded if accepted answers provided, otherwise uses model answer/rubric.'
             : 'Worked problems show work area for students. Grade using model answer and rubric in the Advanced section.';
         container.appendChild(infoText);
+
+        if (type === 'short_answer') {
+            // Accepted answers field
+            const acceptedField = document.createElement('div');
+            acceptedField.className = 'quiz-field';
+            acceptedField.innerHTML = `<label>Accepted Answers <span class="quiz-field-hint">(one per line, case-insensitive)</span></label>`;
+            const acceptedTextarea = document.createElement('textarea');
+            acceptedTextarea.className = 'quiz-accepted-answers';
+            acceptedTextarea.value = (question.acceptedAnswers || []).join('\n');
+            acceptedTextarea.rows = 3;
+            acceptedTextarea.placeholder = 'Enter accepted answers, one per line';
+            acceptedField.appendChild(acceptedTextarea);
+            container.appendChild(acceptedField);
+
+            // Exhaustive checkbox
+            const exhaustiveField = document.createElement('div');
+            exhaustiveField.className = 'quiz-field quiz-field-inline';
+            const exhaustiveLabel = document.createElement('label');
+            exhaustiveLabel.className = 'quiz-checkbox-label';
+            const exhaustiveCheckbox = document.createElement('input');
+            exhaustiveCheckbox.type = 'checkbox';
+            exhaustiveCheckbox.className = 'quiz-exhaustive';
+            exhaustiveCheckbox.checked = !!question.exhaustive;
+            exhaustiveLabel.appendChild(exhaustiveCheckbox);
+            exhaustiveLabel.appendChild(document.createTextNode(' Exhaustive — non-matches marked incorrect (not pending review)'));
+            exhaustiveField.appendChild(exhaustiveLabel);
+            container.appendChild(exhaustiveField);
+        }
 
     } else if (type === 'numeric') {
         // Numeric: answer + tolerance
@@ -5536,6 +5564,19 @@ function getQuestionsEditorValue() {
                     correctAnswers.push([rowIdx, colIdx]);
                 });
                 question.correctAnswers = correctAnswers;
+            }
+        }
+
+        // Get short_answer-specific fields
+        if (question.type === 'short_answer') {
+            const acceptedAnswers = questionEl.querySelector('.quiz-accepted-answers');
+            if (acceptedAnswers && acceptedAnswers.value.trim()) {
+                question.acceptedAnswers = acceptedAnswers.value.trim().split('\n').map(a => a.trim()).filter(Boolean);
+            }
+
+            const exhaustive = questionEl.querySelector('.quiz-exhaustive');
+            if (exhaustive && exhaustive.checked) {
+                question.exhaustive = true;
             }
         }
 
