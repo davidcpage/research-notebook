@@ -6752,10 +6752,9 @@ async function switchGitHubBranch(newBranch) {
     if (newBranch === storageBackend.branch) return;
 
     try {
-        showToast(`Switching to branch ${newBranch}...`);
-
-        // Close the editor so stale data isn't displayed over new content
+        // Close the editor and show loading overlay during branch switch
         closeEditor();
+        showLoadingIndicator(`Switching to branch ${newBranch}...`);
 
         // Update backend branch and reload tree
         storageBackend.branch = newBranch;
@@ -6781,8 +6780,10 @@ async function switchGitHubBranch(newBranch) {
             openEditor('settings', 'section-.notebook', settingsCard);
         }
 
+        hideLoadingIndicator();
         showToast(`Switched to branch ${newBranch}`);
     } catch (error) {
+        hideLoadingIndicator();
         console.error('[GitHub] Branch switch error:', error);
         showToast('❌ Error switching branch: ' + error.message);
     }
