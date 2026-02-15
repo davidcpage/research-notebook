@@ -6754,6 +6754,9 @@ async function switchGitHubBranch(newBranch) {
     try {
         showToast(`Switching to branch ${newBranch}...`);
 
+        // Close the editor so stale data isn't displayed over new content
+        closeEditor();
+
         // Update backend branch and reload tree
         storageBackend.branch = newBranch;
         storageBackend._tree.clear();
@@ -6770,6 +6773,14 @@ async function switchGitHubBranch(newBranch) {
 
         // Reload notebook data
         await reloadFromFilesystem(false);
+
+        // Re-open Settings editor so user can see the result
+        const settingsSection = data.sections.find(s => s.id === 'section-.notebook');
+        const settingsCard = settingsSection?.items.find(i => i.type === 'settings');
+        if (settingsCard) {
+            openEditor('settings', 'section-.notebook', settingsCard);
+        }
+
         showToast(`Switched to branch ${newBranch}`);
     } catch (error) {
         console.error('[GitHub] Branch switch error:', error);
