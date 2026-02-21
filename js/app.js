@@ -1996,6 +1996,9 @@ function renderCard(sectionId, card) {
         return '';
     }
 
+    // Apply any unsaved editor draft for rendering
+    card = applyDraftToCard(card, template);
+
     const preview = renderCardPreview(card, template);
     const title = renderCardTitle(card, template);
     const meta = renderCardMeta(card, template);
@@ -2313,18 +2316,21 @@ function openViewer(sectionId, itemId) {
         return;
     }
 
-    currentViewingCard = { ...card, sectionId };
+    // Apply any unsaved editor draft to a copy of the card for viewing
+    const viewCard = applyDraftToCard(card, template);
+
+    currentViewingCard = { ...viewCard, sectionId };
 
     // Set title
-    document.getElementById('viewerTitle').textContent = card.title || 'Untitled';
+    document.getElementById('viewerTitle').textContent = viewCard.title || 'Untitled';
 
     // Set tags
-    document.getElementById('viewerTags').innerHTML = renderTagBadges(card, '', true);
+    document.getElementById('viewerTags').innerHTML = renderTagBadges(viewCard, '', true);
 
     // Render content based on viewer layout, with author badge inside content area
     const contentEl = document.getElementById('viewerContent');
 
-    // In diff mode with changes, show diff content
+    // In diff mode with changes, show diff content (diffs use original saved card)
     if (diffMode.active && cardHasChanges(card)) {
         contentEl.innerHTML = '<div class="viewer-loading">Loading diff...</div>';
         // Load diff asynchronously
@@ -2376,11 +2382,11 @@ function openViewer(sectionId, itemId) {
                     `;
                 }
             } else {
-                contentEl.innerHTML = renderViewerContent(card, template) + renderAuthorBadge(card);
+                contentEl.innerHTML = renderViewerContent(viewCard, template) + renderAuthorBadge(viewCard);
             }
         });
     } else {
-        contentEl.innerHTML = renderViewerContent(card, template) + renderAuthorBadge(card);
+        contentEl.innerHTML = renderViewerContent(viewCard, template) + renderAuthorBadge(viewCard);
     }
 
     // Apply syntax highlighting if needed (for non-diff content)
@@ -2411,38 +2417,38 @@ function openViewer(sectionId, itemId) {
     }
 
     // Set meta info
-    const isSystemNote = card.system && card.type === 'note';
-    const isSourceCard = card.template === 'source' || card.type === 'source';
+    const isSystemNote = viewCard.system && viewCard.type === 'note';
+    const isSourceCard = viewCard.template === 'source' || viewCard.type === 'source';
     let metaText;
     if (isSourceCard) {
         // Show language and line count for source cards
         const parts = [];
-        if (card.language) parts.push(card.language);
-        if (card.lineCount) parts.push(`${card.lineCount} lines`);
-        if (card.modified) parts.push(`Modified ${formatDate(card.modified)}`);
+        if (viewCard.language) parts.push(viewCard.language);
+        if (viewCard.lineCount) parts.push(`${viewCard.lineCount} lines`);
+        if (viewCard.modified) parts.push(`Modified ${formatDate(viewCard.modified)}`);
         metaText = parts.join(' · ');
     } else if (isSystemNote) {
-        metaText = card.modified ? `Modified ${formatDate(card.modified)}` : '';
+        metaText = viewCard.modified ? `Modified ${formatDate(viewCard.modified)}` : '';
     } else {
-        metaText = formatDate(card.created || card.modified);
-        if (card.modified && card.created && card.modified !== card.created) {
-            metaText += ` · Updated ${formatDate(card.modified)}`;
+        metaText = formatDate(viewCard.created || viewCard.modified);
+        if (viewCard.modified && viewCard.created && viewCard.modified !== viewCard.created) {
+            metaText += ` · Updated ${formatDate(viewCard.modified)}`;
         }
     }
     document.getElementById('viewerMeta').textContent = metaText;
 
     // Configure action buttons based on template
     const actionsEl = document.getElementById('viewerActions');
-    actionsEl.innerHTML = renderViewerActions(card, template, isSystemNote);
+    actionsEl.innerHTML = renderViewerActions(viewCard, template, isSystemNote);
 
     // Set template attribute on modal for CSS styling
     const modal = document.getElementById('viewerModal');
     const modalInner = modal.querySelector('.modal');
     modalInner.setAttribute('data-template', template.name);
-    modalInner.setAttribute('data-topic', card.topic || '');
+    modalInner.setAttribute('data-topic', viewCard.topic || '');
 
     // Add modified indicator for templates that differ from defaults
-    const isModified = isTemplateModified(card);
+    const isModified = isTemplateModified(viewCard);
     modalInner.classList.toggle('template-modified', isModified);
 
     modal.classList.add('active');
@@ -3458,6 +3464,203 @@ async function runViewerCode() {
 // State for generic editor
 let editingCard = null;  // { templateName, sectionId, card, isNew }
 let editorManualThumbnail = null;  // For thumbnail field uploads
+let editorDraftKey = null;  // localStorage key for current editor draft
+
+// ---- Editor Draft Auto-Save ----
+// Saves editor field values to localStorage so accidental close/refresh doesn't lose work.
+// Drafts are cleared only on intentional save (not on close).
+
+// Build localStorage key for the current editor draft
+function getEditorDraftKey() {
+    if (!editingCard) return null;
+    const { card, templateName, sectionId, isNew } = editingCard;
+    return isNew ? `editor-draft-new-${templateName}-${sectionId}` : `editor-draft-${card.id}`;
+}
+
+// Collect current editor field values and save to localStorage
+function saveEditorDraft() {
+    if (!editingCard || !editorDraftKey) return;
+    const { templateName } = editingCard;
+    const template = templateRegistry[templateName];
+    if (!template) return;
+
+    try {
+        const draft = {};
+        const fields = template.editor?.fields || [];
+        for (const fieldConfig of fields) {
+            const fieldName = fieldConfig.field;
+            const fieldDef = template.schema[fieldConfig.field];
+            const type = fieldConfig.type || fieldDef?.type || 'text';
+
+            // For CodeMirror fields, store raw text (avoid YAML parse errors during draft)
+            if (codeMirrorInstances[fieldName]) {
+                draft[fieldName] = getCodeMirrorValue(fieldName);
+            } else if (type === 'thumbnail') {
+                // Skip thumbnails - binary data doesn't belong in localStorage
+                continue;
+            } else if (type === 'list' || type === 'records' || type === 'questions' || type === 'templates') {
+                // Complex field types - use getEditorFieldValue for structured data
+                draft[fieldName] = getEditorFieldValue(fieldName, fieldDef, fieldConfig);
+            } else {
+                const el = document.getElementById(`editor-${fieldName}`);
+                if (!el) continue;
+                if (type === 'boolean') {
+                    draft[fieldName] = el.checked;
+                } else {
+                    draft[fieldName] = el.value;
+                }
+            }
+        }
+
+        // Universal fields
+        const tagsInput = document.getElementById('editorTags');
+        if (tagsInput) draft._tags = tagsInput.value;
+        const numberInput = document.getElementById('editorNumber');
+        if (numberInput) draft._number = numberInput.value;
+
+        localStorage.setItem(editorDraftKey, JSON.stringify(draft));
+    } catch (e) {
+        // localStorage full or unavailable - silently ignore
+    }
+}
+
+// Restore draft values from localStorage, returns parsed object or null
+function loadEditorDraft(key) {
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch (e) {
+        return null;
+    }
+}
+
+// Remove draft from localStorage
+function clearEditorDraft(key) {
+    if (!key) return;
+    try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
+}
+
+// Overlay draft values onto a shallow copy of a card (for rendering card/viewer with unsaved edits)
+function applyDraftToCard(card, template) {
+    const draft = loadEditorDraft(`editor-draft-${card.id}`);
+    if (!draft) return card;
+
+    const merged = { ...card };
+    const fields = template.editor?.fields || [];
+    for (const fieldConfig of fields) {
+        const fieldName = fieldConfig.field;
+        if (draft[fieldName] === undefined) continue;
+        // Skip title - it derives from filename, showing a draft title outside the editor is confusing
+        if (fieldName === 'title') continue;
+        const fieldDef = template.schema?.[fieldName];
+        const type = fieldConfig.type || fieldDef?.type || 'text';
+        if (type === 'yaml' && typeof draft[fieldName] === 'string') {
+            try { merged[fieldName] = jsyaml.load(draft[fieldName]); } catch (e) { /* skip */ }
+        } else {
+            merged[fieldName] = draft[fieldName];
+        }
+    }
+    if (draft._tags !== undefined && draft._tags.trim()) {
+        merged.tags = draft._tags.split(',').map(t => t.trim()).filter(t => t);
+    }
+    return merged;
+}
+
+// Apply saved draft values to the editor form fields
+function applyDraftToEditor(draft, template) {
+    const fields = template.editor?.fields || [];
+    for (const fieldConfig of fields) {
+        const fieldName = fieldConfig.field;
+        if (draft[fieldName] === undefined) continue;
+        // Skip title - it derives from filename and should always show the saved value
+        if (fieldName === 'title') continue;
+        const fieldDef = template.schema[fieldConfig.field];
+        const type = fieldConfig.type || fieldDef?.type || 'text';
+
+        // CodeMirror fields - replace document content
+        if (codeMirrorInstances[fieldName]) {
+            const editor = codeMirrorInstances[fieldName];
+            const currentText = editor.state.doc.toString();
+            const draftText = String(draft[fieldName]);
+            if (currentText !== draftText) {
+                editor.dispatch({
+                    changes: { from: 0, to: editor.state.doc.length, insert: draftText }
+                });
+            }
+            continue;
+        }
+
+        const el = document.getElementById(`editor-${fieldName}`);
+        if (!el) continue;
+
+        if (type === 'boolean') {
+            el.checked = !!draft[fieldName];
+        } else if (type === 'thumbnail' || type === 'list' || type === 'records' || type === 'questions' || type === 'templates') {
+            // Skip complex types for now - the DOM structure is hard to reconstruct
+            continue;
+        } else {
+            el.value = draft[fieldName] ?? '';
+        }
+    }
+
+    // Universal fields
+    if (draft._tags !== undefined) {
+        const tagsInput = document.getElementById('editorTags');
+        if (tagsInput) tagsInput.value = draft._tags;
+    }
+    if (draft._number !== undefined) {
+        const numberInput = document.getElementById('editorNumber');
+        if (numberInput) numberInput.value = draft._number;
+    }
+}
+
+// Attach input/change listeners to editor fields to auto-save drafts
+function attachEditorDraftAutoSave(template) {
+    const bodyEl = document.getElementById('editorBody');
+    if (!bodyEl) return;
+
+    const debouncedSave = debounce(() => saveEditorDraft(), 1000);
+
+    const fields = template.editor?.fields || [];
+    for (const fieldConfig of fields) {
+        const fieldDef = template.schema[fieldConfig.field];
+        const type = fieldConfig.type || fieldDef?.type || 'text';
+        const el = document.getElementById(`editor-${fieldConfig.field}`);
+
+        if (type === 'boolean') {
+            if (el) el.addEventListener('change', debouncedSave);
+        } else if (type === 'records') {
+            if (el) {
+                el.addEventListener('records-reorder', debouncedSave);
+                el.addEventListener('records-toggle', debouncedSave);
+                el.addEventListener('records-add', debouncedSave);
+                el.addEventListener('input', debouncedSave);
+            }
+        } else if (type === 'list') {
+            if (el) {
+                el.addEventListener('list-reorder', debouncedSave);
+                el.addEventListener('list-delete', debouncedSave);
+                el.addEventListener('input', debouncedSave);
+            }
+        } else if (type === 'thumbnail') {
+            // Skip thumbnails
+        } else if (!codeMirrorInstances[fieldConfig.field]) {
+            // Regular text/textarea inputs
+            if (el) el.addEventListener('input', debouncedSave);
+        }
+        // CodeMirror fields use onChange callback (see createCodeMirrorEditor)
+    }
+
+    // Universal fields
+    const tagsInput = document.getElementById('editorTags');
+    if (tagsInput) tagsInput.addEventListener('input', debouncedSave);
+    const numberInput = document.getElementById('editorNumber');
+    if (numberInput) numberInput.addEventListener('input', debouncedSave);
+}
+
+// Callback invoked on any CodeMirror document change (set by draft auto-save)
+let codeMirrorOnChange = null;
 
 // CodeMirror editor instances (field name -> EditorView)
 let codeMirrorInstances = {};
@@ -3596,6 +3799,14 @@ async function createCodeMirrorEditor(container, options = {}) {
         extensions.push(cm.oneDark);
     }
 
+    // Add change listener for draft auto-save (uses module-level callback)
+    if (codeMirrorOnChange) {
+        const cb = codeMirrorOnChange;
+        extensions.push(cm.EditorView.updateListener.of(update => {
+            if (update.docChanged) cb();
+        }));
+    }
+
     // Create editor
     const editor = new cm.EditorView({
         doc: value,
@@ -3641,6 +3852,10 @@ async function openEditor(templateName, sectionId, card = null) {
         isNew
     };
     editorManualThumbnail = null;
+
+    // Set up draft auto-save for non-settings templates
+    editorDraftKey = (templateName !== 'settings') ? getEditorDraftKey() : null;
+    codeMirrorOnChange = editorDraftKey ? debounce(() => saveEditorDraft(), 1000) : null;
 
     // Set modal data-template for CSS
     const modal = document.querySelector('#editorModal .modal');
@@ -3822,6 +4037,17 @@ async function openEditor(templateName, sectionId, card = null) {
     // Settings auto-apply: attach listeners so changes take effect immediately
     if (templateName === 'settings') {
         attachSettingsAutoApply(template);
+    }
+
+    // Editor draft auto-save: restore any saved draft and attach listeners
+    if (editorDraftKey) {
+        const draft = loadEditorDraft(editorDraftKey);
+        if (draft) {
+            // Defer to allow async CodeMirror instances to initialize
+            setTimeout(() => applyDraftToEditor(draft, template), 200);
+        }
+        // Attach listeners (also deferred so CM instances exist)
+        setTimeout(() => attachEditorDraftAutoSave(template), 250);
     }
 }
 
@@ -5888,6 +6114,11 @@ function closeEditor() {
     document.getElementById('editorCodeOutput').innerHTML = '';
     editingCard = null;
     editorManualThumbnail = null;
+    editorDraftKey = null;
+    codeMirrorOnChange = null;
+
+    // Re-render so card previews reflect any draft changes
+    render();
 }
 
 // Save the editor content
@@ -6020,8 +6251,10 @@ async function saveEditor() {
         await saveData();
         await saveCardFile(sectionId, cardData);
 
+        // Clear draft on successful save (data is now persisted)
+        clearEditorDraft(editorDraftKey);
+
         closeEditor();
-        render();
         if (templateName === 'settings') {
             showToast('Settings saved to disk');
         } else {
@@ -10396,6 +10629,7 @@ async function deleteItem(sectionId, itemId) {
     const section = data.sections.find(s => s.id === sectionId);
     if (!section) return;
     const item = section.items.find(i => i.id === itemId);
+    clearEditorDraft(`editor-draft-${itemId}`);
     section.items = section.items.filter(i => i.id !== itemId);
     await saveData();
     if (item) await deleteItemFile(sectionId, item);  // Delete specific file
