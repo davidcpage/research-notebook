@@ -3691,27 +3691,27 @@ async function loadCodeMirror() {
             import('@codemirror/language'),
             import('@lezer/highlight')
         ]);
-        // Create custom markdown highlight style with warm, readable colors
+        // Custom markdown highlight style: warm, subdued colors for focused writing
         const t = lezerHighlight.tags;
         const markdownHighlightStyle = cmLanguage.HighlightStyle.define([
-            { tag: t.heading1, color: '#8b4513', fontSize: '1.4em', fontWeight: 'bold' },
-            { tag: t.heading2, color: '#8b4513', fontSize: '1.25em', fontWeight: 'bold' },
-            { tag: t.heading3, color: '#8b4513', fontSize: '1.1em', fontWeight: 'bold' },
-            { tag: t.heading4, color: '#8b4513', fontWeight: 'bold' },
-            { tag: t.heading5, color: '#8b4513', fontWeight: 'bold' },
-            { tag: t.heading6, color: '#8b4513', fontWeight: 'bold' },
-            { tag: t.heading, color: '#8b4513', fontWeight: 'bold' },
-            { tag: t.strong, fontWeight: 'bold', color: '#2d3748' },
-            { tag: t.emphasis, fontStyle: 'italic', color: '#4a5568' },
-            { tag: t.strikethrough, textDecoration: 'line-through', color: '#718096' },
+            { tag: t.heading1, color: '#7a4520', fontSize: '1.2em', fontWeight: 'bold' },
+            { tag: t.heading2, color: '#7a4520', fontSize: '1.1em', fontWeight: 'bold' },
+            { tag: t.heading3, color: '#7a4520', fontSize: '1.05em', fontWeight: 'bold' },
+            { tag: t.heading4, color: '#7a4520', fontWeight: 'bold' },
+            { tag: t.heading5, color: '#7a4520', fontWeight: 'bold' },
+            { tag: t.heading6, color: '#7a4520', fontWeight: 'bold' },
+            { tag: t.heading, color: '#7a4520', fontWeight: 'bold' },
+            { tag: t.strong, fontWeight: 'bold', color: '#2c2724' },
+            { tag: t.emphasis, fontStyle: 'italic', color: '#4a4238' },
+            { tag: t.strikethrough, textDecoration: 'line-through', color: '#888178' },
             { tag: t.link, color: '#2b6cb0', textDecoration: 'underline' },
             { tag: t.url, color: '#3182ce' },
-            { tag: t.monospace, color: '#c53030', backgroundColor: '#fef2f2', fontFamily: 'monospace' },
-            { tag: t.quote, color: '#6b7280', fontStyle: 'italic', borderLeft: '3px solid #d1d5db' },
-            { tag: t.list, color: '#7c3aed' },
-            { tag: t.contentSeparator, color: '#9ca3af' },
-            { tag: t.processingInstruction, color: '#9ca3af' },  // For markdown markers like #, *, etc.
-            { tag: t.meta, color: '#9ca3af' }  // For frontmatter, etc.
+            { tag: t.monospace, color: '#a0724e', backgroundColor: '#f5ede5', fontFamily: 'monospace' },
+            { tag: t.quote, color: '#8a7f74', fontStyle: 'italic' },
+            { tag: t.list, color: '#7a4520' },
+            { tag: t.contentSeparator, color: '#c8c0b8' },
+            { tag: t.processingInstruction, color: '#b8b0a8' },  // Markdown markers (#, *, etc.) - visible but recessive
+            { tag: t.meta, color: '#b8b0a8' }  // Frontmatter, etc.
         ]);
 
         codeMirrorModules = {
@@ -3770,7 +3770,9 @@ async function createCodeMirrorEditor(container, options = {}) {
 
     // Add theme: custom light theme for markdown, One Dark for code
     if (isMarkdown) {
-        // Light theme with custom markdown syntax highlighting
+        // Soft-wrap long lines for prose editing
+        extensions.push(cm.EditorView.lineWrapping);
+        // Light theme for focused markdown writing
         extensions.push(cm.EditorView.theme({
             '&': {
                 backgroundColor: '#faf8f5',
@@ -3779,17 +3781,19 @@ async function createCodeMirrorEditor(container, options = {}) {
             '.cm-content': {
                 caretColor: '#4a4542',
                 fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace',
-                fontSize: '14px',
-                lineHeight: '1.6'
+                fontSize: '13.5px',
+                lineHeight: '1.7',
+                padding: '0.5rem 1rem'
             },
             '.cm-cursor': {
-                borderLeftColor: '#4a4542'
+                borderLeftColor: '#4a4542',
+                borderLeftWidth: '1.5px'
             },
             '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
                 backgroundColor: '#d7d4cf'
             },
             '.cm-activeLine': {
-                backgroundColor: '#f0ebe0'
+                backgroundColor: 'rgba(0, 0, 0, 0.025)'
             }
         }, { dark: false }));
         extensions.push(cm.syntaxHighlighting(cm.markdownHighlightStyle));
@@ -3864,7 +3868,8 @@ async function openEditor(templateName, sectionId, card = null) {
 
     // Set title
     const buttonLabel = template.ui?.button_label || templateName;
-    document.getElementById('editorTitle').textContent = isNew ? `New ${buttonLabel}` : `Edit ${buttonLabel}`;
+    const editorTitleEl = document.getElementById('editorTitle');
+    editorTitleEl.textContent = isNew ? `New ${buttonLabel}` : `Edit ${buttonLabel}`;
 
     // Build form body
     const bodyEl = document.getElementById('editorBody');
@@ -3889,13 +3894,7 @@ async function openEditor(templateName, sectionId, card = null) {
     // Store computed path for saveEditorCard
     editingCard.locationPath = locationPath;
 
-    const locationGroup = document.createElement('div');
-    locationGroup.className = 'form-group';
-    locationGroup.innerHTML = `
-        <label>Location</label>
-        <input type="text" value="${escapeHtml(locationPath)}" disabled class="location-readonly" title="File location (use terminal to move files)">
-    `;
-    bodyEl.appendChild(locationGroup);
+    // Location path will be added to footer after action buttons are rendered
 
     // Render each field from template.editor.fields
     const fields = template.editor?.fields || [];
@@ -4010,6 +4009,15 @@ async function openEditor(templateName, sectionId, card = null) {
 
     actionsEl.innerHTML = actionsHtml;
 
+    // Show location path in footer (after action buttons so it's not overwritten)
+    if (!['settings', 'template'].includes(templateName)) {
+        const locationSpan = document.createElement('span');
+        locationSpan.className = 'editor-location';
+        locationSpan.title = 'File location';
+        locationSpan.textContent = locationPath;
+        actionsEl.prepend(locationSpan);
+    }
+
     // Update Pyodide status if this is a code template
     if (templateName === 'code') {
         updateEditorPyodideStatus();
@@ -4064,7 +4072,7 @@ function renderEditorField(fieldConfig, fieldDef, value) {
 
     const labelEl = document.createElement('label');
     labelEl.setAttribute('for', `editor-${field}`);
-    labelEl.textContent = label + (required ? ' *' : '');
+    labelEl.textContent = label;
     div.appendChild(labelEl);
 
     let inputEl;

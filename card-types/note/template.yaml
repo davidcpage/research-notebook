@@ -24,13 +24,13 @@ editor:
   fields:
     - field: title
       label: Title
-    - field: author
-      label: Author
     - field: content
       label: Content
       multiline: true
       rows: 20
       preview: true
+    - field: author
+      label: Author
 style:
   variables:
     --preview-bg: "#f0ebe0"
