@@ -6133,6 +6133,16 @@ function closeEditor() {
 async function saveEditor() {
     if (!editingCard) return;
 
+    // Re-verify filesystem permission early, while still in user gesture context
+    // (async operations like Pyodide/thumbnails later can break the gesture chain)
+    if (storageBackend?.type === 'filesystem' && storageBackend._root) {
+        const hasPermission = await verifyDirPermission(storageBackend._root);
+        if (!hasPermission) {
+            showToast('Filesystem permission lost. Your edits are preserved — please re-grant folder access and try saving again.');
+            return;
+        }
+    }
+
     // Check if we're in remote/read-only mode - prompt to save to folder first
     if (isRemoteMode()) {
         const shouldSave = await promptSaveToFolder();
@@ -9590,9 +9600,11 @@ async function createSection() {
         return;
     }
 
+    const dirName = slugify(name);
     const section = {
-        id: Date.now().toString(),
+        id: 'section-' + dirName,
         name: name,
+        _dirName: dirName,
         items: []
     };
     data.sections.push(section);
@@ -10623,11 +10635,11 @@ async function deleteSection(sectionId) {
 
     if (!confirm('Delete this section?')) return;
     const section = data.sections.find(s => s.id === sectionId);
-    const sectionName = section?.name;
+    const dirName = section?._dirName;
     data.sections = data.sections.filter(s => s.id !== sectionId);
     await saveData();
     await saveNotebookMeta();  // Update settings.yaml
-    if (sectionName) await deleteSectionDir(sectionName);  // Delete section directory
+    if (dirName) await deleteSectionDir(dirName);  // Delete section directory
     render();
     showToast('Section deleted');
 }
