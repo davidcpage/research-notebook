@@ -2452,6 +2452,7 @@ function openViewer(sectionId, itemId) {
     modalInner.classList.toggle('template-modified', isModified);
 
     modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
 }
 
 // Refresh the viewer if it's open (called after filesystem reload)
@@ -2753,6 +2754,7 @@ function closeViewer() {
     document.getElementById('viewerModal').classList.remove('active');
     currentViewingCard = null;
     viewerCloseGuard = null;
+    document.body.style.overflow = '';
 }
 
 // Set a guard function that runs before viewer closes (return false to cancel)
@@ -3704,8 +3706,8 @@ async function loadCodeMirror() {
             { tag: t.strong, fontWeight: 'bold', color: '#2c2724' },
             { tag: t.emphasis, fontStyle: 'italic', color: '#4a4238' },
             { tag: t.strikethrough, textDecoration: 'line-through', color: '#888178' },
-            { tag: t.link, color: '#2b6cb0', textDecoration: 'underline' },
-            { tag: t.url, color: '#3182ce' },
+            { tag: t.link, color: '#6251b5', textDecoration: 'underline' },
+            { tag: t.url, color: '#6251b5' },
             { tag: t.monospace, color: '#a0724e', backgroundColor: '#f5ede5', fontFamily: 'monospace' },
             { tag: t.quote, color: '#8a7f74', fontStyle: 'italic' },
             { tag: t.list, color: '#7a4520' },
@@ -4032,6 +4034,7 @@ async function openEditor(templateName, sectionId, card = null) {
 
     // Show modal
     document.getElementById('editorModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
 
     // Focus first input
     const firstInput = bodyEl.querySelector('input, textarea');
@@ -6116,6 +6119,7 @@ function closeEditor() {
     destroyCodeMirrorInstances();
 
     document.getElementById('editorModal').classList.remove('active');
+    document.body.style.overflow = '';
     document.getElementById('editorBody').innerHTML = '';
     document.getElementById('editorActions').innerHTML = '';
     document.getElementById('editorOutput').style.display = 'none';
