@@ -8616,32 +8616,50 @@ async function deleteItemFile(sectionId, item) {
         const section = data.sections.find(s => s.id === sectionId);
         if (!section) return;
 
-        const sectionPath = getSectionPath(section);
+        let sectionPath = getSectionPath(section);
         if (!sectionPath) return;
 
-        // Support both legacy type field and new template field (Phase 3)
-        const itemType = item.template || item.type;
+        // Handle subdirectory if specified
+        const subdir = getSubdirFromPath(item._path);
+        if (subdir) {
+            sectionPath = `${sectionPath}/${subdir}`;
+        }
 
-        // Use stored _filename if available (from filesystem load), otherwise derive from title
-        if (itemType === 'note') {
-            const filename = item._filename || `${slugify(item.title)}.md`;
-            await storageBackend.deleteEntry(`${sectionPath}/${filename}`);
-            recordSave(`${sectionPath}/${filename}`);
-        } else if (itemType === 'code') {
-            const baseFilename = item._filename || slugify(item.title);
-            const filename = `${baseFilename}.code.py`;
-            await storageBackend.deleteEntry(`${sectionPath}/${filename}`);
-            recordSave(`${sectionPath}/${filename}`);
-            try {
-                const outputFilename = `${baseFilename}.output.html`;
-                await storageBackend.deleteEntry(`${sectionPath}/${outputFilename}`);
-                recordSave(`${sectionPath}/${outputFilename}`);
-            } catch (e) { /* output might not exist */ }
-        } else if (itemType === 'bookmark') {
-            const baseFilename = item._filename || slugify(item.title);
-            const filename = `${baseFilename}.bookmark.json`;
-            await storageBackend.deleteEntry(`${sectionPath}/${filename}`);
-            recordSave(`${sectionPath}/${filename}`);
+        // Use serializeCard to determine the file extension (same logic as saveCardFile)
+        const { extension } = serializeCard(item);
+
+        // Derive filename: preserve original if loaded from filesystem, otherwise from title
+        let baseFilename;
+        if (item._source?.filename) {
+            const origFilename = item._source.filename;
+            if (origFilename.endsWith(extension)) {
+                baseFilename = origFilename.slice(0, -extension.length);
+            } else {
+                baseFilename = origFilename.replace(/\.(md|code\.py|bookmark\.json|card\.yaml|paper\.md)$/, '');
+            }
+        } else if (item._filename) {
+            // Legacy: _filename without _source
+            baseFilename = item._filename.endsWith(extension)
+                ? item._filename.slice(0, -extension.length)
+                : item._filename;
+        } else {
+            baseFilename = slugify(item.title);
+        }
+
+        const filename = `${baseFilename}${extension}`;
+        await storageBackend.deleteEntry(`${sectionPath}/${filename}`);
+        recordSave(`${sectionPath}/${filename}`);
+
+        // Delete companion files (e.g., .output.html for code cards)
+        const extConfig = extensionRegistry?.[extension];
+        if (extConfig?.companionFiles) {
+            for (const companion of extConfig.companionFiles) {
+                try {
+                    const companionFilename = `${baseFilename}${companion.suffix}`;
+                    await storageBackend.deleteEntry(`${sectionPath}/${companionFilename}`);
+                    recordSave(`${sectionPath}/${companionFilename}`);
+                } catch (e) { /* companion might not exist */ }
+            }
         }
     } catch (e) {
         console.error('[Filesystem] Error deleting item file:', e);
