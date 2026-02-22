@@ -1,7 +1,7 @@
 // Paper card type - custom render and arxiv metadata fetching
 import { escapeHtml, renderMarkdown } from '/js/framework.js';
 
-// Render card preview: mini paper abstract or placeholder
+// Render card preview: miniature arxiv abstract page
 export function renderPreview(card, template) {
     const hasMetadata = card.title || (Array.isArray(card.authors) && card.authors.length > 0) || card.abstract;
     if (!hasMetadata) {
@@ -10,44 +10,36 @@ export function renderPreview(card, template) {
 
     const authors = Array.isArray(card.authors) ? card.authors : [];
     const authorsStr = authors.length > 0 ? escapeHtml(authors.join(', ')) : '';
-    const yearStr = card.year ? escapeHtml(String(card.year)) : '';
-    const metaParts = [authorsStr, yearStr].filter(Boolean).join(' · ');
+    const yearStr = card.year ? `[${escapeHtml(String(card.year))}]` : '';
 
-    return `<div class="preview-page paper-preview"><div class="preview-scaler">
-        <div class="paper-preview-title">${escapeHtml(card.title || '')}</div>
-        ${metaParts ? `<div class="paper-preview-meta">${metaParts}</div>` : ''}
-        ${card.abstract ? `<div class="paper-preview-separator"></div><div class="paper-preview-abstract">${escapeHtml(card.abstract)}</div>` : ''}
+    return `<div class="preview-page paper-preview"><div class="paper-arxiv-banner"></div><div class="preview-scaler">
+        <div class="paper-arxiv-title">${escapeHtml(card.title || '')}</div>
+        ${authorsStr ? `<div class="paper-arxiv-authors">${authorsStr}</div>` : ''}
+        ${card.abstract ? `<div class="paper-arxiv-abstract-box"><div class="paper-arxiv-abstract">${escapeHtml(card.abstract)}</div></div>` : ''}
     </div></div>`;
 }
 
-// Render viewer: URL, authors/year meta row, abstract section, then full markdown notes
+// Render viewer: arxiv-style layout matching card preview, plus notes
 export function renderViewer(card, template) {
-    const urlHtml = card.url
-        ? `<div class="viewer-url"><a href="${escapeHtml(card.url)}" target="_blank" rel="noopener">${escapeHtml(card.url)}</a></div>`
-        : '';
-
     const authors = Array.isArray(card.authors) ? card.authors : [];
-    const hasAuthors = authors.length > 0;
-    const hasYear = card.year;
-    const metaHtml = (hasAuthors || hasYear)
-        ? `<div class="paper-viewer-meta">
-            ${hasAuthors ? `<span class="paper-authors">${escapeHtml(authors.join(', '))}</span>` : ''}
-            ${hasYear ? `<span class="paper-year">${escapeHtml(String(card.year))}</span>` : ''}
-           </div>`
+    const authorsStr = authors.length > 0 ? escapeHtml(authors.join(', ')) : '';
+
+    const urlHtml = card.url
+        ? `<div class="paper-viewer-url"><a href="${escapeHtml(card.url)}" target="_blank" rel="noopener">${escapeHtml(card.url)}</a></div>`
         : '';
 
     const abstractHtml = card.abstract
-        ? `<div class="paper-viewer-abstract"><h3>Abstract</h3><div class="md-content viewer-markdown">${renderMarkdown(card.abstract)}</div></div>`
+        ? `<div class="paper-arxiv-abstract-box"><div class="paper-arxiv-abstract md-content viewer-markdown">${renderMarkdown(card.abstract)}</div></div>`
         : '';
 
     const contentHtml = card.content
-        ? `<div class="paper-viewer-notes"><h3>Notes</h3><div class="md-content viewer-markdown">${renderMarkdown(card.content)}</div></div>`
+        ? `<div class="paper-viewer-notes"><div class="paper-viewer-section-label">Notes</div><div class="md-content viewer-markdown">${renderMarkdown(card.content)}</div></div>`
         : '';
 
     return `
         <div class="paper-viewer">
+            ${authorsStr ? `<div class="paper-arxiv-authors">${authorsStr}</div>` : ''}
             ${urlHtml}
-            ${metaHtml}
             ${abstractHtml}
             ${contentHtml}
         </div>

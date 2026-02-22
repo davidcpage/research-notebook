@@ -2308,6 +2308,19 @@ function renderCardMeta(card, template) {
         return meta || `<span>${formatDate(created)}</span>`;
     }
 
+    // For paper cards, show authors · year instead of card dates
+    if (card.template === 'paper' || card.type === 'paper') {
+        const authors = Array.isArray(card.authors) ? card.authors : [];
+        if (authors.length > 0) {
+            const authorStr = authors.length <= 2 ? authors.join(', ') : `${authors[0]} et al.`;
+            meta += `<span>${escapeHtml(authorStr)}</span>`;
+        }
+        if (card.year) {
+            meta += `<span>${escapeHtml(String(card.year))}</span>`;
+        }
+        return meta || `<span>${formatDate(created)}</span>`;
+    }
+
     // For source cards, show language and line count
     if (card.template === 'source' || card.type === 'source') {
         if (card.language) {

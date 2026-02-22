@@ -1,4 +1,4 @@
-/* Paper card type - academic purple-tinted palette */
+/* Paper card type - arxiv-inspired palette */
 .card[data-template="paper"],
 .modal.viewer[data-template="paper"] {
     --template-border: #b8a9c9;
@@ -9,97 +9,154 @@
     --template-heading-font: 'Playfair Display', serif;
 }
 
-/* Paper card preview - mini abstract */
+/* ── Card preview ── */
 .card[data-template="paper"] .card-preview {
-    background: linear-gradient(135deg, var(--bg-primary) 0%, var(--border) 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    border-bottom: 1px solid #ddd;
+}
+
+/* Compact footer - title is already prominent in preview */
+.card[data-template="paper"] .card-content {
+    padding: 0.6rem 1rem;
+}
+
+.card[data-template="paper"] .card-title {
+    font-size: 0.85rem;
+    line-height: 1.3;
+}
+
+.card[data-template="paper"] .card-meta {
+    padding: 0 1rem 0.5rem;
 }
 
 .paper-preview {
-    background: #f3eff7;
+    background: #fff;
 }
 
-.paper-preview-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.1rem;
+/* Fade-out at bottom matching white page */
+.card[data-template="paper"] .preview-page::after {
+    background: linear-gradient(transparent, #fff);
+}
+
+/* Push scaler content below the banner (banner is 18px but scaler is 0.45x, so need ~52px) */
+.paper-preview .preview-scaler {
+    padding-top: 52px;
+}
+
+/* ── Shared arxiv-style elements (card + viewer) ── */
+
+/* Red banner + grey toolbar */
+.paper-arxiv-banner {
+    height: 18px;
+    background: linear-gradient(to bottom,
+        #a12b2b 0%, #a12b2b 38%,
+        #f4f4f4 38%, #f4f4f4 95%,
+        #ccc 95%, #ccc 100%);
+}
+
+/* In card preview: position at top */
+.paper-preview .paper-arxiv-banner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
+}
+
+.paper-arxiv-title {
+    font-size: 1.25rem;
     font-weight: 700;
     line-height: 1.3;
-    color: var(--text-primary);
-    margin-bottom: 6px;
+    color: #000;
+    margin-bottom: 8px;
 }
 
-.paper-preview-meta {
-    font-size: 0.85rem;
-    font-style: italic;
-    color: #7c6a8a;
+.paper-arxiv-authors {
+    font-size: 0.9rem;
+    color: #2256a0;
     line-height: 1.4;
-    margin-bottom: 6px;
+    margin-bottom: 12px;
 }
 
-.paper-preview-separator {
-    border-top: 1px solid #b8a9c9;
-    margin: 6px 0;
-    opacity: 0.5;
+/* Indented abstract block */
+.paper-arxiv-abstract-box {
+    margin: 8px 0 0 12px;
+    padding: 8px 12px;
 }
 
-.paper-preview-abstract {
+.paper-arxiv-abstract {
     font-size: 0.85rem;
     line-height: 1.5;
-    color: var(--text-secondary);
+    color: #333;
 }
 
-/* Override fade-out gradient color to match paper background */
-.card[data-template="paper"] .preview-page::after {
-    background: linear-gradient(transparent, #f3eff7);
-}
-
-/* Paper viewer */
+/* ── Viewer ── */
 .modal.viewer[data-template="paper"] {
-    background: var(--bg-secondary);
+    background: #fff;
 }
 
-/* Paper viewer metadata row */
-.paper-viewer-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 16px;
-    padding: 8px 0;
-    font-size: 14px;
-    color: var(--text-secondary);
-    border-bottom: 1px solid var(--border);
+/* Viewer banner: pseudo-element on modal, first flex child above header */
+.modal.viewer[data-template="paper"]::before {
+    content: '';
+    display: block;
+    flex-shrink: 0;
+    height: 40px;
+    background: linear-gradient(to bottom,
+        #a12b2b 0%, #a12b2b 38%,
+        #f4f4f4 38%, #f4f4f4 92%,
+        #ccc 92%, #ccc 100%);
+    order: -1;
+}
+
+/* Viewer uses larger text */
+.paper-viewer .paper-arxiv-authors {
+    font-size: 1rem;
+    margin-bottom: 8px;
+}
+
+.paper-viewer .paper-arxiv-abstract-box {
+    margin: 16px 0 0 16px;
+    padding: 10px 16px;
+}
+
+.paper-viewer .paper-arxiv-abstract {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    text-align: justify;
+    hyphens: auto;
+}
+
+.paper-viewer-url {
+    font-size: 13px;
     margin-bottom: 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.paper-viewer-meta .paper-authors {
-    font-style: italic;
+.paper-viewer-url a {
+    color: #2256a0;
+    text-decoration: none;
 }
 
-.paper-viewer-meta .paper-year {
-    color: var(--text-muted);
+.paper-viewer-url a:hover {
+    text-decoration: underline;
 }
 
-/* Paper viewer abstract section */
-.paper-viewer-abstract {
-    margin-bottom: 24px;
-}
-
-.paper-viewer-abstract h3 {
+/* Notes section label */
+.paper-viewer-section-label {
     font-family: 'Playfair Display', serif;
-    font-size: 1rem;
+    font-size: 0.85rem;
     font-weight: 600;
-    color: var(--text-secondary);
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     margin: 0 0 8px 0;
 }
 
-/* Paper viewer notes section */
-.paper-viewer-notes h3 {
-    font-family: 'Playfair Display', serif;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    margin: 0 0 8px 0;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
+/* Notes section - visually distinct from paper content, symmetric padding */
+.paper-viewer-notes {
+    margin: 24px -32px -24px -32px;
+    padding: 20px 32px 24px 32px;
+    background: #f5f3ee;
+    border-top: 2px solid #e0dbd2;
 }
