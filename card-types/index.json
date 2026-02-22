@@ -3,6 +3,7 @@
   "modules": [
     "note",
     "bookmark",
+    "paper",
     "image",
     "code",
     "source",

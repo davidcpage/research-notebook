@@ -1,0 +1,105 @@
+/* Paper card type - academic purple-tinted palette */
+.card[data-template="paper"],
+.modal.viewer[data-template="paper"] {
+    --template-border: #b8a9c9;
+    --template-bg: #f3eff7;
+    --template-preview-bg: linear-gradient(135deg, #f3eff7 0%, #e4dced 100%);
+    --template-title-text: var(--text-primary);
+    --template-meta-text: #7c6a8a;
+    --template-heading-font: 'Playfair Display', serif;
+}
+
+/* Paper card preview - mini abstract */
+.card[data-template="paper"] .card-preview {
+    background: linear-gradient(135deg, var(--bg-primary) 0%, var(--border) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.paper-preview {
+    background: #f3eff7;
+}
+
+.paper-preview-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.paper-preview-meta {
+    font-size: 0.85rem;
+    font-style: italic;
+    color: #7c6a8a;
+    line-height: 1.4;
+    margin-bottom: 6px;
+}
+
+.paper-preview-separator {
+    border-top: 1px solid #b8a9c9;
+    margin: 6px 0;
+    opacity: 0.5;
+}
+
+.paper-preview-abstract {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+/* Override fade-out gradient color to match paper background */
+.card[data-template="paper"] .preview-page::after {
+    background: linear-gradient(transparent, #f3eff7);
+}
+
+/* Paper viewer */
+.modal.viewer[data-template="paper"] {
+    background: var(--bg-secondary);
+}
+
+/* Paper viewer metadata row */
+.paper-viewer-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 8px 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+}
+
+.paper-viewer-meta .paper-authors {
+    font-style: italic;
+}
+
+.paper-viewer-meta .paper-year {
+    color: var(--text-muted);
+}
+
+/* Paper viewer abstract section */
+.paper-viewer-abstract {
+    margin-bottom: 24px;
+}
+
+.paper-viewer-abstract h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 8px 0;
+}
+
+/* Paper viewer notes section */
+.paper-viewer-notes h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 8px 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}

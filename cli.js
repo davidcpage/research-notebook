@@ -267,9 +267,47 @@ async function gitShow(notebookPath, filePath, commit) {
     }
 }
 
+// Proxy fetch for external APIs that don't support CORS (e.g., arxiv)
+async function proxyFetch(targetUrl) {
+    const { default: https } = await import('node:https');
+    const { default: http } = await import('node:http');
+
+    return new Promise((resolve, reject) => {
+        const mod = targetUrl.startsWith('https') ? https : http;
+        const req = mod.get(targetUrl, { timeout: 10000 }, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => resolve({ status: res.statusCode, data }));
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    });
+}
+
 // Handle API requests
 async function handleApiRequest(req, res, url, notebookPath) {
     res.setHeader('Content-Type', 'application/json');
+
+    // Arxiv proxy - doesn't require notebookPath
+    if (url.pathname === '/api/arxiv') {
+        const id = url.searchParams.get('id');
+        if (!id || !/^\d{4}\.\d{4,5}(v\d+)?$/.test(id)) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'invalid_id', message: 'Valid arxiv ID required (e.g., 2401.12345)' }));
+            return true;
+        }
+
+        try {
+            const result = await proxyFetch(`https://export.arxiv.org/api/query?id_list=${id}`);
+            res.setHeader('Content-Type', 'application/xml');
+            res.writeHead(result.status);
+            res.end(result.data);
+        } catch (err) {
+            res.writeHead(502);
+            res.end(JSON.stringify({ error: 'proxy_error', message: err.message }));
+        }
+        return true;
+    }
 
     if (!notebookPath) {
         res.writeHead(503);

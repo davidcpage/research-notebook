@@ -2735,7 +2735,7 @@ function renderViewerActions(card, template, isSystemNote) {
     let actions = '';
 
     // Template-specific actions
-    if (templateName === 'bookmark' && card.url) {
+    if ((templateName === 'bookmark' || templateName === 'paper') && card.url) {
         actions += `<a href="${escapeHtml(card.url)}" target="_blank" class="btn btn-primary btn-small">Open ↗</a>`;
     }
     if (templateName === 'code') {
@@ -3488,6 +3488,7 @@ async function runViewerCode() {
 let editingCard = null;  // { templateName, sectionId, card, isNew }
 let editorManualThumbnail = null;  // For thumbnail field uploads
 let editorDraftKey = null;  // localStorage key for current editor draft
+let editorAutoFetchPromise = null;  // Pending auto-fetch promise (awaited by saveEditor)
 
 // ---- Editor Draft Auto-Save ----
 // Saves editor field values to localStorage so accidental close/refresh doesn't lose work.
@@ -4065,6 +4066,11 @@ async function openEditor(templateName, sectionId, card = null) {
 
     // Initialize thumbnail upload if present
     initEditorThumbnailUpload();
+
+    // Attach auto-fetch blur handler to URL fields with data-auto-fetch
+    bodyEl.querySelectorAll('input[data-auto-fetch="true"]').forEach(input => {
+        input.addEventListener('blur', () => handleEditorAutoFetch(input));
+    });
 
     // Settings auto-apply: attach listeners so changes take effect immediately
     if (templateName === 'settings') {
@@ -5952,6 +5958,96 @@ function getEditorFieldValue(fieldName, fieldDef, fieldConfig) {
     return el.value;
 }
 
+// Handle auto-fetch when a URL field with data-auto-fetch loses focus
+// Calls fetchMetadata on the card type module if available, then populates empty editor fields
+function handleEditorAutoFetch(inputEl) {
+    const url = inputEl.value.trim();
+    if (!url) return;
+
+    const templateName = editingCard?.templateName;
+    if (!templateName) return;
+
+    const module = cardTypeModules[templateName];
+    if (!module?.fetchMetadata) return;
+
+    // Avoid re-fetching the same URL
+    if (inputEl.dataset.lastFetched === url) return;
+
+    // Track the promise so saveEditor can await it
+    editorAutoFetchPromise = _doAutoFetch(inputEl, url, module, templateName);
+}
+
+// Perform the actual async auto-fetch and populate editor fields
+async function _doAutoFetch(inputEl, url, module, templateName) {
+    // Show loading state on the URL input
+    inputEl.classList.add('auto-fetching');
+    const submitBtn = document.getElementById('editorSubmitBtn');
+    const originalText = submitBtn?.textContent;
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="loading-spinner"></span> Fetching metadata...';
+    }
+
+    try {
+        const metadata = await module.fetchMetadata(url);
+        if (!metadata) return;
+
+        inputEl.dataset.lastFetched = url;
+
+        // If fetchMetadata normalized the URL, update the URL field
+        if (metadata.url && metadata.url !== url) {
+            inputEl.value = metadata.url;
+        }
+
+        // Populate empty editor fields from metadata
+        for (const [key, value] of Object.entries(metadata)) {
+            if (key === 'url' || !value) continue;
+
+            // List fields (e.g., authors)
+            const listContainer = document.getElementById(`editor-${key}`);
+            if (listContainer && listContainer.classList.contains('list-editor')) {
+                // Only populate if list is empty
+                if (listContainer.children.length === 0 && Array.isArray(value)) {
+                    const allowDelete = listContainer.getAttribute('data-allow-delete') === 'true';
+                    value.forEach((item, idx) => {
+                        const row = createListEditorItem(key, item, idx, allowDelete);
+                        listContainer.appendChild(row);
+                    });
+                }
+                continue;
+            }
+
+            // CodeMirror fields (e.g., content/notes)
+            if (codeMirrorInstances[key]) {
+                const cm = codeMirrorInstances[key];
+                // Only populate if empty
+                const currentContent = cm.state.doc.toString();
+                if (!currentContent.trim()) {
+                    cm.dispatch({ changes: { from: 0, to: cm.state.doc.length, insert: value } });
+                }
+                continue;
+            }
+
+            // Standard input fields (title, year, etc.)
+            const input = document.getElementById(`editor-${key}`);
+            if (input && !input.value.trim()) {
+                input.value = typeof value === 'string' ? value : String(value);
+            }
+        }
+
+        showToast('Metadata fetched', 'success');
+    } catch (e) {
+        console.warn('[Editor] Auto-fetch failed:', e);
+    } finally {
+        inputEl.classList.remove('auto-fetching');
+        editorAutoFetchPromise = null;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    }
+}
+
 // Initialize thumbnail drag-drop for editor
 function initEditorThumbnailUpload() {
     const previewEl = document.getElementById('editorThumbnailPreview');
@@ -6088,6 +6184,7 @@ function closeEditor() {
     document.getElementById('editorCodeOutput').innerHTML = '';
     editingCard = null;
     editorManualThumbnail = null;
+    editorAutoFetchPromise = null;
     editorDraftKey = null;
     codeMirrorOnChange = null;
 
@@ -6114,6 +6211,11 @@ async function saveEditor() {
         const shouldSave = await promptSaveToFolder();
         if (!shouldSave) return;
         // After saving to folder, continue with the edit save (now in filesystem mode)
+    }
+
+    // Wait for any pending auto-fetch to complete before validating
+    if (editorAutoFetchPromise) {
+        await editorAutoFetchPromise;
     }
 
     const { templateName, sectionId, card, isNew } = editingCard;
@@ -7819,21 +7921,23 @@ async function loadFromFilesystem() {
 
                     const { content, lastModified, size } = await storageBackend.readFile(filePath);
 
-                    // Special handling for bookmarks: load thumbnail from assets
+                    // Special handling for cards with thumbnails: load from assets
                     if (filename.endsWith('.bookmark.json')) {
                         try {
+                            let thumbnailRef = null;
                             const bookmarkData = JSON.parse(content);
-                            if (bookmarkData.thumbnail && !bookmarkData.thumbnail.startsWith('data:')) {
+                            thumbnailRef = bookmarkData.thumbnail;
+                            if (thumbnailRef && !thumbnailRef.startsWith('data:')) {
                                 try {
-                                    const thumbFilename = bookmarkData.thumbnail.split('/').pop();
+                                    const thumbFilename = thumbnailRef.split('/').pop();
                                     const { dataUrl } = await storageBackend.readFileAsDataUrl(`assets/thumbnails/${thumbFilename}`);
                                     companionData.thumbnail = dataUrl;
                                 } catch (e) {
-                                    console.warn(`[Filesystem] Could not load thumbnail ${bookmarkData.thumbnail}:`, e);
+                                    console.warn(`[Filesystem] Could not load thumbnail ${thumbnailRef}:`, e);
                                 }
                             }
                         } catch (e) {
-                            // JSON parse error, will be caught below
+                            // Parse error, will be caught below
                         }
                     }
 
@@ -8338,8 +8442,9 @@ async function saveCardFile(sectionId, card) {
         baseFilename = slugify(card.title);
     }
 
-    // Special handling for bookmarks: save thumbnail to assets folder
-    if ((card.type === 'bookmark' || card.template === 'bookmark') && card.thumbnail && card.thumbnail.startsWith('data:')) {
+    // Special handling for cards with thumbnails: save thumbnail to assets folder
+    const cardTemplate = card.template || card.type;
+    if (cardTemplate === 'bookmark' && card.thumbnail && card.thumbnail.startsWith('data:')) {
         const thumbFilename = `${card.id || baseFilename}.png`;
         const depth = sectionPath.split('/').length;
         const thumbnailPath = '../'.repeat(depth) + `assets/thumbnails/${thumbFilename}`;
@@ -8351,9 +8456,9 @@ async function saveCardFile(sectionId, card) {
             await storageBackend.writeFile(`assets/thumbnails/${thumbFilename}`, await blob.arrayBuffer());
             recordSave(`assets/thumbnails/${thumbFilename}`);
 
-            const bookmarkJson = JSON.parse(content);
-            bookmarkJson.thumbnail = thumbnailPath;
-            const updatedContent = JSON.stringify(bookmarkJson, null, 2);
+            // Re-serialize card with thumbnail path instead of data URL
+            const cardCopy = { ...card, thumbnail: thumbnailPath };
+            const { content: updatedContent } = serializeCard(cardCopy);
 
             const filename = `${baseFilename}${extension}`;
             await storageBackend.writeFile(`${sectionPath}/${filename}`, updatedContent);
@@ -11258,6 +11363,7 @@ document.addEventListener('keydown', (e) => {
             document.getElementById('editorCodeOutput').innerHTML = '';
             editingCard = null;
             editorManualThumbnail = null;
+            editorAutoFetchPromise = null;
             editorDraftKey = null;
             codeMirrorOnChange = null;
             openViewer(sectionId, cardId);

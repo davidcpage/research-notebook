@@ -1,0 +1,63 @@
+name: paper
+description: Academic paper with metadata, abstract, and reading notes
+schema:
+  title:
+    type: text
+    required: true
+  url:
+    type: url
+    required: true
+  authors:
+    type: list
+    item_type: text
+  year:
+    type: text
+  abstract:
+    type: markdown
+  content:
+    type: markdown
+  author:
+    type: text
+  tags:
+    type: list
+  created:
+    type: datetime
+  modified:
+    type: datetime
+card:
+  layout: document
+  placeholder: "📄"
+  title_link_field: url
+viewer:
+  layout: paper
+editor:
+  fields:
+    - field: url
+      label: URL
+      auto_fetch: true
+    - field: title
+      label: Title
+    - field: authors
+      label: Authors
+    - field: year
+      label: Year
+      width: quarter
+    - field: abstract
+      label: Abstract
+      multiline: true
+      rows: 6
+    - field: content
+      label: Notes
+      multiline: true
+      rows: 16
+      preview: true
+    - field: author
+      label: Author
+ui:
+  button_label: Paper
+  icon: "📄"
+  sort_order: 4
+extensions:
+  ".paper.md":
+    parser: yaml-frontmatter
+    bodyField: content

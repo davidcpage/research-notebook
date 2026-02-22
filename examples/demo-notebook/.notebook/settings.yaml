@@ -21,5 +21,8 @@ enabled_templates:
   - code
   - lesson
   - note
-quiz_template_mode: false
+quiz_template_mode: null
+source_cards_editable: null
+preserve_dir_names: false
+compact_cards: false
 grading: null

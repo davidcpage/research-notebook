@@ -1,7 +1,16 @@
+---
+id: card-type-modulesmd-1770642838529
+title: card-type-modules.md
+modified: "2026-02-09T13:14:29.972Z"
+sectionId: section-planning
+template: note
+author: 
+---
+
 # Self-Contained Card Type Modules (dp-092)
 
 *Design document for extracting card types into modular folders*
-
+ 
 ## Goal
 
 Extract card types into self-contained module folders (`template.yaml` + `styles.css` + optional `index.js`) to create a clear framework/extension boundary.
