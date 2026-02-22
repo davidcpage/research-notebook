@@ -439,7 +439,7 @@ nb create note "Title" section/ # Create card with correct frontmatter
 ---
 id: unique-id
 title: Note Title
-author: Claude
+created_by: Claude
 created: 2024-12-08T09:00:00Z
 modified: 2024-12-08T09:00:00Z
 ---
@@ -471,7 +471,7 @@ Your markdown content here...
 # ---
 # id: code-example
 # title: Plot Example
-# author: Claude
+# created_by: Claude
 # created: 2024-12-08T09:00:00Z
 # modified: 2024-12-08T09:00:00Z
 # ---
@@ -485,11 +485,14 @@ plt.title('Sine Wave')
 # Don't call plt.show() or plt.close() - app auto-captures
 ```
 
-### Author Field and Author Icons
-Note and code cards support an `author` field to track who created them:
-- Badge appears in top-right corner of the content area (on the markdown/code preview)
-- Set `default_author` in Settings to auto-populate author for new cards created in the UI
-- When creating cards via files, include `author` in frontmatter (see examples above)
+### Created By Field and Author Icons
+All card types support a `created_by` field to track who created them:
+- Stored as a comma-separated list (array in data, e.g., `created_by: [Claude, David]`)
+- Badge appears in top-right corner of the content area (shows first author with an icon)
+- Set `default_author` in Settings to auto-populate `created_by` for new cards created in the UI
+- When creating cards via files, include `created_by` in frontmatter (see examples above)
+- Legacy `author` field is auto-migrated to `created_by` on load
+- In the editor, `created_by` appears in a collapsible "Details" section along with tags and number
 
 **Author icons are configured in `.notebook/settings.yaml`:**
 ```yaml

@@ -4,8 +4,6 @@ schema:
   title:
     type: text
     required: true
-  author:
-    type: text
   code:
     type: code
     language: python
@@ -40,8 +38,6 @@ editor:
   fields:
     - field: title
       label: Title
-    - field: author
-      label: Author
     - field: code
       label: Code
       multiline: true

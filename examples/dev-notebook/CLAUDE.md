@@ -36,7 +36,7 @@ dev-notebook/
 ---
 id: 1735200000000
 title: API Design Notes
-author: Claude
+created_by: Claude
 created: 2024-12-26T10:00:00Z
 modified: 2024-12-26T10:00:00Z
 tags: [architecture, api]
@@ -51,7 +51,7 @@ tags: [architecture, api]
 # ---
 # id: 1735200000001
 # title: Example Implementation
-# author: Claude
+# created_by: Claude
 # created: 2024-12-26T10:00:00Z
 # modified: 2024-12-26T10:00:00Z
 # ---

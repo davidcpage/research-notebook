@@ -8,18 +8,13 @@ schema:
     type: url
     required: true
   authors:
-    type: list
-    item_type: text
+    type: commalist
   year:
     type: text
   abstract:
     type: markdown
   content:
     type: markdown
-  author:
-    type: text
-  tags:
-    type: list
   created:
     type: datetime
   modified:
@@ -51,8 +46,6 @@ editor:
       multiline: true
       rows: 16
       preview: true
-    - field: author
-      label: Author
 ui:
   button_label: Paper
   icon: "📄"

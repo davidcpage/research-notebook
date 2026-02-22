@@ -1832,6 +1832,12 @@ function loadCard(filename, content, sectionName, companionData = {}) {
         frontmatter._filename = filename.replace('.bookmark.json', '');
     }
 
+    // Migrate legacy 'author' field to 'created_by' (array)
+    if (frontmatter.author && !frontmatter.created_by) {
+        frontmatter.created_by = [frontmatter.author];
+        delete frontmatter.author;
+    }
+
     return frontmatter;
 }
 
@@ -1918,12 +1924,21 @@ function serializeCard(card) {
 // Template-driven card rendering that replaces type-specific renderers
 
 // Render author badge using authorRegistry (loaded from settings.yaml)
+// Supports created_by as string or array (commalist)
 function renderAuthorBadge(card) {
-    if (!card.author) return '';
-    const authorKey = card.author.toLowerCase();
-    const iconSvg = authorRegistry[authorKey];
-    if (iconSvg) {
-        return `<div class="author-badge" title="Authored by ${escapeHtml(card.author)}">${iconSvg}</div>`;
+    const creators = card.created_by;
+    if (!creators) return '';
+    const list = Array.isArray(creators) ? creators : [creators];
+    if (list.length === 0) return '';
+    // Show badge for first creator that has an icon
+    for (const name of list) {
+        const iconSvg = authorRegistry[String(name).toLowerCase()];
+        if (iconSvg) {
+            const title = list.length > 1
+                ? `Created by ${list.join(', ')}`
+                : `Created by ${name}`;
+            return `<div class="author-badge" title="${escapeHtml(title)}">${iconSvg}</div>`;
+        }
     }
     return '';
 }
@@ -3537,6 +3552,8 @@ function saveEditorDraft() {
         }
 
         // Universal fields
+        const createdByInput = document.getElementById('editorCreatedBy');
+        if (createdByInput) draft._createdBy = createdByInput.value;
         const tagsInput = document.getElementById('editorTags');
         if (tagsInput) draft._tags = tagsInput.value;
         const numberInput = document.getElementById('editorNumber');
@@ -3585,6 +3602,9 @@ function applyDraftToCard(card, template) {
             merged[fieldName] = draft[fieldName];
         }
     }
+    if (draft._createdBy !== undefined && draft._createdBy.trim()) {
+        merged.created_by = draft._createdBy.split(',').map(s => s.trim()).filter(s => s);
+    }
     if (draft._tags !== undefined && draft._tags.trim()) {
         merged.tags = draft._tags.split(',').map(t => t.trim()).filter(t => t);
     }
@@ -3629,6 +3649,10 @@ function applyDraftToEditor(draft, template) {
     }
 
     // Universal fields
+    if (draft._createdBy !== undefined) {
+        const createdByInput = document.getElementById('editorCreatedBy');
+        if (createdByInput) createdByInput.value = draft._createdBy;
+    }
     if (draft._tags !== undefined) {
         const tagsInput = document.getElementById('editorTags');
         if (tagsInput) tagsInput.value = draft._tags;
@@ -3677,6 +3701,8 @@ function attachEditorDraftAutoSave(template) {
     }
 
     // Universal fields
+    const createdByInput = document.getElementById('editorCreatedBy');
+    if (createdByInput) createdByInput.addEventListener('input', debouncedSave);
     const tagsInput = document.getElementById('editorTags');
     if (tagsInput) tagsInput.addEventListener('input', debouncedSave);
     const numberInput = document.getElementById('editorNumber');
@@ -3944,30 +3970,57 @@ async function openEditor(templateName, sectionId, card = null) {
         bodyEl.appendChild(fieldEl);
     }
 
-    // Universal tags and order fields (for all card types except system cards)
+    // Universal fields in collapsible Details section (for all card types except system cards)
     if (!['settings', 'template'].includes(templateName)) {
+        // Compute values to determine if details should be open
+        const createdByRaw = card?.created_by || card?.author;
+        const createdByValue = Array.isArray(createdByRaw) ? createdByRaw.join(', ') : (createdByRaw || '');
+        const tagsValue = normalizeTags(card?.tags).join(', ');
+        const numberValue = card?.number ?? '';
+        const hasValues = createdByValue || tagsValue || numberValue;
+
+        const details = document.createElement('details');
+        details.className = 'editor-details';
+        if (hasValues) details.setAttribute('open', '');
+        details.innerHTML = `<summary>Details</summary>`;
+
+        const detailsBody = document.createElement('div');
+        detailsBody.className = 'editor-details-body';
+
+        // Created by field
+        const createdByGroup = document.createElement('div');
+        createdByGroup.className = 'form-group';
+        createdByGroup.innerHTML = `
+            <label for="editorCreatedBy">Created by</label>
+            <input type="text" id="editorCreatedBy" value="${escapeHtml(createdByValue)}" placeholder="e.g., Claude, David">
+            <span class="field-hint">Comma-separated. Matches author icons from settings.</span>
+        `;
+        detailsBody.appendChild(createdByGroup);
+
+        // Tags field
         const tagsGroup = document.createElement('div');
         tagsGroup.className = 'form-group';
-        const tagsValue = normalizeTags(card?.tags).join(', ');
         tagsGroup.innerHTML = `
             <label for="editorTags">Tags</label>
             <input type="text" id="editorTags" value="${escapeHtml(tagsValue)}" placeholder="e.g., ongoing, feature, architecture">
             <span class="field-hint">Comma-separated. Status tags (completed, ongoing, future) get traffic light colors.</span>
         `;
-        bodyEl.appendChild(tagsGroup);
+        detailsBody.appendChild(tagsGroup);
 
         // Number field (for explicit sorting) - skip if template has its own 'number' field (like lesson)
         if (!template.schema?.number) {
             const numberGroup = document.createElement('div');
             numberGroup.className = 'form-group form-group-quarter';
-            const numberValue = card?.number ?? '';
             numberGroup.innerHTML = `
                 <label for="editorNumber">Number</label>
                 <input type="text" id="editorNumber" value="${escapeHtml(String(numberValue))}" placeholder="e.g., 1.2">
                 <span class="field-hint">Sort position (1, 1.1, 2.0)</span>
             `;
-            bodyEl.appendChild(numberGroup);
+            detailsBody.appendChild(numberGroup);
         }
+
+        details.appendChild(detailsBody);
+        bodyEl.appendChild(details);
     }
 
     // Handle output display for code templates
@@ -4274,6 +4327,14 @@ function renderEditorField(fieldConfig, fieldDef, value) {
             option.selected = opt === value;
             inputEl.appendChild(option);
         });
+        div.appendChild(inputEl);
+    } else if (type === 'commalist') {
+        // Comma-separated list (stored as array, edited as text)
+        inputEl = document.createElement('input');
+        inputEl.type = 'text';
+        inputEl.id = `editor-${field}`;
+        inputEl.placeholder = label;
+        inputEl.value = Array.isArray(value) ? value.join(', ') : (value || '');
         div.appendChild(inputEl);
     } else if (type === 'list') {
         // List editor with reorderable items
@@ -5902,6 +5963,9 @@ function getEditorFieldValue(fieldName, fieldDef, fieldConfig) {
             showToast('Invalid YAML: ' + e.message, true);
             return null;
         }
+    } else if (type === 'commalist') {
+        // Parse comma-separated text into array
+        return el.value ? el.value.split(',').map(s => s.trim()).filter(Boolean) : [];
     } else if (type === 'list') {
         // Collect values from list editor items in order
         const values = [];
@@ -6269,6 +6333,19 @@ async function saveEditor() {
         }
     }
 
+    // Parse created_by from universal field
+    const createdByInput = document.getElementById('editorCreatedBy');
+    if (createdByInput) {
+        const createdByValue = createdByInput.value.trim();
+        if (createdByValue) {
+            cardData.created_by = createdByValue.split(',').map(s => s.trim()).filter(s => s);
+        } else {
+            delete cardData.created_by;
+        }
+        // Remove legacy author field if present
+        delete cardData.author;
+    }
+
     // Use stored location path (computed in openEditor, not editable by user)
     cardData._path = editingCard.locationPath || card._path;
 
@@ -6277,8 +6354,8 @@ async function saveEditor() {
     if (isNew) {
         cardData.created = now;
         // Apply default author for new cards if not already set
-        if (!cardData.author && notebookSettings?.default_author) {
-            cardData.author = notebookSettings.default_author;
+        if (!cardData.created_by && notebookSettings?.default_author) {
+            cardData.created_by = [notebookSettings.default_author];
         }
     }
     cardData.modified = now;

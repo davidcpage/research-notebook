@@ -4,8 +4,6 @@ schema:
   title:
     type: text
     required: true
-  author:
-    type: text
   topic:
     type: text
     description: Subject area for progress tracking
@@ -171,9 +169,6 @@ editor:
   fields:
     - field: title
       label: Title
-    - field: author
-      label: Author
-      width: half
     - field: topic
       label: Topic
       width: half

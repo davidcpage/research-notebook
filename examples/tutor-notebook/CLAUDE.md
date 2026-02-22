@@ -111,7 +111,7 @@ Use markdown files for explanations, lessons, and reference material:
 ---
 id: unique-id
 title: Introduction to Fractions
-author: Claude
+created_by: Claude
 created: 2025-12-26T10:00:00Z
 modified: 2025-12-26T10:00:00Z
 tags: [math, fractions, beginner]
@@ -135,7 +135,7 @@ Use Python code cells for interactive examples:
 # ---
 # id: unique-id
 # title: Calculating Percentages
-# author: Claude
+# created_by: Claude
 # created: 2025-12-26T10:00:00Z
 # modified: 2025-12-26T10:00:00Z
 # ---

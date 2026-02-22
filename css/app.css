@@ -2228,6 +2228,37 @@ body.diff-mode-active .section:not(:has(.card.has-changes)) {
     line-height: 1.6;
 }
 
+/* Collapsible details section in editor */
+.editor-details {
+    margin-top: 0.5rem;
+    margin-bottom: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+
+.editor-details summary {
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    user-select: none;
+}
+
+.editor-details summary:hover {
+    color: var(--text-secondary);
+}
+
+.editor-details-body {
+    padding: 0 0.75rem 0.5rem;
+}
+
+.editor-details-body .form-group {
+    margin-bottom: 0.75rem;
+}
+
 .form-hint {
     font-size: 0.75rem;
     color: var(--text-muted);

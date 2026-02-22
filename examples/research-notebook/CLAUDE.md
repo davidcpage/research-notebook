@@ -36,7 +36,7 @@ research-notebook/
 ---
 id: 1735200000000
 title: Paper Summary - Smith 2024
-author: Your Name
+created_by: Your Name
 created: 2024-12-26T10:00:00Z
 modified: 2024-12-26T10:00:00Z
 tags: [paper, machine-learning]
@@ -51,7 +51,7 @@ tags: [paper, machine-learning]
 # ---
 # id: 1735200000001
 # title: Data Analysis
-# author: Your Name
+# created_by: Your Name
 # created: 2024-12-26T10:00:00Z
 # modified: 2024-12-26T10:00:00Z
 # ---
