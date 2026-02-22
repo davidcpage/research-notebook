@@ -739,18 +739,23 @@ body.compact-cards .section-toggle {
 
 /* Markdown editor: taller, more writing-focused layout */
 .codemirror-container.markdown-editor {
-    min-height: 50vh;
-    max-height: 60vh;
+    height: 60vh;
+    max-height: none;
 }
 
 .codemirror-container.markdown-editor .cm-editor {
-    min-height: 50vh;
-    max-height: 60vh;
+    height: 100%;
+    min-height: none;
+    max-height: none;
 }
 
 .codemirror-container .cm-scroller {
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     line-height: 1.5;
+}
+
+.codemirror-container.markdown-editor .cm-scroller {
+    line-height: 1.4;
 }
 
 .code-output {
@@ -2082,7 +2087,6 @@ body.diff-mode-active .section:not(:has(.card.has-changes)) {
     z-index: 1000;
     opacity: 0;
     visibility: hidden;
-    transition: all 0.3s ease;
     backdrop-filter: blur(4px);
 }
 
@@ -2098,12 +2102,6 @@ body.diff-mode-active .section:not(:has(.card.has-changes)) {
     max-width: 500px;
     max-height: 90vh;
     overflow-y: auto;
-    transform: translateY(20px);
-    transition: transform 0.3s ease;
-}
-
-.modal-overlay.active .modal {
-    transform: translateY(0);
 }
 
 .modal-large {
@@ -2769,52 +2767,6 @@ body.diff-mode-active .section:not(:has(.card.has-changes)) {
 
 .remote-banner .btn {
     flex-shrink: 0;
-}
-
-/* Tab switcher for note editor */
-.editor-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 1rem;
-}
-
-.editor-tab {
-    padding: 0.5rem 1rem;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    transition: all 0.2s;
-}
-
-.editor-tab:hover {
-    color: var(--text-primary);
-}
-
-.editor-tab.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-}
-
-.editor-preview {
-    display: none;
-    padding: 1rem;
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    min-height: 300px;
-    max-height: 60vh;
-    overflow-y: auto;
-    line-height: 1.7;
-}
-
-.editor-preview.active {
-    display: block;
-}
-
-.editor-preview .katex-display {
-    margin: 1rem 0;
 }
 
 @media (max-width: 768px) {

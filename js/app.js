@@ -4101,16 +4101,7 @@ function renderEditorField(fieldConfig, fieldDef, value) {
         }
         div.appendChild(thumbnailDiv);
     } else if (type === 'markdown' && preview) {
-        // Markdown with preview tabs and CodeMirror editor
-        const tabsDiv = document.createElement('div');
-        tabsDiv.className = 'editor-tabs';
-        tabsDiv.innerHTML = `
-            <button type="button" class="editor-tab active" onclick="switchEditorTab('write')">Write</button>
-            <button type="button" class="editor-tab" onclick="switchEditorTab('preview')">Preview</button>
-        `;
-        div.appendChild(tabsDiv);
-
-        // CodeMirror container for markdown editing
+        // Markdown editor with CodeMirror (preview via Cmd+E to viewer modal)
         const editorContainer = document.createElement('div');
         editorContainer.id = `editor-${field}`;
         editorContainer.className = 'codemirror-container markdown-editor';
@@ -4128,16 +4119,6 @@ function renderEditorField(fieldConfig, fieldDef, value) {
             // Fallback to textarea
             editorContainer.innerHTML = `<textarea class="markdown-editor-fallback" style="width:100%;height:300px;">${escapeHtml(value || '')}</textarea>`;
         });
-
-        const previewDiv = document.createElement('div');
-        previewDiv.id = 'editorPreview';
-        previewDiv.className = 'editor-preview md-content';
-        div.appendChild(previewDiv);
-
-        const hint = document.createElement('p');
-        hint.className = 'form-hint';
-        hint.textContent = 'Supports Markdown and LaTeX ($inline$, $$display$$). Link with [[Title]] or [[id:xyz]]';
-        div.appendChild(hint);
     } else if (type === 'yaml') {
         // YAML editor with CodeMirror
         // Convert object to YAML string for editing
@@ -5950,48 +5931,6 @@ function getEditorFieldValue(fieldName, fieldDef, fieldConfig) {
     return el.value;
 }
 
-// Switch between write/preview tabs
-function switchEditorTab(tab) {
-    const tabs = document.querySelectorAll('#editorBody .editor-tab');
-    const editorContainer = document.querySelector('#editorBody .codemirror-container.markdown-editor');
-    const fallbackTextarea = document.querySelector('#editorBody textarea.markdown-editor-fallback');
-    const preview = document.getElementById('editorPreview');
-
-    // Get the editor element (CodeMirror container or fallback textarea)
-    const editorEl = editorContainer || fallbackTextarea;
-    if (!editorEl || !preview) return;
-
-    tabs.forEach(t => t.classList.remove('active'));
-    event.target.classList.add('active');
-
-    if (tab === 'preview') {
-        editorEl.style.display = 'none';
-        preview.style.display = 'block';
-        preview.classList.add('active');
-
-        // Render markdown preview - get content from CodeMirror or fallback textarea
-        let content;
-        if (editorContainer && codeMirrorInstances['content']) {
-            content = getCodeMirrorValue('content');
-        } else if (fallbackTextarea) {
-            content = fallbackTextarea.value;
-        } else {
-            content = '';
-        }
-
-        const format = editingCard.card.format || 'markdown';
-        if (format === 'markdown') {
-            preview.innerHTML = renderMarkdownWithLinks(content, editingCard.card._path);
-        } else {
-            preview.innerHTML = `<pre>${escapeHtml(content)}</pre>`;
-        }
-    } else {
-        editorEl.style.display = 'block';
-        preview.style.display = 'none';
-        preview.classList.remove('active');
-    }
-}
-
 // Initialize thumbnail drag-drop for editor
 function initEditorThumbnailUpload() {
     const previewEl = document.getElementById('editorThumbnailPreview');
@@ -6115,6 +6054,8 @@ async function runEditorCode() {
 
 // Close the editor modal
 function closeEditor() {
+    const wasOpen = !!editingCard;
+
     // Clean up CodeMirror instances before clearing DOM
     destroyCodeMirrorInstances();
 
@@ -6130,7 +6071,7 @@ function closeEditor() {
     codeMirrorOnChange = null;
 
     // Re-render so card previews reflect any draft changes
-    render();
+    if (wasOpen) render();
 }
 
 // Save the editor content
@@ -11194,6 +11135,32 @@ document.addEventListener('keydown', (e) => {
         closeEditor();
         closeViewer();
         closeGitHubConnectModal();
+    }
+
+    // Cmd/Ctrl + E = Toggle between editor and viewer modals
+    if (e.key.toLowerCase() === 'e' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        const editorOpen = document.getElementById('editorModal').classList.contains('active');
+        const viewerOpen = document.getElementById('viewerModal').classList.contains('active');
+        if (editorOpen && editingCard && !editingCard.isNew) {
+            e.preventDefault();
+            const sectionId = editingCard.sectionId;
+            const cardId = editingCard.card.id;
+            // Close editor without render() — viewer opens immediately
+            destroyCodeMirrorInstances();
+            document.getElementById('editorModal').classList.remove('active');
+            document.getElementById('editorBody').innerHTML = '';
+            document.getElementById('editorActions').innerHTML = '';
+            document.getElementById('editorOutput').style.display = 'none';
+            document.getElementById('editorCodeOutput').innerHTML = '';
+            editingCard = null;
+            editorManualThumbnail = null;
+            editorDraftKey = null;
+            codeMirrorOnChange = null;
+            openViewer(sectionId, cardId);
+        } else if (viewerOpen && currentViewingCard) {
+            e.preventDefault();
+            editViewerCard();
+        }
     }
 
     // Skip shortcuts if typing in an input/textarea
