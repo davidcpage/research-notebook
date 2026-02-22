@@ -4131,7 +4131,7 @@ function renderEditorField(fieldConfig, fieldDef, value) {
 
         const previewDiv = document.createElement('div');
         previewDiv.id = 'editorPreview';
-        previewDiv.className = 'editor-preview';
+        previewDiv.className = 'editor-preview md-content';
         div.appendChild(previewDiv);
 
         const hint = document.createElement('p');

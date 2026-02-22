@@ -2813,14 +2813,6 @@ body.diff-mode-active .section:not(:has(.card.has-changes)) {
     display: block;
 }
 
-.editor-preview h1, .editor-preview h2, .editor-preview h3 {
-    font-family: 'Playfair Display', serif;
-}
-
-.editor-preview p {
-    margin-bottom: 1rem;
-}
-
 .editor-preview .katex-display {
     margin: 1rem 0;
 }
