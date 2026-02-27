@@ -417,6 +417,27 @@ const RESERVED_DIRECTORIES = new Set([
     'node_modules'
 ]);
 
+// Binary file extensions that should never be read as text
+// These get a placeholder file card with metadata only
+const BINARY_EXTENSIONS = new Set([
+    // Compiled / object files
+    '.pb', '.bin', '.exe', '.dll', '.so', '.dylib', '.o', '.a', '.obj', '.lib',
+    '.rlib', '.rmeta', '.pdb', '.class', '.pyc', '.pyd', '.pyo', '.wasm',
+    // Archives
+    '.zip', '.tar', '.gz', '.bz2', '.xz', '.7z', '.rar', '.jar', '.war', '.egg', '.whl',
+    // Documents (binary formats)
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+    // Databases
+    '.sqlite', '.db', '.mdb',
+    // Fonts
+    '.ttf', '.otf', '.woff', '.woff2', '.eot',
+    // Media (non-image — images handled separately)
+    '.mp3', '.mp4', '.wav', '.avi', '.mov', '.mkv', '.flac', '.ogg', '.webm',
+]);
+
+// Maximum file size (in bytes) to read as text. Larger files get a placeholder.
+const MAX_TEXT_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
+
 // Get the .notebook directory handle (creates if it doesn't exist when create=true)
 async function getNotebookConfigDir(dirHandle, create = false) {
     if (!dirHandle) return null;
@@ -1138,7 +1159,7 @@ const SETTINGS_SCHEMA = {
     sort_by: { default: 'modified' }, // Sort cards by: 'modified', 'title', 'created', 'filename'
     preserve_dir_names: { default: false }, // Show directory names as-is (default: Title Case)
     compact_cards: { default: false }, // Smaller cards for viewing large codebases
-    excluded_paths: { default: ['node_modules'] }, // Directory names to skip during scan
+    excluded_paths: { default: ['node_modules', 'target', 'dist', 'build', '__pycache__', 'venv', '.venv'] }, // Directory names to skip during scan
     grading: { default: null }            // Grading settings: { roster_path, show_student_names }
 };
 
@@ -6373,6 +6394,14 @@ class FileSystemBackend {
         return { content, lastModified: file.lastModified, size: file.size };
     }
 
+    // Get file metadata without reading content. Returns {lastModified, size}
+    async readFileMetadata(path) {
+        const { dir, name } = await this._resolvePath(path);
+        const fileHandle = await dir.getFileHandle(name);
+        const file = await fileHandle.getFile();
+        return { lastModified: file.lastModified, size: file.size };
+    }
+
     // Read a file as a data URL (for binary files like images). Returns {dataUrl, lastModified, size}
     async readFileAsDataUrl(path) {
         const { dir, name } = await this._resolvePath(path);
@@ -6670,6 +6699,12 @@ class GitHubBackend {
         const content = decodeBase64UTF8(data.content);
         await this._cachePut(path, data.sha, content, 'text');
         return { content, lastModified: null, size: data.size };
+    }
+
+    // Get file metadata without reading content. Returns {lastModified, size}
+    async readFileMetadata(path) {
+        const treeEntry = this._tree.get(path);
+        return { lastModified: null, size: treeEntry?.size ?? 0 };
     }
 
     // Read a file as a data URL (for binary files like images). Returns {dataUrl, lastModified, size}
@@ -7528,7 +7563,20 @@ async function loadFromFilesystem() {
             if (filename === 'theme.css') continue;
             if (filename.endsWith('.template.yaml')) continue;
 
+            // Skip binary files at root level
+            const rootFileExt = filename.match(/\.[^.]+$/)?.[0]?.toLowerCase() || '';
+            if (BINARY_EXTENSIONS.has(rootFileExt)) continue;
+
             try {
+                // Check file size before reading (skip oversized files at root)
+                try {
+                    const meta = await storageBackend.readFileMetadata(filename);
+                    if (meta.size > MAX_TEXT_FILE_SIZE) {
+                        console.log(`[Filesystem] Skipping large root file: ${filename} (${(meta.size / 1024 / 1024).toFixed(1)} MB)`);
+                        continue;
+                    }
+                } catch (e) { /* proceed if metadata check fails */ }
+
                 const { content, lastModified } = await storageBackend.readFile(filename);
 
                 // System files that need special handling (README.md, CLAUDE.md)
@@ -7710,6 +7758,62 @@ async function loadFromFilesystem() {
                         };
                         items.push(card);
                         console.log(`[Filesystem] Loaded image: ${subdirPath ? subdirPath + '/' : ''}${filename}`);
+                        continue;
+                    }
+
+                    // Check for binary extensions or oversized files — create placeholder without reading content
+                    const fileExt = filename.match(/\.[^.]+$/)?.[0]?.toLowerCase() || '';
+                    const isBinaryExt = BINARY_EXTENSIONS.has(fileExt);
+                    let skipContent = isBinaryExt;
+                    let fileMeta = null;
+
+                    if (!skipContent) {
+                        // For non-binary extensions, check file size before reading
+                        try {
+                            fileMeta = await storageBackend.readFileMetadata(filePath);
+                            if (fileMeta.size > MAX_TEXT_FILE_SIZE) {
+                                skipContent = true;
+                            }
+                        } catch (e) {
+                            // If metadata check fails, try reading normally
+                        }
+                    }
+
+                    if (skipContent) {
+                        // Get metadata if we don't have it yet (binary extension path)
+                        if (!fileMeta) {
+                            try { fileMeta = await storageBackend.readFileMetadata(filePath); } catch (e) { /* ignore */ }
+                        }
+                        const fileSize = fileMeta?.size ?? 0;
+                        const formatSize = (bytes) => {
+                            if (bytes < 1024) return bytes + ' B';
+                            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                        };
+                        const relativePath = subdirPath
+                            ? `${sectionDirName}/${subdirPath}/${filename}`
+                            : `${sectionDirName}/${filename}`;
+                        items.push({
+                            id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                            template: 'file',
+                            type: 'file',
+                            title: filename,
+                            path: relativePath,
+                            filesize: formatSize(fileSize),
+                            binary: true,
+                            content: (isBinaryExt ? 'Binary file' : 'File too large to preview') + (fileSize ? ` (${formatSize(fileSize)})` : ''),
+                            _path: subdirPath ? `${sectionDirName}/${subdirPath}` : sectionDirName,
+                            _source: {
+                                filename,
+                                format: 'binary',
+                                section: sectionDirName,
+                                subdir: subdirPath,
+                                extension: fileExt
+                            },
+                            _fileModified: fileMeta?.lastModified,
+                            modified: fileMeta?.lastModified ? new Date(fileMeta.lastModified).toISOString() : new Date().toISOString()
+                        });
+                        console.log(`[Filesystem] Skipped reading ${isBinaryExt ? 'binary' : 'large'} file: ${subdirPath ? subdirPath + '/' : ''}${filename} (${formatSize(fileSize)})`);
                         continue;
                     }
 

@@ -77,7 +77,13 @@ schema:
     type: list
     default:
       - node_modules
-    description: Directory names to skip when scanning (e.g., node_modules, __pycache__, dist)
+      - target
+      - dist
+      - build
+      - __pycache__
+      - venv
+      - .venv
+    description: Directory names to skip when scanning (e.g., node_modules, target, dist)
 card:
   layout: yaml
   placeholder: "⚙"
