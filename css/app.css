@@ -2294,6 +2294,50 @@ body.diff-mode-active .section:not(:has(.card.has-changes)) {
     cursor: wait;
 }
 
+/* Notebook Chooser */
+.notebook-chooser-list {
+    margin-bottom: 16px;
+}
+
+.notebook-chooser-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    margin-bottom: 6px;
+}
+
+.notebook-chooser-item:hover {
+    background: var(--bg-hover, rgba(0,0,0,0.04));
+    border-color: var(--accent);
+}
+
+.notebook-chooser-item .chooser-icon {
+    font-size: 1.4rem;
+    flex-shrink: 0;
+    width: 28px;
+    text-align: center;
+}
+
+.notebook-chooser-item .chooser-label {
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.notebook-chooser-item .chooser-sublabel {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.notebook-chooser-actions {
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+}
+
 /* List editor styles */
 .list-editor {
     display: flex;

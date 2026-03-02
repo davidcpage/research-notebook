@@ -10099,6 +10099,92 @@ async function refreshFromFilesystem() {
     }
 }
 
+// ========== SECTION: NOTEBOOK_CHOOSER ==========
+// Show saved notebooks and let user pick which to open
+
+// Show notebook chooser modal listing saved local folders and GitHub connections
+async function showNotebookChooser() {
+    const list = document.getElementById('notebookChooserList');
+    list.innerHTML = '';
+
+    // Local folder handles
+    const handles = await listNamedHandles();
+    for (const name of handles) {
+        const item = document.createElement('div');
+        item.className = 'notebook-chooser-item';
+        item.innerHTML = `<span class="chooser-icon">📁</span>
+            <div><div class="chooser-label">${escapeHtml(name)}</div>
+            <div class="chooser-sublabel">Local folder</div></div>`;
+        item.onclick = async () => {
+            const handle = await getNamedHandle(name);
+            if (!handle) {
+                showToast('⚠️ Could not find saved folder');
+                return;
+            }
+            const hasPermission = await verifyDirPermission(handle);
+            if (!hasPermission) {
+                showToast('⚠️ Permission denied for folder');
+                return;
+            }
+            closeNotebookChooser();
+            notebookDirHandle = handle;
+            storageBackend = new FileSystemBackend(handle);
+            filesystemLinked = true;
+            viewMode = 'filesystem';
+            history.replaceState(null, '', `?notebook=${encodeURIComponent(name)}`);
+            try {
+                data = await loadFromFilesystem();
+                await startWatchingFilesystem(handle);
+                restoreCollapsedSections();
+                restoreExpandedSubdirs();
+                restoreFocus();
+                render();
+            } catch (error) {
+                console.error('[Filesystem] Error loading folder:', error);
+                showToast('⚠️ Error loading notebook');
+            }
+        };
+        list.appendChild(item);
+    }
+
+    // GitHub connections
+    const ghConnections = getGitHubConnections();
+    for (const gh of ghConnections) {
+        const item = document.createElement('div');
+        item.className = 'notebook-chooser-item';
+        const label = `${escapeHtml(gh.owner)}/${escapeHtml(gh.repo)}`;
+        const branch = gh.branch ? ` (${escapeHtml(gh.branch)})` : '';
+        item.innerHTML = `<span class="chooser-icon">🐙</span>
+            <div><div class="chooser-label">${label}${branch}</div>
+            <div class="chooser-sublabel">GitHub</div></div>`;
+        item.onclick = async () => {
+            closeNotebookChooser();
+            showLoadingIndicator('Connecting to GitHub...');
+            try {
+                await connectToGitHub(gh);
+            } catch (error) {
+                console.error('[GitHub] Error connecting:', error);
+                showToast('⚠️ Error connecting to GitHub');
+            }
+            hideLoadingIndicator();
+        };
+        list.appendChild(item);
+    }
+
+    // Show/hide filesystem option based on support
+    const fsOption = document.getElementById('chooserFilesystemOption');
+    if (fsOption) {
+        fsOption.style.display = isFileSystemAccessSupported() ? '' : 'none';
+    }
+
+    document.getElementById('notebookChooserModal').classList.add('active');
+}
+
+// Close notebook chooser modal
+function closeNotebookChooser() {
+    document.getElementById('notebookChooserModal').classList.remove('active');
+}
+
 // ========== SECTION: ONBOARDING ==========
 // First-time setup flow for new notebooks
 
@@ -11575,75 +11661,19 @@ window.notebook = {
 // Default initialization flow (no URL params)
 async function initDefaultFlow() {
     // First, migrate any legacy handle to named registry
-    const migrated = await migrateLegacyHandle();
+    await migrateLegacyHandle();
 
-    // Try to restore last used notebook from named handles
+    // Check if there are any saved notebooks (local or GitHub)
     const handles = await listNamedHandles();
+    const ghConnections = getGitHubConnections();
 
-    if (handles.length > 0) {
-        // Try the migrated handle first, or first in list
-        const name = migrated?.name || handles[0];
-        const handle = await getNamedHandle(name);
-
-        if (handle) {
-            const hasPermission = await verifyDirPermission(handle);
-            if (hasPermission) {
-                notebookDirHandle = handle;
-                storageBackend = new FileSystemBackend(handle);
-                filesystemLinked = true;
-                viewMode = 'filesystem';
-
-                // Update URL to include notebook name
-                history.replaceState(null, '', `?notebook=${encodeURIComponent(name)}`);
-
-                // Load data from filesystem
-                try {
-                    data = await loadFromFilesystem();
-                    await startWatchingFilesystem(handle);
-
-                    // Restore UI state
-                    restoreCollapsedSections();
-                    restoreExpandedSubdirs();
-                    restoreFocus();
-                    render();
-                    return;
-                } catch (error) {
-                    console.error('[Filesystem] Error loading from saved folder:', error);
-                    showToast('⚠️ Error loading from linked folder');
-                }
-            }
-        }
+    if (handles.length > 0 || ghConnections.length > 0) {
+        // Show chooser so user can pick which notebook to open
+        await showNotebookChooser();
+    } else {
+        // No saved notebooks at all - show onboarding for first-time users
+        showOnboarding();
     }
-
-    // Fall back to legacy initFilesystem for backwards compatibility
-    await initFilesystem();
-
-    if (filesystemLinked) {
-        restoreCollapsedSections();
-        restoreExpandedSubdirs();
-        restoreFocus();
-        render();
-        return;
-    }
-
-    // Try restoring last GitHub connection before showing onboarding
-    const lastGH = getLastGitHubConnection();
-    if (lastGH && lastGH.token) {
-        try {
-            console.log(`[Init] Restoring GitHub connection: ${lastGH.owner}/${lastGH.repo}`);
-            showLoadingIndicator('Connecting to GitHub...');
-            await connectToGitHub(lastGH);
-            hideLoadingIndicator();
-            return;
-        } catch (error) {
-            console.error('[GitHub] Error restoring connection:', error);
-            hideLoadingIndicator();
-            // Fall through to onboarding
-        }
-    }
-
-    // No restorable notebook - show onboarding
-    showOnboarding();
 }
 
 // Initialize

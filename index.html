@@ -221,6 +221,28 @@
         </div>
     </div>
 
+    <!-- Notebook Chooser Modal -->
+    <div class="modal-overlay" id="notebookChooserModal">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Open Notebook</h2>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div id="notebookChooserList" class="notebook-chooser-list"></div>
+                <div class="notebook-chooser-actions">
+                    <div id="chooserFilesystemOption">
+                        <button class="btn btn-primary" onclick="closeNotebookChooser(); linkNotebookFolder().then(s => { if (s) render(); })" style="width: 100%; padding: 10px; font-size: 1rem;">
+                            Open Another Folder
+                        </button>
+                    </div>
+                    <button class="btn btn-secondary" onclick="closeNotebookChooser(); showGitHubConnectModal()" style="width: 100%; padding: 10px; font-size: 1rem; margin-top: 8px;">
+                        Connect to GitHub
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- GitHub Connect Modal -->
     <div class="modal-overlay" id="githubConnectModal">
         <div class="modal" style="max-width: 480px;">
